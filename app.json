@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Synesthesia",
+    "slug": "synesthesia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "synesthesia",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#090506",
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "O Synesthesia usa a câmera para detectar a vibe da cena e aplicar filtros em tempo real. Tudo processado no seu celular.",
+        "NSPhotoLibraryUsageDescription": "O Synesthesia salva suas capturas na galeria do dispositivo.",
+        "NSPhotoLibraryAddUsageDescription": "O Synesthesia salva suas capturas na galeria do dispositivo."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#090506",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O Synesthesia usa a câmera para detectar a vibe da cena e aplicar filtros em tempo real. Tudo processado no seu celular."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "O Synesthesia salva suas capturas na galeria do dispositivo.",
+          "savePhotosPermission": "O Synesthesia salva suas capturas na galeria do dispositivo."
+        }
+      ],
+      "expo-audio",
+      "expo-font",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

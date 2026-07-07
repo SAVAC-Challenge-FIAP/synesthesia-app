@@ -25,6 +25,31 @@ Este repositório é a evolução **mobile (Expo / React Native)** do MVP funcio
 2. **Fusão entre Atmosfera e Som** — imagem e música formam um único pacote sensorial no momento da captura.
 3. **Ciclo de Vida da Mídia** — galeria inteligente que preserva a intenção criativa: revisite, lapide e exporte.
 
+## 🚀 Como rodar (Expo Go)
+
+Pré-requisitos: Node 20+, celular com o app **Expo Go** ([Android](https://play.google.com/store/apps/details?id=host.exp.exponent) / [iOS](https://apps.apple.com/app/expo-go/id982107779)) na mesma rede Wi-Fi do computador.
+
+```bash
+npm install
+npx expo start
+```
+
+Escaneie o QR code exibido no terminal: no **Android**, pelo próprio app Expo Go; no **iOS**, pela câmera do sistema. Se a rede bloquear a conexão local (Wi-Fi corporativo/universidade), use `npx expo start --tunnel`.
+
+Chaves de API são **opcionais** (o Deezer não exige chave): copie `.env.example` para `.env` para habilitar a curadoria via Gemini.
+
+### ⚠️ Adaptações para Expo Go
+
+O Expo Go não carrega módulos nativos fora do SDK. Para validação imediata no celular, esta versão substitui parte da stack final por equivalentes compatíveis, mantendo os contratos da arquitetura:
+
+| Arquitetura final | Nesta versão (Expo Go) |
+|---|---|
+| `react-native-vision-camera` | `expo-camera` |
+| ML Kit (rotulagem de cena on-device) | Vibe simulada on-device (`src/services/vibeEngine.ts`) — mesmo contrato `detectVibe() → Vibe` |
+| Skia (shaders GPU) | Overlays + style `filter` do RN (GPU) |
+| `ffmpeg-kit` (vídeo .mp4 imagem+áudio) | Compartilha a imagem renderizada com filtro (`react-native-view-shot`) |
+| `expo-av` | `expo-audio` (sucessor oficial) |
+
 ## 🛠️ Stack
 
 `Expo` · `expo-router` · `TypeScript` · `react-native-vision-camera` · `react-native-skia` · `react-native-reanimated` · `react-native-mlkit-image-labeling` · `zustand` · `async-storage` · `@google/generative-ai` (Gemini) · `Deezer` · `Last.fm` · `expo-av` · `@gorhom/bottom-sheet` · `ffmpeg-kit-react-native` · `expo-media-library` · `expo-sharing`
@@ -44,6 +69,13 @@ Tipografia: **Syne** (display) + **DM Mono** (labels técnicas). Filtros: Vivid 
 
 ```
 .
+├── app/                          # Rotas (expo-router): permissões, câmera, galeria, ajustes
+├── src/
+│   ├── components/               # CaptureSheet, MusicSheet, PostSheet, FilterCarousel, player...
+│   ├── constants/                # 8 filtros + vibes
+│   ├── services/                 # vibeEngine (contexto), music (Gemini/Deezer), mediaStorage
+│   ├── stores/                   # zustand: ajustes, galeria, sessão de captura
+│   └── theme/                    # Design tokens (ruby/amber/ink/parchment, Syne + DM Mono)
 ├── CLAUDE.md                     # Guia para agentes de código
 ├── docs/                         # Documentos-fonte (requisitos + arquitetura)
 ├── specs/001-synesthesia-mvp/    # Especificação (Spec Kit)
