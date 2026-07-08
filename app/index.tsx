@@ -1,38 +1,50 @@
 import { useCameraPermissions } from 'expo-camera';
-import * as MediaLibrary from 'expo-media-library';
 import { Redirect, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  checkSystemGalleryPermission,
+  requestSystemGalleryPermission,
+  SystemGalleryPermission,
+} from '@/services/systemGallery';
 import { colors, fonts, radii } from '@/theme/tokens';
 
 /**
  * Onboarding de permissões (US01/FR-009): justificativa clara + ênfase no
  * processamento local (LGPD) antes de pedir câmera e galeria.
+ *
+ * A galeria do sistema é best-effort: no Expo Go o expo-media-library rejeita
+ * toda chamada ('unavailable') e a exportação degrada — só a câmera bloqueia.
  */
 export default function PermissionsScreen() {
   const router = useRouter();
   const [cameraPerm, requestCamera] = useCameraPermissions();
-  // Só fotos: o app não acessa mídia de áudio/vídeo. Evita a permissão AUDIO
-  // (que exige READ_MEDIA_AUDIO no manifest e é rejeitada no Expo Go).
-  const [mediaPerm, requestMedia] = MediaLibrary.usePermissions({
-    granularPermissions: ['photo'],
-  });
+  const [mediaStatus, setMediaStatus] = useState<SystemGalleryPermission | null>(null);
   const [negado, setNegado] = useState(false);
 
-  // Android 14+ pode conceder acesso "limitado" (usuário escolhe algumas fotos):
-  // isso é suficiente para salvar/compartilhar, então contamos como liberado.
-  const mediaOk = (p: MediaLibrary.PermissionResponse | null): boolean =>
-    !!p && (p.granted || p.accessPrivileges === 'limited');
+  useEffect(() => {
+    checkSystemGalleryPermission().then(setMediaStatus);
+  }, []);
 
-  if (cameraPerm?.granted && mediaOk(mediaPerm)) {
+  const mediaOk = (s: SystemGalleryPermission | null): boolean =>
+    s === 'granted' || s === 'unavailable';
+
+  // Segura o splash escuro enquanto os dois estados carregam, para decidir
+  // uma única vez entre redirecionar e mostrar o onboarding (sem flash)
+  if (!cameraPerm || mediaStatus === null) {
+    return <View style={styles.root} />;
+  }
+
+  if (cameraPerm.granted && mediaOk(mediaStatus)) {
     return <Redirect href="/camera" />;
   }
 
   const permitirTudo = async () => {
     const cam = cameraPerm?.granted ? cameraPerm : await requestCamera();
-    const med = mediaOk(mediaPerm) ? mediaPerm : await requestMedia();
+    const med = mediaOk(mediaStatus) ? mediaStatus : await requestSystemGalleryPermission();
+    setMediaStatus(med);
     if (cam?.granted && mediaOk(med)) {
       router.replace('/camera');
     } else {

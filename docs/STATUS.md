@@ -55,16 +55,38 @@ ERROR  Call to function 'ExpoMediaLibrary.getPermissionsAsync' has been rejected
 ```
 
 - **Causa:** no SDK 54, o `expo-media-library` checa por padrão todas as permissões granulares (inclui `AUDIO`), mas o manifest só declara imagens.
-- **Correção:** em `app/index.tsx`, `usePermissions({ granularPermissions: ['photo'] })` — o app não acessa mídia de áudio/vídeo. Também passamos a aceitar o modo *acesso limitado* do Android 14 (`accessPrivileges === 'limited'`) para não travar o onboarding.
+- **Correção:** pedir só a permissão granular `photo` — o app não acessa mídia de áudio/vídeo. Também aceitamos o modo *acesso limitado* do Android 14 (`accessPrivileges === 'limited'`). Hoje isso vive em `src/services/systemGallery.ts` (ver item seguinte, que substituiu o `usePermissions` do onboarding).
 
-### Aviso conhecido (não é bug) — media library limitada no Expo Go
+### Resolvido — `ExpoMediaLibrary.getPermissionsAsync` rejeita no Expo Go (Android)
 
 ```
-WARN  Due to changes in Androids permission requirements, Expo Go can no longer
-provide full access to the media library. [...] create a development build.
+ERROR  [Error: Uncaught (in promise, id: 0) Error: Call to function
+'ExpoMediaLibrary.getPermissionsAsync' has been rejected.
+→ Caused by: Due to changes in Androids permission requirements, Expo Go can no
+  longer provide full access to the media library. To test the full functionality
+  of this module, you can create a development build]
 ```
 
-- É uma **limitação do Expo Go**, não do código. `MediaLibrary.saveToLibraryAsync` (salvar na galeria do sistema) pode falhar — já está em `try/catch` e degrada sem perder a foto (segue salva dentro do app). Some num **development build**.
+- **Causa:** no Expo Go (Android 13+), **todas** as chamadas do `expo-media-library` rejeitam com `CodedError` — inclusive `getPermissionsAsync`, que o hook `usePermissions` dispara na montagem do onboarding. A rejeição não tratada virava o card vermelho.
+- **Correção:** criado `src/services/systemGallery.ts`, wrapper com degradação graciosa: check/request/save em `try/catch`, devolvendo o estado `'unavailable'` quando o módulo rejeita (Expo Go). O onboarding (`app/index.tsx`) deixou de usar `usePermissions` e trata a galeria do sistema como *best-effort* — só a **câmera** bloqueia o fluxo; `'unavailable'` conta como liberado. O `CaptureSheet` exporta via `saveToSystemGallery()` (nunca lança). Num development build o wrapper volta a pedir/usar a permissão real (granular `photo`, aceitando acesso limitado do Android 14).
+- O `WARN` correspondente ("Expo Go can no longer provide full access...") continua aparecendo e é inofensivo — some no development build.
+
+### Resolvido — tela vazia ao abrir (loop de redirect index ↔ camera)
+
+- **Sintoma:** app abre numa tela escura sem nenhum botão, sem erro no terminal.
+- **Causa:** com a galeria tratada como best-effort, o onboarding passou a redirecionar para `/camera` assim que as permissões resolvem; mas o `useCameraPermissions()` de `app/camera.tsx` retorna `null` no primeiro render (carregamento assíncrono) e o guard `!cameraPerm?.granted` devolvia um `<Redirect href="/">` — as duas telas ficavam se redirecionando mutuamente, renderizando apenas `<Redirect>` (nada na tela).
+- **Correção:** distinguir "permissão carregando" de "permissão negada". `camera.tsx` segura um `<View>` escuro enquanto `cameraPerm === null` e só redireciona quando a negação é real; `index.tsx` também segura o splash até `cameraPerm` e o status da galeria carregarem, decidindo uma única vez entre redirect e onboarding.
+
+### Resolvido — "Rendered more hooks than during the previous render" na câmera
+
+- **Sintoma:** card vermelho de Rules of Hooks apontando `CameraScreen` assim que a permissão da câmera termina de carregar.
+- **Causa:** bug latente em `app/camera.tsx` — o `useCallback` de `capturar` estava declarado **depois** dos guards de permissão. Com o guard antigo (`<Redirect>`) a tela desmontava e o problema nunca aparecia; com o novo estado "permissão carregando" (que mantém a tela montada), o 1º render retornava cedo com N hooks e o seguinte executava N+1.
+- **Correção:** todos os hooks movidos para antes dos early returns; os guards de permissão agora vêm depois do último hook. Padrão conferido nas demais telas/componentes com early return (`index`, `CaptureSheet`, `MusicSheet`) — só a câmera violava.
+
+### Endurecimentos preventivos (mesma classe de erro)
+
+- `MusicPlayer`: `player.seekTo()` do `expo-audio` retorna Promise — todas as chamadas ganharam `.catch(() => {})` para não gerar "Uncaught (in promise)" se o seek na prévia remota rejeitar.
+- `CaptureSheet.salvar`: se `persistPhoto()` (cópia para o `documentDirectory`) lançar, a mídia entra na galeria apontando para a URI original do cache — regra "nunca perder a foto".
 
 ### Estratégia para os próximos erros
 

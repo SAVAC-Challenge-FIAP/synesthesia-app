@@ -1,4 +1,3 @@
-import * as MediaLibrary from 'expo-media-library';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +20,7 @@ import { filterById } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
 import { getSuggestions } from '@/services/music';
 import { persistPhoto } from '@/services/mediaStorage';
+import { saveToSystemGallery } from '@/services/systemGallery';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
@@ -108,7 +108,14 @@ export function CaptureSheet() {
         });
       } else {
         const id = `${Date.now()}`;
-        const uriPersistente = persistPhoto(session.photoUri, id);
+        // Nunca perder a foto: se a cópia permanente falhar, o registro
+        // entra na galeria apontando para o arquivo original do cache.
+        let uriPersistente: string;
+        try {
+          uriPersistente = persistPhoto(session.photoUri, id);
+        } catch {
+          uriPersistente = session.photoUri;
+        }
         media = {
           id,
           photoUri: uriPersistente,
@@ -122,13 +129,9 @@ export function CaptureSheet() {
         };
         add(media);
         patch({ mediaId: id, photoUri: uriPersistente });
-        // Exporta a versão com filtro para a galeria do sistema
-        try {
-          const renderizada = await renderizarComFiltro();
-          await MediaLibrary.saveToLibraryAsync(renderizada);
-        } catch {
-          // sem permissão de escrita — a mídia segue salva no app
-        }
+        // Exporta a versão com filtro para a galeria do sistema (best-effort:
+        // sem permissão ou no Expo Go retorna false e a mídia segue no app)
+        await saveToSystemGallery(await renderizarComFiltro());
       }
       if (fechar) clear();
       return media;

@@ -49,10 +49,6 @@ export default function CameraScreen() {
     setVibeId(detectVibe({ facing, sceneSeed }).id);
   }, [facing, sceneSeed]);
 
-  if (!cameraPerm?.granted) {
-    return <Redirect href="/" />;
-  }
-
   const vibe = vibeById(vibeId);
   const filtroAtivo: FilterId | null =
     manualFiltro ?? (filtroAutomatico ? vibe.filtro : null);
@@ -84,6 +80,17 @@ export default function CameraScreen() {
       setCapturando(false);
     }
   }, [capturando, filtroAtivo, startSession, vibe.filtro, vibeId]);
+
+  // Guards DEPOIS de todos os hooks (Rules of Hooks): um return antecipado
+  // entre hooks muda a ordem entre renders e derruba a tela
+  if (!cameraPerm) {
+    // permissão ainda carregando (1º render do hook): segurar a tela — um
+    // <Redirect> aqui cria ping-pong com o redirect do index
+    return <View style={styles.root} />;
+  }
+  if (!cameraPerm.granted) {
+    return <Redirect href="/" />;
+  }
 
   const ultimaMedia = medias[0];
 

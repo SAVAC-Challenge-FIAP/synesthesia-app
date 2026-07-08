@@ -27,7 +27,7 @@ export function MusicPlayer({ musica, trechoInicio, onTrechoInicio }: Props) {
   useEffect(() => {
     if (status.playing && status.currentTime >= TRECHO_MAX_S) {
       player.pause();
-      player.seekTo(trechoInicio);
+      player.seekTo(trechoInicio).catch(() => {});
     }
   }, [status.playing, status.currentTime, player, trechoInicio]);
 
@@ -44,7 +44,7 @@ export function MusicPlayer({ musica, trechoInicio, onTrechoInicio }: Props) {
       player.pause();
     } else {
       if (status.currentTime < trechoInicio || status.currentTime >= TRECHO_MAX_S) {
-        player.seekTo(trechoInicio);
+        player.seekTo(trechoInicio).catch(() => {});
       }
       player.play();
     }
@@ -71,7 +71,7 @@ export function MusicPlayer({ musica, trechoInicio, onTrechoInicio }: Props) {
             onSlidingComplete={(v) => {
               const inicio = Math.min(Math.max(0, Math.round(v)), TRECHO_MAX_S);
               onTrechoInicio(inicio);
-              player.seekTo(inicio);
+              player.seekTo(inicio).catch(() => {});
             }}
           />
           <View style={styles.legendRow}>
