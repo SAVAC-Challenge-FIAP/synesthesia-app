@@ -61,7 +61,8 @@ export interface Media {
   id: string;
   /** URI persistente da foto (documentDirectory) */
   photoUri: string;
-  filtroId: FilterId;
+  /** null = foto original, sem filtro (T-0B) */
+  filtroId: FilterId | null;
   vibeId: VibeId;
   musica: MusicSuggestion | null;
   /** Trecho da música em segundos (0–30) */

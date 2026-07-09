@@ -6,19 +6,29 @@ import { colors, fonts, radii } from '@/theme/tokens';
 import { FilterId } from '@/types';
 
 interface Props {
-  ativo: FilterId;
-  onSelect: (id: FilterId) => void;
+  /** null = chip "Original" (sem filtro, T-0B) */
+  ativo: FilterId | null;
+  onSelect: (id: FilterId | null) => void;
   /** chip "AUTO" indica que o filtro veio da vibe (não escolhido manualmente) */
   autoAtivo?: boolean;
 }
 
-/** Carrossel horizontal dos 8 filtros (chips do Figma, radius 15). */
+interface CarouselItem {
+  id: FilterId | null;
+  nome: string;
+  emoji: string;
+}
+
+/** "Original" + os 8 filtros: a foto sem filtro é uma escolha de primeira classe. */
+const ITEMS: CarouselItem[] = [{ id: null, nome: 'Original', emoji: '📷' }, ...FILTERS];
+
+/** Carrossel horizontal dos filtros (chips do Figma, radius 15). */
 export function FilterCarousel({ ativo, onSelect, autoAtivo }: Props) {
   return (
     <FlatList
       horizontal
-      data={FILTERS}
-      keyExtractor={(f) => f.id}
+      data={ITEMS}
+      keyExtractor={(f) => f.id ?? 'original'}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.row}
       renderItem={({ item }) => {

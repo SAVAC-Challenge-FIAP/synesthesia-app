@@ -32,8 +32,8 @@ export default function SettingsScreen() {
           onToggle={() => s.toggle('filtroAutomatico')}
         />
         <Row
-          titulo="Detecção em tempo real"
-          desc="Recalcula a vibe continuamente (ML Kit on-device no build nativo)"
+          titulo="Leitura da cena (IA)"
+          desc="A foto capturada é analisada pelo Gemini para inferir a vibe real e curar a trilha. Desligado: prévia local por hora/câmera, nada sai do aparelho"
           value={s.deteccaoTempoReal}
           onToggle={() => s.toggle('deteccaoTempoReal')}
         />
@@ -67,8 +67,9 @@ export default function SettingsScreen() {
           onToggle={() => s.toggle('metadadosAnonimos')}
         />
         <Text style={styles.privacyNote}>
-          🔒 A análise da cena acontece no seu celular. Somente a curadoria musical consulta a
-          internet — nunca com as suas imagens.
+          🔒 O visor processa tudo no seu celular. Com "Leitura da cena (IA)" ativa, a foto
+          capturada é enviada ao Gemini apenas para inferir a vibe e sugerir a trilha — desative
+          para que nenhuma imagem saia do aparelho.
         </Text>
       </ScrollView>
     </SafeAreaView>

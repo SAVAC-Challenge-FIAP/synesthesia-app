@@ -2,19 +2,18 @@ import { VIBES } from '@/constants/vibes';
 import { Vibe } from '@/types';
 
 /**
- * Motor de vibe contextual — versão Expo Go.
+ * Prévia de vibe do visor — versão Expo Go.
  *
- * O ML Kit (react-native-mlkit-image-labeling) exige dev build nativo e não roda
- * no Expo Go. Este módulo simula a detecção on-device combinando hora do dia,
- * câmera ativa e variação periódica, mantendo o contrato da arquitetura:
- * `detectVibe(contexto) → Vibe`. Em dev build, basta trocar a implementação
- * pela rotulagem de frames do ML Kit sem tocar no resto do app.
+ * A vibe REAL agora é inferida da própria foto pelo Gemini multimodal na
+ * captura (`analyzePhotoAndSuggest` em src/services/music.ts) — T-0A. Este
+ * módulo fornece apenas a prévia exibida no visor antes de existir foto, de
+ * forma determinística: mesma hora + mesma câmera → mesma vibe, sem timer e
+ * sem sorteio. Em dev build, a prévia pode ser trocada pela rotulagem de
+ * frames do ML Kit mantendo o contrato `detectVibe(contexto) → Vibe`.
  */
 
 export interface VibeContext {
   facing: 'front' | 'back';
-  /** semente que muda periodicamente para simular mudança de cena */
-  sceneSeed: number;
 }
 
 function vibesByPeriod(hour: number): Vibe[] {
@@ -38,8 +37,10 @@ export function detectVibe(ctx: VibeContext, date: Date = new Date()): Vibe {
       ? candidates.filter((v) => ['romantica', 'sonhadora', 'dourada', 'noturna'].includes(v.id))
       : candidates;
   const list = pool.length > 0 ? pool : candidates;
-  return list[Math.abs(ctx.sceneSeed) % list.length];
+  const escolhida = list[0];
+  console.log(
+    `[vibeEngine] prévia hora=${date.getHours()}h facing=${ctx.facing} → "${escolhida.id}" ` +
+      `(determinística; a vibe real vem da análise da foto na captura)`,
+  );
+  return escolhida;
 }
-
-/** Intervalo (ms) de recálculo da vibe no visor */
-export const VIBE_TICK_MS = 8000;

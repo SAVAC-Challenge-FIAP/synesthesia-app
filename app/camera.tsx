@@ -1,7 +1,7 @@
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Redirect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,53 +10,43 @@ import { FilterCarousel } from '@/components/FilterCarousel';
 import { FilterLayer } from '@/components/FilterLayer';
 import { FilteredImage } from '@/components/FilteredImage';
 import { filterById } from '@/constants/filters';
-import { vibeById } from '@/constants/vibes';
-import { detectVibe, VIBE_TICK_MS } from '@/services/vibeEngine';
+import { detectVibe } from '@/services/vibeEngine';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { colors, fonts, sizes } from '@/theme/tokens';
-import { FilterId, VibeId } from '@/types';
+import { FilterId } from '@/types';
 
 /**
- * Visor principal (US1/US2): vibe recalculada em tempo real, filtro ao vivo,
- * carrossel manual, flip frontal/traseira, grade e atalho para Ajustes.
+ * Visor principal (US1/US2): prévia de vibe determinística (hora + câmera),
+ * filtro ao vivo opcional, carrossel manual (com "Original"), flip
+ * frontal/traseira, grade e atalho para Ajustes. A vibe REAL é inferida da
+ * foto na captura (T-0A), então o visor mostra "PRÉVIA" — sem timer/sorteio.
  */
 export default function CameraScreen() {
   const router = useRouter();
   const [cameraPerm] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
 
-  const { filtroAutomatico, deteccaoTempoReal, gradeComposicao } = useSettingsStore();
+  const { filtroAutomatico, gradeComposicao } = useSettingsStore();
   const medias = useGalleryStore((s) => s.medias);
   const startSession = useCaptureStore((s) => s.start);
   const session = useCaptureStore((s) => s.session);
 
   const [facing, setFacing] = useState<CameraType>('back');
-  const [sceneSeed, setSceneSeed] = useState(0);
-  const [vibeId, setVibeId] = useState<VibeId>(() => detectVibe({ facing: 'back', sceneSeed: 0 }).id);
-  const [manualFiltro, setManualFiltro] = useState<FilterId | null>(null);
+  // 'original' = usuário escolheu explicitamente sem filtro; null = automático
+  const [manualFiltro, setManualFiltro] = useState<FilterId | 'original' | null>(null);
   const [capturando, setCapturando] = useState(false);
 
-  // Contexto em tempo real: a vibe muda com a cena (tick) e com o flip da câmera
-  useEffect(() => {
-    if (!deteccaoTempoReal) return;
-    const t = setInterval(() => setSceneSeed((s) => s + 1), VIBE_TICK_MS);
-    return () => clearInterval(t);
-  }, [deteccaoTempoReal]);
-
-  useEffect(() => {
-    setVibeId(detectVibe({ facing, sceneSeed }).id);
-  }, [facing, sceneSeed]);
-
-  const vibe = vibeById(vibeId);
+  const vibe = useMemo(() => detectVibe({ facing }), [facing]);
+  const filtroAuto = manualFiltro === null && filtroAutomatico;
   const filtroAtivo: FilterId | null =
-    manualFiltro ?? (filtroAutomatico ? vibe.filtro : null);
+    manualFiltro === 'original' ? null : (manualFiltro ?? (filtroAutomatico ? vibe.filtro : null));
   const filtro = filtroAtivo ? filterById(filtroAtivo) : null;
 
   const flip = () => {
+    // flip recalcula a prévia da vibe (FR-001): frontal puxa vibes pessoais
     setFacing((f) => (f === 'back' ? 'front' : 'back'));
-    setSceneSeed((s) => s + 1); // flip também recalcula a vibe (FR-001)
   };
 
   const capturar = useCallback(async () => {
@@ -69,8 +59,9 @@ export default function CameraScreen() {
         startSession({
           mediaId: null,
           photoUri: foto.uri,
-          filtroId: filtroAtivo ?? vibe.filtro,
-          vibeId,
+          filtroId: filtroAtivo,
+          filtroAuto,
+          vibeId: vibe.id,
           musica: null,
           trechoInicio: 0,
           trechoFim: 30,
@@ -79,7 +70,7 @@ export default function CameraScreen() {
     } finally {
       setCapturando(false);
     }
-  }, [capturando, filtroAtivo, startSession, vibe.filtro, vibeId]);
+  }, [capturando, filtroAtivo, filtroAuto, startSession, vibe.id]);
 
   // Guards DEPOIS de todos os hooks (Rules of Hooks): um return antecipado
   // entre hooks muda a ordem entre renders e derruba a tela
@@ -107,7 +98,7 @@ export default function CameraScreen() {
           <View style={styles.vibeBadge}>
             <Text style={styles.vibeEmoji}>{vibe.emoji}</Text>
             <View>
-              <Text style={styles.vibeLabel}>VIBE {deteccaoTempoReal ? '· AO VIVO' : ''}</Text>
+              <Text style={styles.vibeLabel}>VIBE · PRÉVIA</Text>
               <Text style={styles.vibeNome}>{vibe.nome.toUpperCase()}</Text>
             </View>
           </View>
@@ -124,9 +115,9 @@ export default function CameraScreen() {
           ) : null}
 
           <FilterCarousel
-            ativo={filtroAtivo ?? vibe.filtro}
-            autoAtivo={manualFiltro === null && filtroAutomatico}
-            onSelect={(id) => setManualFiltro(id)}
+            ativo={filtroAtivo}
+            autoAtivo={filtroAuto}
+            onSelect={(id) => setManualFiltro(id ?? 'original')}
           />
 
           {/* Home bar: galeria / captura / flip */}

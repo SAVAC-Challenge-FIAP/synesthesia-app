@@ -15,7 +15,8 @@ import { FilterId } from '@/types';
 
 interface Props {
   uri: string;
-  filtroId: FilterId;
+  /** null = foto original, sem filtro (T-0B) */
+  filtroId: FilterId | null;
   style?: StyleProp<ViewStyle>;
   imageStyle?: StyleProp<ImageStyle>;
 }
@@ -23,10 +24,11 @@ interface Props {
 /**
  * Foto com o filtro aplicado: style `filter` do RN (brightness/saturate/
  * contrast/sepia — Android integral, iOS parcial) + overlays de identidade.
+ * Com `filtroId` nulo renderiza a imagem pura, como capturada.
  */
 export function FilteredImage({ uri, filtroId, style, imageStyle }: Props) {
-  const filter = filterById(filtroId);
-  const f = filter.imageFilter;
+  const filter = filtroId ? filterById(filtroId) : null;
+  const f = filter?.imageFilter;
   const filterFns: FilterFunction[] = f
     ? [
         ...(f.brightness !== undefined ? [{ brightness: f.brightness }] : []),
@@ -45,7 +47,7 @@ export function FilteredImage({ uri, filtroId, style, imageStyle }: Props) {
           resizeMode="cover"
         />
       </View>
-      <FilterLayer filter={filter} />
+      {filter ? <FilterLayer filter={filter} /> : null}
     </View>
   );
 }

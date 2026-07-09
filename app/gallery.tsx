@@ -27,6 +27,7 @@ export default function GalleryScreen() {
       mediaId: m.id,
       photoUri: m.photoUri,
       filtroId: m.filtroId,
+      filtroAuto: false, // edição preserva o filtro salvo; só o usuário troca
       vibeId: m.vibeId,
       musica: m.musica,
       trechoInicio: m.trechoInicio,

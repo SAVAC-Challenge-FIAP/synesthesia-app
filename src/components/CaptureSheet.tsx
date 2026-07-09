@@ -18,7 +18,7 @@ import { MusicSheet } from '@/components/MusicSheet';
 import { PostSheet } from '@/components/PostSheet';
 import { filterById } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
-import { getSuggestions } from '@/services/music';
+import { analyzePhotoAndSuggest, getSuggestions } from '@/services/music';
 import { persistPhoto } from '@/services/mediaStorage';
 import { saveToSystemGallery } from '@/services/systemGallery';
 import { useCaptureStore } from '@/stores/useCaptureStore';
@@ -38,6 +38,7 @@ export function CaptureSheet() {
   const add = useGalleryStore((s) => s.add);
   const update = useGalleryStore((s) => s.update);
   const sugestaoAutomatica = useSettingsStore((s) => s.sugestaoAutomatica);
+  const deteccaoTempoReal = useSettingsStore((s) => s.deteccaoTempoReal);
 
   const previewRef = useRef<View>(null);
   const [showMusic, setShowMusic] = useState(false);
@@ -46,15 +47,21 @@ export function CaptureSheet() {
 
   const photoUri = session?.photoUri;
 
-  // Curadoria musical fora do caminho crítico do frame (constituição III)
+  // Análise sensorial fora do caminho crítico do frame (constituição III):
+  // com "Detecção em tempo real" ativa, a PRÓPRIA FOTO vai ao Gemini, que
+  // infere a vibe real da cena e cura as faixas numa só chamada (T-0A/T-0B);
+  // desativada, nada sai do aparelho e a curadoria usa a vibe heurística.
   useEffect(() => {
     if (!photoUri) return;
     const { session: s } = useCaptureStore.getState();
     if (!s || s.sugestoes.length > 0 || s.carregandoSugestoes) return;
-    if (!sugestaoAutomatica) return;
+    if (!sugestaoAutomatica && !deteccaoTempoReal) return;
     patch({ carregandoSugestoes: true });
-    getSuggestions(vibeById(s.vibeId))
-      .then((sugestoes) => {
+    const analise = deteccaoTempoReal
+      ? analyzePhotoAndSuggest(s.photoUri, vibeById(s.vibeId))
+      : getSuggestions(vibeById(s.vibeId)).then((sugestoes) => ({ vibeId: null, sugestoes }));
+    analise
+      .then(({ vibeId: vibeReal, sugestoes }) => {
         const atual = useCaptureStore.getState().session;
         if (!atual || atual.photoUri !== photoUri) return;
         const primeira =
@@ -62,20 +69,28 @@ export function CaptureSheet() {
         patch({
           sugestoes,
           carregandoSugestoes: false,
+          // A vibe real da foto substitui a prévia do visor (T-0A)
+          ...(vibeReal ? { vibeId: vibeReal } : {}),
+          // Filtro acompanha a vibe real enquanto o usuário não escolher um
+          ...(vibeReal && atual.filtroAuto ? { filtroId: vibeById(vibeReal).filtro } : {}),
           // Redução do atrito: o sistema decide, o usuário refina (US3)
-          ...(atual.musica === null && atual.mediaId === null ? { musica: primeira } : {}),
+          ...(sugestaoAutomatica && atual.musica === null && atual.mediaId === null
+            ? { musica: primeira }
+            : {}),
         });
       })
       .catch(() => patch({ carregandoSugestoes: false }));
-  }, [photoUri, sugestaoAutomatica, patch]);
+  }, [photoUri, sugestaoAutomatica, deteccaoTempoReal, patch]);
 
   if (!session) return null;
 
-  const filtro = filterById(session.filtroId);
+  const filtro = session.filtroId ? filterById(session.filtroId) : null;
   const vibe = vibeById(session.vibeId);
   const editando = session.mediaId !== null;
 
   const renderizarComFiltro = async (): Promise<string> => {
+    // Sem filtro, a imagem sai exatamente como capturada (T-0B)
+    if (!session.filtroId) return session.photoUri;
     try {
       return await captureRef(previewRef, { format: 'jpg', quality: 0.92 });
     } catch {
@@ -102,6 +117,7 @@ export function CaptureSheet() {
         };
         update(session.mediaId, {
           filtroId: session.filtroId,
+          vibeId: session.vibeId,
           musica: session.musica,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
@@ -181,13 +197,14 @@ export function CaptureSheet() {
             <View style={styles.filtroRow}>
               <Text style={styles.sectionLabel}>FILTRO</Text>
               <Text style={styles.filtroAtual}>
-                {filtro.emoji} {filtro.nome.toUpperCase()} · VIBE {vibe.nome.toUpperCase()}
+                {filtro ? `${filtro.emoji} ${filtro.nome.toUpperCase()}` : '📷 ORIGINAL'} · VIBE{' '}
+                {vibe.nome.toUpperCase()}
               </Text>
             </View>
             <View style={styles.carouselWrap}>
               <FilterCarousel
                 ativo={session.filtroId}
-                onSelect={(id) => patch({ filtroId: id })}
+                onSelect={(id) => patch({ filtroId: id, filtroAuto: false })}
               />
             </View>
 
@@ -199,7 +216,11 @@ export function CaptureSheet() {
               {session.carregandoSugestoes ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator color={colors.amber} />
-                  <Text style={styles.loadingText}>CURANDO A TRILHA DA SUA VIBE...</Text>
+                  <Text style={styles.loadingText}>
+                    {deteccaoTempoReal
+                      ? 'LENDO A CENA E CURANDO A TRILHA...'
+                      : 'CURANDO A TRILHA DA SUA VIBE...'}
+                  </Text>
                 </View>
               ) : session.musica ? (
                 <>

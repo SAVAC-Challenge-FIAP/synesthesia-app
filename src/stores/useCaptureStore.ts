@@ -11,7 +11,14 @@ interface CaptureSession {
   /** id da mídia quando é uma edição de item existente; null em captura nova */
   mediaId: string | null;
   photoUri: string;
-  filtroId: FilterId;
+  /** null = foto original, sem filtro (T-0B) */
+  filtroId: FilterId | null;
+  /**
+   * true enquanto o filtro segue a vibe automaticamente — permite que a
+   * análise da foto (Gemini) troque o filtro pela vibe real; qualquer escolha
+   * manual no carrossel derruba a flag.
+   */
+  filtroAuto: boolean;
   vibeId: VibeId;
   musica: MusicSuggestion | null;
   sugestoes: MusicSuggestion[];

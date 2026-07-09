@@ -1,7 +1,34 @@
 # Status de Implementação — Synesthesia (MVP mobile)
 
 > Checkpoint do progresso. Atualize ao fechar cada fatia de trabalho.
-> **Última atualização:** 2026-07-07
+> **Última atualização:** 2026-07-09
+
+## ✅ Fase 0 concluída e validada no dispositivo (2026-07-09): vibe real da foto + modo sem filtro
+
+**T-0A e T-0B implementados juntos** via Gemini multimodal (confirmado: `gemini-3.1-flash-lite` aceita entrada de imagem — inputs Text/Image/Video/Audio/PDF, doc oficial do modelo). Validação estática: `tsc --noEmit` limpo, `expo-doctor` 18/18, `expo export --platform android` ok.
+
+**Validado no dispositivo (Expo Go)** — duas capturas reais, com o chip "Original 📷" (sem filtro) selecionado:
+- Foto 1 (bilhete/mural com corações) → Gemini leu `"bilhete escrito à mão com corações em um mural"` → vibe **romantica**.
+- Foto 2 (jogo de futebol na TV) → Gemini leu `"partida de futebol profissional vista em uma tela de TV"` → vibe **energetica**.
+- A prévia do visor (`detectVibe`, determinística por hora/câmera) ficou fixa em "romantica" nas duas — prova de que a vibe salva veio da análise real da foto, não da prévia. Salvar/postar funcionaram normalmente sem filtro aplicado, com música sugerida.
+- Sem erros de runtime; log `ORIGEM=gemini-foto` confirmado nas duas capturas.
+
+O que mudou:
+- **`src/services/music.ts`** — nova `analyzePhotoAndSuggest(photoUri, fallbackVibe)`: reduz a foto (~640px JPEG, `expo-image-manipulator`) e envia em base64 numa única chamada multimodal à Interactions API (`input: [{type:'text'},{type:'image'}]`); o Gemini classifica a cena numa das 8 vibes **e** sugere as 4 faixas (com log da cena lida: `[music] Gemini leu a cena: ...`). Degradação: falha na análise → `getSuggestions(vibe heurística)` → Deezer → catálogo local.
+- **`src/services/vibeEngine.ts`** — `sceneSeed` e timer de 8s **removidos**; `detectVibe({facing})` virou prévia determinística (hora + câmera → sempre a mesma vibe). Badge do visor mostra "VIBE · PRÉVIA".
+- **`filtroId` agora é `FilterId | null`** em `Media`/sessão/componentes; carrossel ganhou o chip **"Original 📷"** (primeiro item). Sem filtro, salvar/compartilhar usa a foto pura (sem `captureRef`).
+- **`CaptureSheet`** — na captura, a análise da foto atualiza a vibe da sessão e (se o filtro ainda estava no automático, flag `filtroAuto`) troca o filtro pelo da vibe real; qualquer escolha manual no carrossel derruba a flag. Música auto-selecionada só com "Sugestão automática" ligada.
+- **Ajustes/LGPD** — o toggle `deteccaoTempoReal` virou **"Leitura da cena (IA)"**: é o opt-in honesto do envio da foto ao Gemini (desligado = nada sai do aparelho, vibe fica na prévia local). A nota de privacidade foi reescrita — a antiga prometia "nunca com as suas imagens", o que a análise multimodal violaria.
+
+Próximo passo: exercitar no Expo Go (capturar cenas distintas → vibes/músicas coerentes; mesma cena 2× → resultado estável; foto sem filtro → sugestão funciona).
+
+## ✅ Curadoria Gemini funcionando (2026-07-09)
+
+A curadoria musical via **Gemini** (feature-chave do produto) está operacional ponta a ponta. Correções feitas em `src/services/music.ts`:
+- Endpoint migrado do legado `v1beta/models/{model}:generateContent` para o atual `v1beta/interactions` (Interactions API); auth via header `x-goog-api-key`.
+- Modelo trocado de `gemini-2.0-flash` (deprecado) para **`gemini-3.1-flash-lite`** — os modelos maiores (`3.5-flash`, `3.1-pro`) retornam 429 "not enough quota" no free tier; só o *lite* tem cota grátis. Comparativo em `docs/ESCOLHA-DO-MODELO-IA.md`.
+- Validado no dispositivo: `[music] ORIGEM=gemini — 4 sugestão(ões) usadas`, justificativas coerentes em pt-BR.
+- **Ainda pendente:** a vibe de entrada é simulada (hora/câmera/timer), então a sugestão só bate com a foto quando o horário coincide com o clima. Detecção real da imagem = T-05 (ver `specs/001-synesthesia-mvp/tasks.md`). Logs de diagnóstico em `music.ts` e `vibeEngine.ts` (`[music]` / `[vibeEngine]`).
 
 ## Onde estamos
 
