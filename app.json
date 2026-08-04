@@ -9,6 +9,7 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#090506",
     "ios": {
+      "bundleIdentifier": "com.savioomiodev.synesthesia",
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "O Synesthesia usa a câmera para detectar a vibe da cena e aplicar filtros em tempo real. Tudo processado no seu celular.",
@@ -17,6 +18,7 @@
       }
     },
     "android": {
+      "package": "com.savioomiodev.synesthesia",
       "adaptiveIcon": {
         "backgroundColor": "#090506",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -25,7 +27,14 @@
       },
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.READ_MEDIA_IMAGES"
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -53,6 +62,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fa06949f-15ac-4a58-8070-a3f99ae66f7e"
+      }
+    },
+    "owner": "savioomiodev"
   }
 }

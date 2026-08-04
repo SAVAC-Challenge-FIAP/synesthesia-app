@@ -1,7 +1,29 @@
 # Status de Implementação — Synesthesia (MVP mobile)
 
 > Checkpoint do progresso. Atualize ao fechar cada fatia de trabalho.
-> **Última atualização:** 2026-07-09
+> **Última atualização:** 2026-08-04
+
+## ✅ Setup migrado para macOS + development build (2026-08-04)
+
+Ambiente recriado do zero num Mac (o projeto antes rodava em Windows). `npm install` limpo, patch `expo@54.0.36` alinhado (`expo-doctor` 18/18, `tsc --noEmit` limpo), `.env` com `EXPO_PUBLIC_GEMINI_API_KEY` preservado.
+
+**Saímos do Expo Go para um development build via EAS**, que é o pré-requisito da T-07 (vídeo `.mp4` real — módulos nativos não carregam no Expo Go):
+- `expo-dev-client` instalado; `eas.json` criado com profiles `development` (dev client, APK interno, conecta no Metro local) e `preview` (APK standalone para compartilhar com o grupo).
+- Projeto EAS criado e linkado (`app.json` ganhou `extra.eas.projectId`); `android.package`/`ios.bundleIdentifier` definidos como `com.savioomiodev.synesthesia` (exigido pelo build não-interativo).
+- Primeiro `eas build --profile development` **concluído com sucesso** e validado no Android do Sávio (keystore gerado na nuvem; duas tentativas anteriores falharam por timeout de rede transitório na geração do keystore, resolvido no retry).
+- Link do build: `https://expo.dev/accounts/savioomiodev/projects/synesthesia/builds/a29bb1bd-5497-4d4d-bd3e-5f237d514f92`.
+- **Próximo:** implementar o Expo Module nativo (Android `MediaMuxer`/`MediaCodec`, opção B do `docs/VIDEO-MP4-OPCOES.md`) para preencher `videoUri` em `sharePackage.ts` e habilitar baixar/compartilhar o `.mp4` real; depois gerar o profile `preview` (APK standalone) para o grupo.
+
+## ✅ T-01 implementada (2026-07-09): postar leva a trilha junto — pacote composto
+
+**Decisão (T-01a, registrada em plan.md):** o `.mp4` único imagem+trilha — o resultado que o Sávio quer — **não é possível no Expo Go** (FFmpeg é módulo nativo e não há muxer JS/Expo); ele é a **T-07** (development build), agora marcada como prioridade da Fase 3. Até lá, "Postar agora" exporta o **pacote composto** com UI honesta:
+
+- **`src/services/sharePackage.ts` (novo)** — `exportPackage()` monta `{videoUri, imageUri, audioUri, caption, musica}`: baixa a prévia de 30s do Deezer para o cache (best-effort) e gera legenda com título, artista e trecho aprovado (`trechoInicio/Fim`). O campo `videoUri` é o encaixe da T-07: FFmpeg só preenche ele, o resto do fluxo não muda.
+- **`CaptureSheet.postar()`** — monta o pacote com `session.musica` + trecho e passa ao PostSheet (antes ia só a URI da imagem).
+- **`PostSheet`** — título "Pacote pronto!" (não promete vídeo); grade de destinos compartilha a imagem; card TRILHA com "Enviar áudio (30s)" (mp3 baixado, via `expo-sharing`) e "Enviar legenda" (`Share.share` nativo). Sem preview do Deezer → aviso de que a legenda leva a trilha. Com `videoUri` (futuro T-07) → "Vídeo gerado!" e o arquivo único vai pela grade.
+- Validação: `tsc --noEmit` limpo. **Pendente:** exercitar no Expo Go (postar com/sem música; faixa sem preview).
+
+⚠️ **Descoberta que muda a T-07:** o `ffmpeg-kit-react-native` da nossa arquitetura **foi aposentado** (06/01/2025; binários fora dos repositórios desde 01/04/2025). O levantamento das alternativas para gerar o `.mp4` de verdade — com recomendação, ressalvas e o que falta verificar — está em **`docs/VIDEO-MP4-OPCOES.md`**. Resumo: nenhum caminho on-device existe no Expo Go; a recomendação é um **Expo Module nativo próprio** (`MediaMuxer`/`MediaCodec` no Android, `AVAssetWriter` no iOS) sobre **development build**.
 
 ## ✅ Fase 0 concluída e validada no dispositivo (2026-07-09): vibe real da foto + modo sem filtro
 

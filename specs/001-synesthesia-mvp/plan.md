@@ -34,7 +34,7 @@ App mobile de câmera que traduz o contexto visual de uma cena em filtro + trilh
 
 | Princípio | Situação | Observação |
 |---|---|---|
-| I. Multimodalidade Primeiro | ⚠️ **Parcial** | A unidade foto+filtro+música é preservada em salvar/editar, mas o **compartilhamento exporta só a imagem** — a música não entra no arquivo final (ver T-01). Viola o princípio até a geração de vídeo. |
+| I. Multimodalidade Primeiro | ⚠️ **Parcial (mitigado)** | A unidade foto+filtro+música é preservada em salvar/editar. **Decisão T-01a (2026-07-09):** no Expo Go o compartilhamento sai como **pacote composto** — imagem + arquivo de áudio da prévia (30s, Deezer) + legenda com trilha e trecho (`src/services/sharePackage.ts`); a UI do PostSheet declara o que vai. O `.mp4` único (desejo final do produto) é **impossível no Expo Go** (FFmpeg é módulo nativo) e entra na T-07 preenchendo o campo `videoUri` do mesmo contrato. |
 | II. Redução do Atrito | ✅ | Captura padrão sugere filtro (vibe) e música automaticamente; refinamentos são opcionais/reversíveis. |
 | III. Contexto em Tempo Real | ⚠️ **Simulado** | Vibe recalcula ao vivo e no flip, mas via `vibeEngine` simulado (hora + câmera + timer 8s), não ML Kit sobre frames reais (ver T-05). |
 | IV. Privacidade/LGPD | ✅ | Onboarding explica processamento local; permissão mínima (`photo`); opt-in de metadados persistente; sem chaves commitadas. |
@@ -95,7 +95,7 @@ Cada linha mantém o **contrato** da arquitetura; a troca é só de implementaç
 | Render de filtro | Skia + Reanimated (GPU) | Overlay + `filter` do RN | `src/components/FilteredImage.tsx` |
 | Curadoria musical | **Gemini** + Deezer + Last.fm | Deezer (ativo) + Gemini (opcional, off) + catálogo local | `src/services/music.ts` |
 | Áudio/prévia | `expo-av` | `expo-audio` | `src/components/MusicPlayer.tsx` |
-| Vídeo final | `ffmpeg-kit` (imagem+áudio → `.mp4`) | **Ausente** — compartilha só a imagem | `src/components/PostSheet.tsx` |
+| Vídeo final | `ffmpeg-kit` (imagem+áudio → `.mp4`) | **Pacote composto** — imagem + áudio 30s + legenda via `exportPackage()`; T-07 preenche `videoUri` no mesmo contrato | `src/services/sharePackage.ts`, `src/components/PostSheet.tsx` |
 | Saída/galeria | `expo-media-library` | idem, best-effort (limitado no Expo Go) | `src/services/systemGallery.ts` |
 | Share | `expo-sharing` | `expo-sharing` (mesmo) | `src/components/PostSheet.tsx` |
 
@@ -106,4 +106,4 @@ Cada linha mantém o **contrato** da arquitetura; a troca é só de implementaç
 | Violação | Por que necessária | Alternativa mais simples rejeitada porque |
 |---|---|---|
 | Vibe simulada (fere III) | ML Kit exige módulo nativo → development build; Expo Go não carrega | Rodar sem detecção deixaria o visor sem o diferencial "contextual"; a simulação preserva a UX e o contrato `detectVibe()` |
-| Compartilhar só imagem (fere I) | FFmpeg exige módulo nativo → development build | Bloquear o compartilhamento até ter vídeo tiraria a US08 do MVP demonstrável; ver T-01 para caminho de vídeo compatível com Expo Go |
+| Sem `.mp4` único no share (fere I parcialmente) | FFmpeg exige módulo nativo → development build (T-07). **Decisão T-01a:** até lá, o pacote sai composto (imagem + áudio 30s + legenda) com UI honesta — a trilha aprovada *sai* do aparelho junto com a imagem, só não no mesmo arquivo | (a) montar `.mp4` sem FFmpeg no Expo Go: inviável, não há muxer JS/Expo; (c) compartilhar só a imagem com aviso: descartada por ferir mais o Princípio I quando dá para levar o áudio junto |

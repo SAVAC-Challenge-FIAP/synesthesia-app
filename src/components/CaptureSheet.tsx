@@ -20,6 +20,7 @@ import { filterById } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
 import { analyzePhotoAndSuggest, getSuggestions } from '@/services/music';
 import { persistPhoto } from '@/services/mediaStorage';
+import { exportPackage, SharePackage } from '@/services/sharePackage';
 import { saveToSystemGallery } from '@/services/systemGallery';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
@@ -42,7 +43,7 @@ export function CaptureSheet() {
 
   const previewRef = useRef<View>(null);
   const [showMusic, setShowMusic] = useState(false);
-  const [shareUri, setShareUri] = useState<string | null>(null);
+  const [sharePkg, setSharePkg] = useState<SharePackage | null>(null);
   const [salvando, setSalvando] = useState(false);
 
   const photoUri = session?.photoUri;
@@ -159,7 +160,15 @@ export function CaptureSheet() {
   const postar = async () => {
     const renderizada = await renderizarComFiltro();
     await salvar(false);
-    setShareUri(renderizada);
+    // O pacote leva a unidade aprovada: imagem + trilha + trecho (RN-001).
+    // No Expo Go sai como imagem + áudio + legenda; no dev build, .mp4 (T-07).
+    const pacote = await exportPackage({
+      imageUri: renderizada,
+      musica: session.musica,
+      trechoInicio: session.trechoInicio,
+      trechoFim: session.trechoFim,
+    });
+    setSharePkg(pacote);
   };
 
   const descartar = () => {
@@ -295,11 +304,11 @@ export function CaptureSheet() {
       </View>
 
       {showMusic ? <MusicSheet onClose={() => setShowMusic(false)} /> : null}
-      {shareUri ? (
+      {sharePkg ? (
         <PostSheet
-          shareUri={shareUri}
+          pacote={sharePkg}
           onClose={() => {
-            setShareUri(null);
+            setSharePkg(null);
             clear();
           }}
         />

@@ -1,14 +1,17 @@
 import * as Sharing from 'expo-sharing';
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
+import { SharePackage } from '@/services/sharePackage';
 import { colors, fonts, radii } from '@/theme/tokens';
 
 /**
- * Confirmação de postagem (US8/FR-014): pacote pronto + grade de destinos.
- * Cada destino dispara o share intent nativo com a imagem filtrada.
- * (A geração do .mp4 imagem+áudio via FFmpeg entra no dev build nativo;
- * no Expo Go compartilhamos a imagem renderizada com o filtro.)
+ * Confirmação de postagem (US8/FR-014): compartilha o pacote sensorial.
+ *
+ * Honestidade de UI (T-01c): no Expo Go não há FFmpeg, então o pacote sai
+ * composto — a imagem vai pelo destino escolhido e a trilha segue como
+ * arquivo de áudio (prévia 30s) + legenda. Quando `videoUri` existir
+ * (T-07, development build), o mesmo fluxo compartilha o `.mp4` único.
  */
 const DESTINOS = [
   { id: 'instagram', nome: 'Instagram', emoji: '📸' },
@@ -19,12 +22,42 @@ const DESTINOS = [
   { id: 'mais', nome: 'Mais', emoji: '➕' },
 ];
 
-export function PostSheet({ shareUri, onClose }: { shareUri: string; onClose: () => void }) {
-  const compartilhar = async () => {
+export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: () => void }) {
+  const temVideo = pacote.videoUri !== null;
+  const temTrilha = pacote.musica !== null;
+
+  const compartilharPrincipal = async () => {
     try {
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(shareUri, { dialogTitle: 'Compartilhar pacote sensorial' });
+        // Com vídeo gerado (T-07) o pacote inteiro vai num arquivo só;
+        // sem ele, vai a imagem — e a trilha segue pelas ações abaixo.
+        await Sharing.shareAsync(pacote.videoUri ?? pacote.imageUri, {
+          dialogTitle: 'Compartilhar pacote sensorial',
+        });
       }
+    } catch {
+      // usuário cancelou o share — sem efeito colateral
+    }
+  };
+
+  const compartilharAudio = async () => {
+    if (!pacote.audioUri) return;
+    try {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(pacote.audioUri, {
+          mimeType: 'audio/mpeg',
+          dialogTitle: 'Enviar trilha (prévia de 30s)',
+        });
+      }
+    } catch {
+      // usuário cancelou o share — sem efeito colateral
+    }
+  };
+
+  const compartilharLegenda = async () => {
+    if (!pacote.caption) return;
+    try {
+      await Share.share({ message: pacote.caption });
     } catch {
       // usuário cancelou o share — sem efeito colateral
     }
@@ -34,20 +67,49 @@ export function PostSheet({ shareUri, onClose }: { shareUri: string; onClose: ()
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
-          <Text style={styles.emoji}>🎬</Text>
-          <Text style={styles.title}>Pacote gerado!</Text>
+          <Text style={styles.emoji}>{temVideo ? '🎬' : '📦'}</Text>
+          <Text style={styles.title}>{temVideo ? 'Vídeo gerado!' : 'Pacote pronto!'}</Text>
           <Text style={styles.subtitle}>
-            Sua captura está salva com filtro e trilha. Escolha o destino:
+            {temVideo
+              ? 'Imagem e trilha unidas num só vídeo. Escolha o destino:'
+              : temTrilha
+                ? 'A imagem vai pelo destino escolhido; a trilha segue como áudio e legenda logo abaixo. O vídeo único imagem+trilha chega na versão final do app.'
+                : 'Sua captura vai como imagem, sem trilha. Escolha o destino:'}
           </Text>
 
           <View style={styles.grid}>
             {DESTINOS.map((d) => (
-              <Pressable key={d.id} style={styles.destino} onPress={compartilhar}>
+              <Pressable key={d.id} style={styles.destino} onPress={compartilharPrincipal}>
                 <Text style={styles.destinoEmoji}>{d.emoji}</Text>
                 <Text style={styles.destinoNome}>{d.nome}</Text>
               </Pressable>
             ))}
           </View>
+
+          {!temVideo && temTrilha ? (
+            <View style={styles.trilhaBox}>
+              <Text style={styles.trilhaLabel}>
+                TRILHA · {pacote.musica!.titulo.toUpperCase()} — {pacote.musica!.artista.toUpperCase()}
+              </Text>
+              <View style={styles.trilhaActions}>
+                {pacote.audioUri ? (
+                  <Pressable style={styles.trilhaBtn} onPress={compartilharAudio}>
+                    <Text style={styles.trilhaBtnText}>🎵 ENVIAR ÁUDIO (30S)</Text>
+                  </Pressable>
+                ) : null}
+                {pacote.caption ? (
+                  <Pressable style={styles.trilhaBtn} onPress={compartilharLegenda}>
+                    <Text style={styles.trilhaBtnText}>✍️ ENVIAR LEGENDA</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {!pacote.audioUri ? (
+                <Text style={styles.trilhaAviso}>
+                  Prévia de áudio indisponível para esta faixa — a legenda leva a trilha.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
 
           <Pressable style={styles.fechar} onPress={onClose}>
             <Text style={styles.fecharText}>Fechar</Text>
@@ -115,6 +177,46 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoMedium,
     fontSize: 10,
     letterSpacing: 0.5,
+  },
+  trilhaBox: {
+    width: '100%',
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: 'rgba(9,5,6,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    padding: 14,
+    gap: 10,
+    marginBottom: 20,
+  },
+  trilhaLabel: {
+    color: colors.ink,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  trilhaActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  trilhaBtn: {
+    borderWidth: 1,
+    borderColor: colors.ruby,
+    borderRadius: radii.chip,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  trilhaBtnText: {
+    color: colors.ruby,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  trilhaAviso: {
+    color: 'rgba(9,5,6,0.5)',
+    fontFamily: fonts.monoLight,
+    fontSize: 10,
+    lineHeight: 15,
   },
   fechar: {
     width: '100%',

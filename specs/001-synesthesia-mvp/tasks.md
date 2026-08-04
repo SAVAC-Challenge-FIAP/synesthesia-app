@@ -38,15 +38,15 @@ Implementada pela direção recomendada: **Gemini multimodal** (confirmado que `
 
 Estas tasks resolvem as violações de constituição rastreadas no plano (Princípios I e III).
 
-### ⬜ T-01 — Compartilhar o pacote com áudio, não só a foto  · P1 · US08 / FR-013, FR-014, RN-001
+### ✅ T-01 — Compartilhar o pacote com áudio, não só a foto  · P1 · US08 / FR-013, FR-014, RN-001 — IMPLEMENTADA (2026-07-09; falta validar no dispositivo)
 
-**Problema atual**: `postar()` gera só a imagem com filtro (`captureRef`) e o `PostSheet` compartilha essa imagem — a música escolhida **não entra no arquivo**. Fere o Princípio I (multimodalidade) e o FR-013 (gerar vídeo imagem+áudio).
+**Decisão (T-01a, registrada em plan.md)**: opção **(b) + (c)** combinadas. O `.mp4` único que o Sávio quer como resultado final é **impossível no Expo Go** (FFmpeg é módulo nativo; não existe muxer JS/Expo) — ele é a **T-07**. Até lá, o pacote sai **composto**: imagem renderizada + arquivo de áudio da prévia (30s, Deezer, baixado para o cache) + legenda com trilha e trecho aprovados, com UI honesta.
 
-- **T-01a**: Definir a estratégia de vídeo compatível com Expo Go. Opções: (a) baixar o preview de 30s do Deezer + still da imagem e montar `.mp4` — inviável sem FFmpeg no Expo Go; (b) compartilhar a imagem **e** anexar o áudio/link da faixa via `Sharing` (pacote de dois arquivos ou legenda com link); (c) deixar a geração real de `.mp4` explicitamente para o development build (FFmpeg) e, no Expo Go, comunicar honestamente que só a imagem vai. **Decidir e registrar em plan.md.**
-- **T-01b**: Implementar a opção escolhida em `PostSheet.tsx` / `CaptureSheet.postar()`, preservando `session.musica` + `trechoInicio/Fim` na exportação.
-- **T-01c**: Ajustar o texto do `PostSheet` para não prometer "vídeo com trilha" quando só a imagem for de fato compartilhada (honestidade de UI).
-- **Arquivos**: `src/components/PostSheet.tsx`, `src/components/CaptureSheet.tsx`.
-- **Aceite**: SC-006 — o que é compartilhado reflete o filtro **e** o áudio aprovados (ou a UI deixa claro o que vai, sem prometer o que não entrega).
+- ✅ **T-01a**: decidida e registrada em `plan.md` (Constitution Check, tabela de fallbacks e Complexity Tracking).
+- ✅ **T-01b**: novo `src/services/sharePackage.ts` — `exportPackage({imageUri, musica, trechoInicio, trechoFim})` devolve `{videoUri, imageUri, audioUri, caption, musica}`; `CaptureSheet.postar()` monta o pacote preservando `session.musica` + `trechoInicio/Fim`; `PostSheet` compartilha imagem (grade de destinos) e trilha (botões "Enviar áudio (30s)" e "Enviar legenda"). Download do áudio é best-effort — falhou, a legenda leva a trilha.
+- ✅ **T-01c**: PostSheet não diz mais "Pacote gerado ... com filtro e trilha" — o título é "Pacote pronto!" e o subtítulo explica que imagem e trilha vão separados e que o vídeo único chega na versão final. O branch `videoUri !== null` ("Vídeo gerado!") já existe para a T-07 plugar.
+- ⬜ **Pendente**: validar no Expo Go (postar com música → áudio compartilhável; sem música → fluxo antigo; preview Deezer nulo → aviso da legenda).
+- **Aceite**: SC-006 — o compartilhado reflete filtro **e** áudio aprovados (imagem + mp3 + legenda), e a UI declara exatamente o que vai.
 
 ### ✅ T-02 — Ativar a curadoria Gemini (curadoria inteligente real)  · P2 · US04 / FR-005  — CONCLUÍDA (2026-07-09)
 
@@ -87,9 +87,11 @@ Trocar `vibeEngine` simulado por rotulagem de frames do ML Kit, mantendo a assin
 
 Substituir overlay + `filter` do RN por shaders Skia para fluidez real do visor.
 
-### ⬜ T-07 — Geração de `.mp4` com FFmpeg (imagem + áudio)  · FR-013
+### ⬜ T-07 — Geração de `.mp4` (imagem + áudio)  · FR-013 · **prioridade do Sávio** · ⚠️ decisão técnica pendente
 
-Fecha de fato o T-01 na stack final: `ffmpeg-kit-react-native` une still + trecho de áudio em `.mp4` compartilhável.
+Fecha de fato o T-01 na stack final — **é o "compartilhar o vídeo pronto" que o Sávio quer** (2026-07-09). O ponto de encaixe já existe: preencher `videoUri` no retorno de `exportPackage()` (`src/services/sharePackage.ts`) — o `PostSheet` já tem o branch "Vídeo gerado!" pronto para isso.
+
+⚠️ **`ffmpeg-kit-react-native` foi aposentado (06/01/2025; binários removidos dos repositórios em 01/04/2025).** A task não é mais executável como escrita. Levantamento completo das 4 alternativas, com recomendação (**Expo Module nativo próprio: `MediaMuxer`/`MediaCodec` no Android, `AVAssetWriter` no iOS**), ressalvas e o que ainda precisa ser verificado: **[`docs/VIDEO-MP4-OPCOES.md`](../../docs/VIDEO-MP4-OPCOES.md)**. Qualquer caminho on-device exige **development build** (fim do Expo Go) — o que também desbloqueia T-05, T-06 e T-08.
 
 ### ⬜ T-08 — Câmera com Vision Camera  · NFR-001
 
