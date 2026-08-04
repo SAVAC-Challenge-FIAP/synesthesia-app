@@ -1,8 +1,9 @@
 import * as Sharing from 'expo-sharing';
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { SharePackage } from '@/services/sharePackage';
+import { saveToSystemGallery } from '@/services/systemGallery';
 import { colors, fonts, radii } from '@/theme/tokens';
 
 /**
@@ -25,6 +26,18 @@ const DESTINOS = [
 export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: () => void }) {
   const temVideo = pacote.videoUri !== null;
   const temTrilha = pacote.musica !== null;
+  const [baixando, setBaixando] = useState(false);
+  const [baixado, setBaixado] = useState(false);
+
+  const baixarVideo = async () => {
+    if (!pacote.videoUri || baixando) return;
+    setBaixando(true);
+    try {
+      setBaixado(await saveToSystemGallery(pacote.videoUri));
+    } finally {
+      setBaixando(false);
+    }
+  };
 
   const compartilharPrincipal = async () => {
     try {
@@ -85,6 +98,18 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
               </Pressable>
             ))}
           </View>
+
+          {temVideo ? (
+            <Pressable
+              style={[styles.baixarBtn, baixado && styles.baixarBtnFeito]}
+              disabled={baixando}
+              onPress={baixarVideo}
+            >
+              <Text style={styles.baixarBtnText}>
+                {baixando ? 'BAIXANDO...' : baixado ? '✓ SALVO NA GALERIA' : '⬇️ BAIXAR VÍDEO'}
+              </Text>
+            </Pressable>
+          ) : null}
 
           {!temVideo && temTrilha ? (
             <View style={styles.trilhaBox}>
@@ -177,6 +202,24 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoMedium,
     fontSize: 10,
     letterSpacing: 0.5,
+  },
+  baixarBtn: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: colors.ruby,
+    borderRadius: radii.card,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  baixarBtnFeito: {
+    borderColor: 'rgba(9,5,6,0.15)',
+  },
+  baixarBtnText: {
+    color: colors.ruby,
+    fontFamily: fonts.monoMedium,
+    fontSize: 11,
+    letterSpacing: 1,
   },
   trilhaBox: {
     width: '100%',

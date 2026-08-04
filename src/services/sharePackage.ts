@@ -1,5 +1,6 @@
 import { File, Paths } from 'expo-file-system';
 
+import { muxImageAndAudio } from '@/services/videoMuxer';
 import { MusicSuggestion } from '@/types';
 
 /**
@@ -7,10 +8,12 @@ import { MusicSuggestion } from '@/types';
  *
  * Decisão registrada em specs/001-synesthesia-mvp/plan.md (T-01a): no Expo Go
  * não existe muxer nativo (FFmpeg), então o `.mp4` único imagem+áudio é
- * impossível aqui — ele entra na T-07 (development build) preenchendo o campo
- * `videoUri` deste mesmo contrato. Até lá, o pacote compartilhável mais fiel
- * ao Princípio I é composto: imagem renderizada + arquivo de áudio da prévia
- * (30s, Deezer) + legenda com a trilha e o trecho aprovados.
+ * impossível ali — é por isso que `videoUri` some no Expo Go e só aparece em
+ * development build, onde `modules/video-muxer` (T-07, MediaMuxer/MediaCodec)
+ * consegue gerá-lo. Sem ele (Expo Go, ou qualquer falha de encoding), o
+ * pacote compartilhável mais fiel ao Princípio I é composto: imagem
+ * renderizada + arquivo de áudio da prévia (30s, Deezer) + legenda com a
+ * trilha e o trecho aprovados.
  */
 
 export interface SharePackage {
@@ -72,10 +75,18 @@ export async function exportPackage(params: {
   if (!musica) {
     return { videoUri: null, imageUri, audioUri: null, caption: null, musica: null };
   }
+  const audioUri = await downloadAudioPreview(musica);
+  const videoUri = audioUri
+    ? await muxImageAndAudio({
+        imageUri,
+        audioUri,
+        durationSeconds: Math.max(1, trechoFim - trechoInicio),
+      })
+    : null;
   return {
-    videoUri: null, // T-07 (FFmpeg, development build) preenche aqui
+    videoUri,
     imageUri,
-    audioUri: await downloadAudioPreview(musica),
+    audioUri,
     caption: buildCaption(musica, trechoInicio, trechoFim),
     musica,
   };

@@ -62,3 +62,22 @@ Guia para obter a chave: [GEMINI-SETUP.md](./GEMINI-SETUP.md).
 - Gemini API Pricing 2026 — MetaCTO, DevTk.AI, PricePerToken
 - LLM API Pricing Comparison 2026 — CloudZero, TokenMix
 - Groq Pricing 2026 — TokenMix; Free LLM APIs — OpenRouter
+
+## Revisão 2026-08-04: modelos novos lançados desde a decisão
+
+O Google lançou modelos novos depois de 09/07 (`gemini-3.1-flash-lite` continua funcionando, sem mudança no código). Registro das opções para uma futura reavaliação — **nada foi trocado**.
+
+| Modelo | Lançamento | Custo (in/out 1M tok) | Free tier | Observação |
+|---|---|---|---|---|
+| **gemini-3.1-flash-lite** (atual) | — | $0.25 / $1.50 | ✅ Confirmado (em uso) | Continua funcionando, é a base de comparação |
+| gemini-3.5-flash-lite | ~jul/2026 | $0.30 / $2.50 | ⚠️ Anunciado, cota da nossa conta não testada | Sucessor direto do atual, mesma faixa de preço — candidato mais natural para reteste |
+| gemini-3.6-flash | 21/07/2026 | $1.50 / $7.50 | ⚠️ Anunciado, cota da nossa conta não testada | ~17% menos tokens de saída que o 3.5-flash, benchmarks melhores em código/contexto longo/computer-use — nenhum desses ganhos é usado pela tarefa de curadoria musical (JSON curto, sem reasoning pesado). Custo de output ~5x maior que o atual; risco de repetir o 429 que já descartou o `3.5-flash` original |
+
+**Argumentos considerados (2026-08-04):**
+- A favor de testar `gemini-3.5-flash-lite`: mesma categoria de custo do modelo atual, sucessor direto, risco baixo (troca de uma linha em `GEMINI_MODEL`), pode trazer ganho de velocidade/qualidade sem sair do free tier.
+- Contra `gemini-3.6-flash`: é um modelo de propósito mais forte (código/agentic) que a tarefa não precisa; custo de output ~5x maior aumenta o risco de esbarrar em cota paga, repetindo o padrão que já tirou o `3.5-flash` (não-lite) de cogitação em julho.
+- Contra trocar agora, de forma geral: a chamada ao Gemini já não é o teto de latência percebida (há Deezer + fallback local depois); trocar exige revalidar cota/estabilidade do JSON de saída para um ganho que o usuário dificilmente notaria.
+
+**Se reavaliar no futuro:** testar `gemini-3.5-flash-lite` primeiro (baixo risco); só considerar `gemini-3.6-flash` se a tarefa mudar de perfil (ex.: passar a exigir reasoning mais pesado) ou se cota grátis generosa for confirmada na conta do projeto.
+
+Fontes (pesquisa 2026-08-04): [Google Blog — Introducing Gemini 3.6 Flash, 3.5 Flash-Lite, and 3.5 Flash Cyber](https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-6-flash-3-5-flash-lite-3-5-flash-cyber/), [9to5Google — Gemini 3.6 Flash launch](https://9to5google.com/2026/07/21/gemini-3-6-flash-launch/), [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models).

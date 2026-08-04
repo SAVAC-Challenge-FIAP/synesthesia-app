@@ -1,0 +1,38 @@
+import { Directory, File, Paths } from 'expo-file-system';
+
+/**
+ * Geração do .mp4 real (imagem + trilha) via módulo nativo local (T-07).
+ *
+ * `modules/video-muxer` (Android: MediaMuxer/MediaCodec) só carrega em
+ * development build — no Expo Go o `require` do módulo nativo lança na
+ * primeira chamada. Por isso tudo aqui é best-effort: qualquer falha (Expo
+ * Go, plataforma não suportada, erro de encoding) devolve `null` e
+ * `sharePackage.ts` mantém o pacote composto atual (RN "nunca perder a
+ * foto" — o vídeo é um extra, não um requisito para salvar/postar).
+ */
+
+export async function muxImageAndAudio(params: {
+  imageUri: string;
+  audioUri: string;
+  durationSeconds: number;
+}): Promise<string | null> {
+  try {
+    // Import dinâmico: em runtimes sem o módulo nativo (Expo Go), a falha
+    // fica isolada nesta função em vez de quebrar o bundle inteiro.
+    const { default: VideoMuxer } = await import('../../modules/video-muxer/src/VideoMuxerModule');
+
+    const outputDir = new Directory(Paths.cache, 'synesthesia-video');
+    if (!outputDir.exists) outputDir.create({ intermediates: true });
+    const output = new File(outputDir, `pacote-${Date.now()}.mp4`);
+
+    const uri = await VideoMuxer.muxImageAndAudio(
+      params.imageUri,
+      params.audioUri,
+      output.uri,
+      params.durationSeconds
+    );
+    return uri;
+  } catch {
+    return null;
+  }
+}
