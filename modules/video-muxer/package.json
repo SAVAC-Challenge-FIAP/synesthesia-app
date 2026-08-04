@@ -1,0 +1,7 @@
+{
+  "name": "video-muxer",
+  "version": "1.0.0",
+  "description": "Geração de .mp4 (imagem + trilha) via MediaMuxer/MediaCodec no Android",
+  "main": "src/VideoMuxerModule.ts",
+  "private": true
+}

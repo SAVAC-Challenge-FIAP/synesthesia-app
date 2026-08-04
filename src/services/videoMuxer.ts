@@ -32,7 +32,8 @@ export async function muxImageAndAudio(params: {
       params.durationSeconds
     );
     return uri;
-  } catch {
+  } catch (error) {
+    console.warn('[videoMuxer] falha ao gerar .mp4, mantendo pacote sem vídeo:', error);
     return null;
   }
 }
