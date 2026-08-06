@@ -80,16 +80,11 @@ class VideoMuxerModule : Module() {
     val muxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
     var videoTrackIndex = -1
     var audioTrackIndex = -1
-    var muxerStarted = false
-
-    fun maybeStart() {
-      if (!muxerStarted && videoTrackIndex >= 0 && audioTrackIndex >= 0) {
-        muxer.start()
-        muxerStarted = true
-      }
-    }
 
     // --- Trilha de vídeo: o mesmo bitmap desenhado a cada frame via Canvas de software ---
+    // As amostras são bufferizadas (não escritas ainda!): o MediaMuxer só aceita
+    // writeSampleData() depois de start(), e start() só pode ocorrer depois que
+    // TODAS as trilhas (vídeo + áudio) já foram registradas via addTrack().
     val videoFormat = MediaFormat.createVideoFormat(VIDEO_MIME, width, height).apply {
       setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
       setInteger(MediaFormat.KEY_BIT_RATE, BIT_RATE)
@@ -103,39 +98,49 @@ class VideoMuxerModule : Module() {
 
     val totalFrames = ((durationUs / 1_000_000.0) * FRAME_RATE).toInt().coerceAtLeast(1)
     val videoBufferInfo = MediaCodec.BufferInfo()
+    val videoSamples = mutableListOf<EncodedSample>()
 
     for (frameIndex in 0 until totalFrames) {
       val canvas = inputSurface.lockCanvas(null)
       canvas.drawBitmap(frameBitmap, 0f, 0f, null)
       inputSurface.unlockCanvasAndPost(canvas)
-      drainVideoEncoder(videoEncoder, videoBufferInfo, muxer, endOfStream = false) { index ->
-        videoTrackIndex = index
-        maybeStart()
-      }
+      drainVideoEncoder(
+        videoEncoder,
+        videoBufferInfo,
+        muxer,
+        endOfStream = false,
+        onFormatChanged = { index -> videoTrackIndex = index },
+        onSample = { sample -> videoSamples.add(sample) },
+      )
     }
     frameBitmap.recycle()
 
     videoEncoder.signalEndOfInputStream()
-    drainVideoEncoder(videoEncoder, videoBufferInfo, muxer, endOfStream = true) { index ->
-      videoTrackIndex = index
-      maybeStart()
-    }
+    drainVideoEncoder(
+      videoEncoder,
+      videoBufferInfo,
+      muxer,
+      endOfStream = true,
+      onFormatChanged = { index -> videoTrackIndex = index },
+      onSample = { sample -> videoSamples.add(sample) },
+    )
     videoEncoder.stop()
     videoEncoder.release()
     inputSurface.release()
+
+    if (videoTrackIndex < 0) throw IllegalStateException("Nenhuma trilha de vídeo foi gerada")
 
     // --- Trilha de áudio: decodifica a fonte (mp3/aac) e reencoda para AAC-LC ---
     val audioSamples = mutableListOf<EncodedSample>()
     transcodeAudioTrack(audioPath, durationUs, onTrackAdded = { format ->
       audioTrackIndex = muxer.addTrack(format)
-      maybeStart()
     }, onSample = { sample -> audioSamples.add(sample) })
 
-    if (!muxerStarted) {
-      // Sem faixa de áudio válida — garante que o muxer finalize só com vídeo.
-      if (videoTrackIndex < 0) throw IllegalStateException("Nenhuma trilha de vídeo foi gerada")
-      muxer.start()
-      muxerStarted = true
+    // Todas as trilhas já foram adicionadas (addTrack) — agora sim o muxer pode começar
+    // e as amostras bufferizadas de vídeo/áudio podem ser escritas.
+    muxer.start()
+    videoSamples.forEach { sample ->
+      muxer.writeSampleData(videoTrackIndex, sample.buffer, sample.info)
     }
     audioSamples.forEach { sample ->
       muxer.writeSampleData(audioTrackIndex, sample.buffer, sample.info)
@@ -148,8 +153,10 @@ class VideoMuxerModule : Module() {
   private class EncodedSample(val buffer: ByteBuffer, val info: MediaCodec.BufferInfo)
 
   /**
-   * Drena o encoder de vídeo, escrevendo as amostras já disponíveis no muxer. A trilha
-   * é reportada via `onFormatChanged` assim que o formato de saída aparece (uma vez só).
+   * Drena o encoder de vídeo, bufferizando as amostras já disponíveis (não escreve no
+   * muxer ainda — `writeSampleData` só é válido depois de `muxer.start()`, que só
+   * ocorre depois que a trilha de áudio também é conhecida). A trilha é reportada via
+   * `onFormatChanged` assim que o formato de saída aparece (uma vez só).
    */
   private fun drainVideoEncoder(
     encoder: MediaCodec,
@@ -157,8 +164,8 @@ class VideoMuxerModule : Module() {
     muxer: MediaMuxer,
     endOfStream: Boolean,
     onFormatChanged: (Int) -> Unit,
+    onSample: (EncodedSample) -> Unit,
   ) {
-    var trackIndex = -1
     while (true) {
       val outIndex = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_US)
       when {
@@ -166,15 +173,20 @@ class VideoMuxerModule : Module() {
           if (!endOfStream) return
         }
         outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-          trackIndex = muxer.addTrack(encoder.outputFormat)
-          onFormatChanged(trackIndex)
+          onFormatChanged(muxer.addTrack(encoder.outputFormat))
         }
         outIndex >= 0 -> {
           val encoded = encoder.getOutputBuffer(outIndex)!!
-          if (bufferInfo.size > 0 && (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0 && trackIndex >= 0) {
+          if (bufferInfo.size > 0 && (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
             encoded.position(bufferInfo.offset)
             encoded.limit(bufferInfo.offset + bufferInfo.size)
-            muxer.writeSampleData(trackIndex, encoded, bufferInfo)
+            val copy = ByteBuffer.allocate(bufferInfo.size)
+            copy.put(encoded)
+            copy.flip()
+            val infoCopy = MediaCodec.BufferInfo().apply {
+              set(0, bufferInfo.size, bufferInfo.presentationTimeUs, bufferInfo.flags)
+            }
+            onSample(EncodedSample(copy, infoCopy))
           }
           encoder.releaseOutputBuffer(outIndex, false)
           if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) return
