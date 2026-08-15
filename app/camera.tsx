@@ -29,10 +29,19 @@ export default function CameraScreen() {
   const [cameraPerm] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
 
-  const { filtroAutomatico, gradeComposicao } = useSettingsStore();
-  const medias = useGalleryStore((s) => s.medias);
+  // Seletores fatiados de propósito (T038). Antes esta tela assinava os stores
+  // inteiros e redesenhava — com CameraView, FilterLayer e carrossel junto — a
+  // cada mexida em qualquer campo deles:
+  // - `useSettingsStore()` sem seletor reagia a ajustes que o visor nem usa
+  //   (sugestão automática, detecção em tempo real, metadados anônimos);
+  // - `s.session` inteiro reagia a **cada** `patch()` da curadoria, que são
+  //   vários por captura — e aqui só interessa se existe sessão ou não;
+  // - `s.medias` inteiro reagia a qualquer mídia, quando só a capa é usada.
+  const filtroAutomatico = useSettingsStore((s) => s.filtroAutomatico);
+  const gradeComposicao = useSettingsStore((s) => s.gradeComposicao);
+  const ultimaMedia = useGalleryStore((s) => s.medias[0]);
   const startSession = useCaptureStore((s) => s.start);
-  const session = useCaptureStore((s) => s.session);
+  const temSessao = useCaptureStore((s) => s.session !== null);
 
   const [facing, setFacing] = useState<CameraType>('back');
   // 'original' = usuário escolheu explicitamente sem filtro; null = automático
@@ -90,8 +99,6 @@ export default function CameraScreen() {
   if (!cameraPerm.granted) {
     return <Redirect href="/" />;
   }
-
-  const ultimaMedia = medias[0];
 
   return (
     <View style={styles.root}>
@@ -161,7 +168,7 @@ export default function CameraScreen() {
         </View>
       </SafeAreaView>
 
-      {session ? <CaptureSheet /> : null}
+      {temSessao ? <CaptureSheet /> : null}
     </View>
   );
 }

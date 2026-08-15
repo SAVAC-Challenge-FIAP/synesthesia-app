@@ -184,7 +184,24 @@ aparece no `adb logcat`. O logcat só serve para o nativo (`VideoMuxer`, `Androi
 
 ## Fase 9 — Performance e fechamento
 
-- [ ] T038 [P] Investigar re-renders desnecessários em `app/camera.tsx` (a tela recalcula vibe em tempo real) e corrigir os que forem confirmados por medição
+- [X] T038 [P] Investigar re-renders desnecessários em `app/camera.tsx` (a tela recalcula vibe em tempo real) e corrigir os que forem confirmados por medição
+
+> **Medido** (contador de renders instrumentado, lido via `adb logcat ReactNativeJS:V` — e não
+> pelo `/tmp/metro.log` como diz a seção "Como retomar": `console.log` **aparece sim** no logcat
+> sob a tag `ReactNativeJS`).
+>
+> | Cenário | Antes | Depois |
+> |---|---|---|
+> | Abertura + 1 captura | 6 | 5 |
+> | 12 trocas de filtro no modal | **12** | **0** |
+> | Total do roteiro | **18** | **5** |
+>
+> **Causa**: a tela assinava os stores inteiros. `useSettingsStore()` sem seletor reagia a
+> ajustes que o visor nem lê; `s.session` reagia a **cada** `patch()` da curadoria e de cada
+> troca de filtro — redesenhando `CameraView`, `FilterLayer` e o carrossel sem nada ter mudado
+> neles; `s.medias` reagia a qualquer mídia quando só a capa é usada.
+> **Correção**: seletores fatiados (`s.filtroAutomatico`, `s.gradeComposicao`, `s.medias[0]`,
+> `s.session !== null`). Nenhuma mudança de comportamento — só de quantas vezes se redesenha.
 - [ ] T039 [P] Verificar fluidez do preview com filtro ativo em `src/components/FilterLayer.tsx`; registrar o resultado
 - [ ] T040 [P] Verificar acúmulo de memória abrindo e fechando `src/components/CaptureSheet.tsx` 20 vezes seguidas
 - [ ] T041 **Não regressão obrigatória**: gerar um pacote completo e confirmar trilhas `vide`+`soun`, codecs `avc1`+`mp4a` e duração igual ao trecho aprovado, conforme [quickstart.md](./quickstart.md) (FR-Q16, SC-Q07)
