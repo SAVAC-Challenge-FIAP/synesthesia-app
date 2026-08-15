@@ -177,6 +177,50 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
 
 **Fases 1 a 4** (T001–T019). Elas restauram os dois princípios violados — Multimodalidade Primeiro e Redução do Atrito de Decisão. Se a rodada precisar parar antes do fim, parar aqui já entrega um app que ninguém tropeça ao usar e que nunca perde a trilha em silêncio.
 
+## Fase 10 — QA de uso real (reportado pelo Sávio, 2026-08-15)
+
+> Três achados de **uso real do app**, não de inspeção. Registrados com diagnóstico feito
+> por leitura do código, mas **nenhum foi implementado** — o Sávio pediu para passar a bola.
+> Nada aqui foi validado no dispositivo pela sessão que os registrou.
+
+- [ ] T044 [BUG] **Dois áudios tocam ao mesmo tempo.** Com a prévia principal tocando, dar
+  play numa opção do modal de música faz as duas soarem juntas.
+  **Diagnóstico**: são dois players independentes de `expo-audio`, e nenhum sabe do outro —
+  `useAudioPlayer(musica.previewUrl)` em [`MusicPlayer.tsx`](../../src/components/MusicPlayer.tsx)
+  e `useAudioPlayer(null)` em [`MusicSheet.tsx`](../../src/components/MusicSheet.tsx). O
+  `MusicPlayer` continua montado por baixo enquanto o modal está aberto, então nada o pausa.
+  **Onde atacar**: pausar o player do `MusicPlayer` quando `showMusic` vira `true` em
+  `CaptureSheet`, ou — melhor — dar um dono único à reprodução, já que hoje dois componentes
+  disputam a mesma saída de áudio.
+
+- [ ] T045 [BUG] **"Postar agora" parece travado e mostra o modal errado antes do vídeo.**
+  Depois de aplicar a música, tocar em Postar não dá retorno nenhum; o usuário toca várias
+  vezes; abre a tela de pacote "em duas partes" (a que diz que o vídeo único chega na versão
+  final); e só uns 20 s depois aparece a tela com o vídeo.
+  **Diagnóstico**: `postar()` em [`CaptureSheet.tsx`](../../src/components/CaptureSheet.tsx)
+  **é reentrante e não tem estado de carregamento**. `salvando` é ligado dentro de `salvar()`
+  e já desligado no `finally` dele, *antes* de `exportPackage()` rodar — e é `exportPackage`
+  que leva os 20–30 s da geração do `.mp4`. Nesse intervalo o botão fica habilitado e sem
+  feedback, então cada toque dispara **uma exportação nova em paralelo**. A tela "em duas
+  partes" é o pacote de uma execução que resolveu sem vídeo (`audioUri` nulo →
+  `videoUri` nulo em [`sharePackage.ts`](../../src/services/sharePackage.ts)); o `setSharePkg`
+  de outra execução, mais lenta e com vídeo, sobrescreve depois.
+  **Onde atacar**: guarda de reentrada + estado `postando` desabilitando o botão, e o
+  progresso real da Fase 8 (T033–T037) como feedback. As duas coisas juntas: sem a guarda, o
+  progresso mostraria várias exportações concorrentes.
+  **Nota**: é o mesmo defeito de fundo da US2 — ação de saída disparando sem o usuário saber
+  em que pé está —, só que no outro extremo do fluxo.
+
+- [ ] T046 [DESIGN] **Trocar a tipografia para Lato e Nunito.** Hoje são Syne (display) e
+  DM Mono (labels técnicas). Envolve `@expo-google-fonts/lato` e `@expo-google-fonts/nunito`,
+  o `useFonts` de [`app/_layout.tsx`](../../app/_layout.tsx) e os tokens `fonts` de
+  [`src/theme/tokens.ts`](../../src/theme/tokens.ts).
+  ⚠️ **Contradiz a fonte da verdade atual**: o `CLAUDE.md` e o guia do Figma fixam Syne +
+  DM Mono como identidade. Trocar exige atualizar o `CLAUDE.md` junto, senão o próximo agente
+  reverte achando que é engano. Ver **D2**.
+
+---
+
 ## Dúvidas para o Sávio
 
 > Preencher aqui qualquer decisão de produto que aparecer durante a execução autônoma, em vez de inventar. Implementar a alternativa mais conservadora e seguir.
@@ -193,11 +237,25 @@ alcança trocando o modelo do Gemini — a alternativa que o [research.md](./res
 classificou como **adiada** por afetar a qualidade da leitura de cena, que é o diferencial
 do produto.
 
-**Decisão conservadora adotada** (a que menos altera comportamento): manter o modelo e o
-payload atuais; entregar da Fase 5 apenas o que é ganho puro e sem risco — a instrumentação
-(T020) e o progresso por etapa (T022, FR-Q08) — e registrar a medição real em vez de
-perseguir uma meta calibrada para um ambiente que não existe mais. **T021 fica sem ação de
-otimização**, com a medição documentando por quê.
+**Decidido pelo Sávio em 2026-08-15**: tentar primeiro reduzir o payload, sem trocar o
+modelo. Feito no T021 — 71 KB → 35 KB, sem perda de leitura de cena. Resultado medido no
+T023: mediana 6,02 s → 5,47 s, **9%**, não os 40%.
 
-**Para o Sávio decidir**: recalibrar o SC-Q03 para a faixa real (~6 s) ou manter o alvo de
-3,6 s e autorizar a troca de modelo, aceitando o impacto na leitura de cena.
+**Ainda em aberto**: o SC-Q03 continua escrito no [spec.md](./spec.md) com a linha de base de
+30–45 s, que não se reproduz. Alguém precisa decidir se recalibra o critério para a faixa
+real (~5,5 s) ou se mantém o alvo e autoriza a troca de modelo. Enquanto isso, o critério
+está **não atingido** de propósito, e não marcado como cumprido.
+
+### D2 — A troca de tipografia contraria a identidade documentada (T046)
+
+O Sávio pediu fontes "mais ortodoxas": **Lato e Nunito**. O `CLAUDE.md` e o guia do Figma
+`kite_camera_style_guide.html` fixam **Syne (700) para display** e **DM Mono para labels
+técnicas**, e a spec trata a fidelidade à identidade visual como Princípio VI — o mesmo que
+justificou a Fase 7 inteira.
+
+Não é conflito de opinião, é de fonte da verdade: enquanto o `CLAUDE.md` disser Syne + DM
+Mono, qualquer agente que abrir este repo vai tratar Lato/Nunito como desvio e reverter.
+
+**Para decidir antes de implementar o T046**: se a troca vale, o `CLAUDE.md` e a seção de
+identidade visual precisam mudar junto, no mesmo commit. Se for só teste, melhor fazer num
+branch e não tocar na documentação.
