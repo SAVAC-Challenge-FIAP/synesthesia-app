@@ -333,6 +333,9 @@ export function CaptureSheet() {
                   <MusicPlayer
                     key={session.musica.id}
                     musica={session.musica}
+                    // Com o modal de música aberto, o dono da saída de áudio é
+                    // ele — este player fica montado por baixo, mas calado (T044)
+                    ativo={!showMusic}
                     trechoInicio={session.trechoInicio}
                     onTrechoInicio={(s) =>
                       patch({ trechoInicio: s, trechoFim: TRECHO_MAX_S })

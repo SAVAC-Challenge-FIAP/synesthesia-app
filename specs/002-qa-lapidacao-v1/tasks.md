@@ -211,7 +211,7 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
 > por leitura do código, mas **nenhum foi implementado** — o Sávio pediu para passar a bola.
 > Nada aqui foi validado no dispositivo pela sessão que os registrou.
 
-- [ ] T044 [BUG] **Dois áudios tocam ao mesmo tempo.** Com a prévia principal tocando, dar
+- [X] T044 [BUG] **Dois áudios tocam ao mesmo tempo.** Com a prévia principal tocando, dar
   play numa opção do modal de música faz as duas soarem juntas.
   **Diagnóstico**: são dois players independentes de `expo-audio`, e nenhum sabe do outro —
   `useAudioPlayer(musica.previewUrl)` em [`MusicPlayer.tsx`](../../src/components/MusicPlayer.tsx)
@@ -220,6 +220,12 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   **Onde atacar**: pausar o player do `MusicPlayer` quando `showMusic` vira `true` em
   `CaptureSheet`, ou — melhor — dar um dono único à reprodução, já que hoje dois componentes
   disputam a mesma saída de áudio.
+  **Feito**: `MusicPlayer` ganhou a prop `ativo`, e o `CaptureSheet` passa `ativo={!showMusic}` —
+  quem está por baixo cede a saída em vez de disputá-la. O `MusicSheet` pausa no unmount, o que
+  cobre também a saída pelo botão físico de voltar.
+  **Evidência** (`dumpsys audio`, players em `state:started`): prévia principal tocando → 1;
+  modal aberto → **0**; play numa sugestão → 1; após Cancelar → 0. Nunca 2.
+  Screenshots em `docs/preview/t044/`.
 
 - [ ] T045 [BUG] **"Postar agora" parece travado e mostra o modal errado antes do vídeo.**
   Depois de aplicar a música, tocar em Postar não dá retorno nenhum; o usuário toca várias

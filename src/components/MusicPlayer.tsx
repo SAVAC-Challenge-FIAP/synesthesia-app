@@ -13,6 +13,13 @@ interface Props {
   musica: MusicSuggestion;
   trechoInicio: number;
   onTrechoInicio: (s: number) => void;
+  /**
+   * Cede a saída de áudio a outro player (T044). Este componente e o
+   * `MusicSheet` têm players independentes de `expo-audio`, e nenhum enxerga o
+   * outro: com o modal de música aberto por cima, dar play numa sugestão fazia
+   * as duas faixas soarem juntas. Quem monta decide quem é o dono da vez.
+   */
+  ativo?: boolean;
 }
 
 /**
@@ -20,7 +27,7 @@ interface Props {
  * com slider que define o início do trecho — sempre travado em 0–30s.
  * Monte com `key={musica.id}` para recriar o player ao trocar de faixa.
  */
-export function MusicPlayer({ musica, trechoInicio, onTrechoInicio }: Props) {
+export function MusicPlayer({ musica, trechoInicio, onTrechoInicio, ativo = true }: Props) {
   const player = useAudioPlayer(musica.previewUrl);
   const status = useAudioPlayerStatus(player);
 
@@ -31,6 +38,13 @@ export function MusicPlayer({ musica, trechoInicio, onTrechoInicio }: Props) {
       player.seekTo(trechoInicio).catch(() => {});
     }
   }, [status.playing, status.currentTime, player, trechoInicio]);
+
+  // Perdeu a vez: cala a boca na hora. Silenciar na subida de `ativo=false`
+  // (e não só no toque que abre o modal) cobre também o caminho em que o modal
+  // aparece por outra via — o dono da saída é sempre um só.
+  useEffect(() => {
+    if (!ativo) player.pause();
+  }, [ativo, player]);
 
   if (!musica.previewUrl) {
     return (

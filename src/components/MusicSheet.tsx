@@ -34,6 +34,11 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
 
+  // Devolve a saída de áudio ao sair por qualquer caminho — Cancelar, Confirmar
+  // e também o botão físico de voltar (T044). Sem isso a prévia da sugestão
+  // continuaria tocando por cima do player do pacote quando o modal fechasse.
+  useEffect(() => () => player.pause(), [player]);
+
   // Busca sob demanda quando o usuário abriu sem sugestões prontas
   useEffect(() => {
     const s = useCaptureStore.getState().session;
