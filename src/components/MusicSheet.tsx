@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   },
   kicker: {
     color: colors.ruby,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 11,
     letterSpacing: 2,
     marginBottom: 6,
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: 'rgba(9,5,6,0.6)',
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 11,
     letterSpacing: 1,
   },
@@ -225,17 +225,17 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     color: colors.ink,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 13,
   },
   itemArtist: {
     color: 'rgba(9,5,6,0.65)',
-    fontFamily: fonts.mono,
+    fontFamily: fonts.label,
     fontSize: 12,
   },
   itemReason: {
     color: 'rgba(9,5,6,0.5)',
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 10,
     fontStyle: 'italic',
     marginTop: 2,

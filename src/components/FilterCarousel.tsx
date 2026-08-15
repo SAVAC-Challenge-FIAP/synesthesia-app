@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   },
   nome: {
     color: colors.parchment,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 11,
     letterSpacing: 1,
   },
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   },
   contadorTexto: {
     color: colors.amber,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 11,
     letterSpacing: 0.5,
   },

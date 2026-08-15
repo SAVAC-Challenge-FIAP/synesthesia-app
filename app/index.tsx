@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   kicker: {
     color: colors.amber,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 11,
     letterSpacing: 2,
     marginBottom: 16,
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: colors.parchment50,
-    fontFamily: fonts.mono,
+    fontFamily: fonts.label,
     fontSize: 13,
     lineHeight: 20,
     marginBottom: 24,
@@ -159,20 +159,20 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: colors.parchment,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 12,
     letterSpacing: 2,
     marginBottom: 4,
   },
   cardDesc: {
     color: colors.parchment50,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 12,
     lineHeight: 18,
   },
   privacy: {
     color: colors.amber,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 12,
     lineHeight: 18,
     marginTop: 12,
@@ -198,12 +198,12 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: colors.parchment50,
-    fontFamily: fonts.mono,
+    fontFamily: fonts.label,
     fontSize: 13,
   },
   deniedText: {
     color: colors.parchment50,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',

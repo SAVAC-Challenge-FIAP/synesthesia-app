@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   },
   count: {
     color: colors.amber,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 10,
     letterSpacing: 1.5,
   },
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   },
   metaVibe: {
     color: colors.parchment,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 10,
     letterSpacing: 1,
   },
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   metaMusic: {
     flex: 1,
     color: colors.parchment50,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 10,
   },
   trash: {
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: colors.parchment50,
-    fontFamily: fonts.mono,
+    fontFamily: fonts.label,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',

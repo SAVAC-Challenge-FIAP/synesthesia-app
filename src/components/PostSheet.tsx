@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   },
   conteudo: {
     color: colors.ruby,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 10,
     letterSpacing: 1.5,
     textAlign: 'center',
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: 'rgba(9,5,6,0.6)',
-    fontFamily: fonts.mono,
+    fontFamily: fonts.label,
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 20,
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   destinoNome: {
     color: colors.ink,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 10,
     letterSpacing: 0.5,
   },
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   },
   baixarBtnText: {
     color: colors.ruby,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 11,
     letterSpacing: 1,
   },
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   },
   trilhaLabel: {
     color: colors.ink,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 10,
     letterSpacing: 1,
   },
@@ -312,13 +312,13 @@ const styles = StyleSheet.create({
   },
   trilhaBtnText: {
     color: colors.ruby,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 10,
     letterSpacing: 1,
   },
   trilhaAviso: {
     color: 'rgba(9,5,6,0.5)',
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 10,
     lineHeight: 15,
   },

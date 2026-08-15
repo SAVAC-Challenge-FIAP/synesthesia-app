@@ -1,6 +1,7 @@
 /**
  * Design tokens — fonte da verdade: Figma `JOVI-Challenge---FIAP-2026`
- * + kite_camera_style_guide.html (ver CLAUDE.md).
+ * + kite_camera_style_guide.html (ver CLAUDE.md). Tipografia divergiu do guia em
+ * 2026-08-15 — ver a nota do T046 no CLAUDE.md.
  */
 export const colors = {
   ruby: '#8D1514',
@@ -14,12 +15,22 @@ export const colors = {
   rubyGradientBottom: 'rgba(39,6,6,0.25)',
 } as const;
 
+/**
+ * Tipografia — Nunito (display) + Lato (labels). Substituiu Syne + DM Mono
+ * em 2026-08-15 por decisão do Sávio (T046/D2); o CLAUDE.md e a constituição
+ * foram atualizados no mesmo commit, senão a próxima leitura trata isto como
+ * desvio e reverte.
+ *
+ * Os nomes dos tokens dizem a **função**, não a fonte — era `mono*` antes, e
+ * Lato não é monoespaçada. As labels perdem o caráter de máquina do DM Mono;
+ * o que as mantém "técnicas" agora é a caixa alta com `letterSpacing`.
+ */
 export const fonts = {
-  display: 'Syne_700Bold',
-  displayExtra: 'Syne_800ExtraBold',
-  monoLight: 'DMMono_300Light',
-  mono: 'DMMono_400Regular',
-  monoMedium: 'DMMono_500Medium',
+  display: 'Nunito_700Bold',
+  labelLight: 'Lato_300Light',
+  label: 'Lato_400Regular',
+  /** Lato não tem 500; 700 é o passo de ênfase seguinte ao regular. */
+  labelForte: 'Lato_700Bold',
 } as const;
 
 export const radii = {

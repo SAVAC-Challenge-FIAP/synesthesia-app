@@ -9,7 +9,7 @@ import { colors, fonts, radii } from '@/theme/tokens';
 
 /**
  * Ajustes (US9/FR-015) + opt-in LGPD de metadados anônimos (FR-010).
- * Toggles ruby, seções em DM Mono, título display em Syne — Figma.
+ * Toggles ruby, seções em Lato, título display em Nunito — Figma.
  */
 export default function SettingsScreen() {
   const router = useRouter();
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   },
   section: {
     color: colors.amber,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 11,
     letterSpacing: 2,
     marginTop: 24,
@@ -163,25 +163,25 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     color: colors.parchment,
-    fontFamily: fonts.mono,
+    fontFamily: fonts.label,
     fontSize: 14,
     marginBottom: 3,
   },
   rowDesc: {
     color: colors.parchment50,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 11,
     lineHeight: 16,
   },
   valueMono: {
     color: colors.amber,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 12,
     letterSpacing: 2,
   },
   privacyNote: {
     color: colors.parchment50,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 11,
     lineHeight: 17,
     marginTop: 8,

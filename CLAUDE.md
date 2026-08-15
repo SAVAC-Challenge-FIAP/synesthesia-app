@@ -49,8 +49,15 @@ Fundo da câmera: gradiente `linear-gradient(180deg, rgba(141,21,20,0.5) 0%, rgb
 Modais claros (permissões, compartilhar, música): superfície `parchment` com texto `ink`.
 
 **Tipografia**
-- **Syne** (700) — títulos/display (ex.: "Ajustes.").
-- **DM Mono** (400 Light / 500 Medium) — labels técnicas, status bar, seções, metadados, chips de filtro.
+- **Nunito** (700 Bold) — títulos/display (ex.: "Ajustes.").
+- **Lato** (300 Light / 400 Regular / 700 Bold) — labels técnicas, status bar, seções, metadados, chips de filtro.
+
+> **Mudou em 2026-08-15** (T046, decisão do Sávio): antes eram **Syne** (display) e **DM Mono**
+> (labels). O Figma e o `kite_camera_style_guide.html` ainda mostram as antigas — **o código e
+> este arquivo é que valem**. Lato não é monoespaçada, então as labels perderam o caráter de
+> máquina do DM Mono; o que as mantém "técnicas" é a caixa alta com `letterSpacing`.
+> Os tokens em `src/theme/tokens.ts` nomeiam a **função**, não a fonte:
+> `display`, `labelLight`, `label`, `labelForte`.
 
 **Raios/medidas** — chips de filtro `border-radius: 15px`; cards/modais `~10–16px`; botão de captura círculo 70px; frame de foto aspecto ~735/913.
 

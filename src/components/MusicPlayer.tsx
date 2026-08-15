@@ -135,13 +135,13 @@ const styles = StyleSheet.create({
   },
   legend: {
     color: colors.amber,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 10,
     letterSpacing: 1,
   },
   offline: {
     color: colors.parchment50,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 11,
   },
 });

@@ -209,13 +209,13 @@ const styles = StyleSheet.create({
   },
   vibeLabel: {
     color: colors.amber,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 8,
     letterSpacing: 1.5,
   },
   vibeNome: {
     color: colors.parchment,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 12,
     letterSpacing: 1,
   },
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   },
   opcoesText: {
     color: colors.parchment,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 11,
     letterSpacing: 1,
   },
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   },
   autoBtnText: {
     color: colors.amber,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 10,
     letterSpacing: 1,
   },

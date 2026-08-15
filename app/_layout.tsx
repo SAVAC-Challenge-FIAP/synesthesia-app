@@ -1,9 +1,5 @@
-import {
-  DMMono_300Light,
-  DMMono_400Regular,
-  DMMono_500Medium,
-} from '@expo-google-fonts/dm-mono';
-import { Syne_700Bold, Syne_800ExtraBold } from '@expo-google-fonts/syne';
+import { Lato_300Light, Lato_400Regular, Lato_700Bold } from '@expo-google-fonts/lato';
+import { Nunito_700Bold } from '@expo-google-fonts/nunito';
 import { setAudioModeAsync } from 'expo-audio';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -15,12 +11,14 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 import { colors } from '@/theme/tokens';
 
 export default function RootLayout() {
+  // Nunito (display) + Lato (labels) — ver `fonts` em src/theme/tokens.ts (T046).
+  // Só os pesos que os tokens realmente usam: carregar um a mais é asset morto
+  // no bundle (foi o caso do Syne_800ExtraBold, que ninguém referenciava).
   const [fontsLoaded] = useFonts({
-    Syne_700Bold,
-    Syne_800ExtraBold,
-    DMMono_300Light,
-    DMMono_400Regular,
-    DMMono_500Medium,
+    Nunito_700Bold,
+    Lato_300Light,
+    Lato_400Regular,
+    Lato_700Bold,
   });
 
   useEffect(() => {

@@ -525,13 +525,13 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     color: colors.parchment50,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 10,
     letterSpacing: 2,
   },
   filtroAtual: {
     color: colors.amber,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 11,
     letterSpacing: 1,
   },
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.amber,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 11,
     letterSpacing: 1,
   },
@@ -568,17 +568,17 @@ const styles = StyleSheet.create({
   },
   musicTitle: {
     color: colors.parchment,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 14,
   },
   musicArtist: {
     color: colors.parchment50,
-    fontFamily: fonts.mono,
+    fontFamily: fonts.label,
     fontSize: 12,
   },
   musicReason: {
     color: colors.parchment50,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 11,
     fontStyle: 'italic',
   },
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
   },
   musicBtnText: {
     color: colors.amber,
-    fontFamily: fonts.monoMedium,
+    fontFamily: fonts.labelForte,
     fontSize: 10,
     letterSpacing: 1,
   },
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
   },
   semAudioText: {
     color: colors.parchment50,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 11,
     lineHeight: 17,
   },
@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
   motivoBloqueio: {
     flex: 1,
     color: colors.amber,
-    fontFamily: fonts.monoLight,
+    fontFamily: fonts.labelLight,
     fontSize: 10,
     letterSpacing: 1,
     lineHeight: 15,

@@ -20,7 +20,7 @@ Processamento de imagem é local por padrão; o texto de UI deve deixar isso exp
 Cada mídia é uma unidade editável e permanente. Edições nunca se perdem: a galeria persiste localmente e alterações são salvas automaticamente. Exclusão é permanente mas exige confirmação explícita. O usuário pode sempre retomar e finalizar uma edição depois.
 
 ### VI. Fidelidade à Identidade Visual
-A UI segue os design tokens definidos (ruby `#8D1514`, amber `#F8A20D`, ink `#090506`, parchment `#F5EEDE`; Syne para display, DM Mono para labels técnicas). Código gerado a partir do Figma é **convertido** para React Native `StyleSheet` — sem introduzir Tailwind ou desviar dos tokens sem justificativa registrada.
+A UI segue os design tokens definidos (ruby `#8D1514`, amber `#F8A20D`, ink `#090506`, parchment `#F5EEDE`; Nunito para display, Lato para labels técnicas). Código gerado a partir do Figma é **convertido** para React Native `StyleSheet` — sem introduzir Tailwind ou desviar dos tokens sem justificativa registrada.
 
 ## Restrições Técnicas
 
@@ -39,4 +39,16 @@ A UI segue os design tokens definidos (ruby `#8D1514`, amber `#F8A20D`, ink `#09
 
 Esta constituição supera práticas informais. Emendas exigem: descrição da mudança, justificativa e atualização de versão. Toda revisão de código verifica os seis princípios acima; complexidade adicional deve ser justificada por escrito.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06
+### Emendas
+
+**1.1.0 — 2026-08-15 · Princípio VI, tipografia**
+*Mudança*: a tipografia da identidade passa de **Syne (display) + DM Mono (labels técnicas)** para
+**Nunito (display) + Lato (labels técnicas)**.
+*Justificativa*: decisão do Sávio (T046 / D2 em `specs/002-qa-lapidacao-v1/tasks.md`), por
+fontes mais ortodoxas. Registrada como emenda porque o Princípio VI nomeava as famílias
+antigas — sem isto, o próprio princípio que protege a identidade visual passaria a acusar a
+identidade nova de desvio. As cores e o restante do princípio não mudam.
+*Efeito colateral aceito*: Lato não é monoespaçada; as labels perdem o caráter de máquina do
+DM Mono e passam a depender da caixa alta com `letterSpacing`.
+
+**Version**: 1.1.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-08-15

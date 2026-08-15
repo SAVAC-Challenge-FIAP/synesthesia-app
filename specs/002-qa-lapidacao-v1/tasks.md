@@ -255,13 +255,24 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   Não regressão do pacote: `vide`+`soun`, `avc1`+`mp4a`, duração 30,00 s.
   Screenshots em `docs/preview/t045/`.
 
-- [ ] T046 [DESIGN] **Trocar a tipografia para Lato e Nunito.** Hoje são Syne (display) e
+- [X] T046 [DESIGN] **Trocar a tipografia para Lato e Nunito.** Hoje são Syne (display) e
   DM Mono (labels técnicas). Envolve `@expo-google-fonts/lato` e `@expo-google-fonts/nunito`,
   o `useFonts` de [`app/_layout.tsx`](../../app/_layout.tsx) e os tokens `fonts` de
   [`src/theme/tokens.ts`](../../src/theme/tokens.ts).
   ⚠️ **Contradiz a fonte da verdade atual**: o `CLAUDE.md` e o guia do Figma fixam Syne +
   DM Mono como identidade. Trocar exige atualizar o `CLAUDE.md` junto, senão o próximo agente
   reverte achando que é engano. Ver **D2**.
+  **Feito** (autorizado pelo Sávio em 2026-08-15, no mesmo commit): **Nunito 700** no display e
+  **Lato 300/400/700** nas labels. Os tokens foram renomeados para a **função** em vez da fonte
+  (`mono*` → `labelLight` / `label` / `labelForte`), porque `fonts.mono` apontando para uma
+  fonte proporcional é exatamente o tipo de pista falsa que faz o próximo agente reverter.
+  `displayExtra` foi removido: ninguém o referenciava e ele carregava um arquivo de fonte à toa.
+  Fonte da verdade atualizada junto: `CLAUDE.md`, `.specify/memory/constitution.md`
+  (emenda **1.1.0** — o Princípio VI nomeava as famílias antigas) e o cabeçalho de `tokens.ts`.
+  **Ressalva registrada**: Lato não é monoespaçada, então as labels perderam o caráter de
+  máquina do DM Mono; o que as mantém "técnicas" agora é a caixa alta com `letterSpacing`.
+  Efeito colateral bem-vindo: Lato é mais estreita, e o chip NEON voltou a caber inteiro.
+  Screenshots em `docs/preview/t046/`.
 
 ---
 
@@ -303,3 +314,8 @@ Mono, qualquer agente que abrir este repo vai tratar Lato/Nunito como desvio e r
 **Para decidir antes de implementar o T046**: se a troca vale, o `CLAUDE.md` e a seção de
 identidade visual precisam mudar junto, no mesmo commit. Se for só teste, melhor fazer num
 branch e não tocar na documentação.
+
+**Decidido pelo Sávio em 2026-08-15**: a troca vale e é definitiva — feita no T046 com o
+`CLAUDE.md`, a constituição (emenda **1.1.0**) e o `tokens.ts` no mesmo commit. O Figma e o
+`kite_camera_style_guide.html` seguem mostrando Syne + DM Mono e **estão desatualizados**: a
+partir daqui o `CLAUDE.md` é a fonte da verdade da tipografia. **D2 encerrada.**
