@@ -18,6 +18,29 @@ import { Directory, File, Paths } from 'expo-file-system';
  */
 export type OnProgresso = (progresso: number) => void;
 
+/**
+ * Apaga os .mp4 de exportações anteriores (T040).
+ *
+ * Medido no device: cada pacote pesa ~15 MB e **nada nunca apagava** —
+ * `cache/synesthesia-video` estava com **834 MB** depois de um dia de uso, de
+ * um cache total de 1,27 GB. O usuário não tem como saber disso nem como
+ * limpar sem ir nas configurações do Android.
+ *
+ * Roda **antes** de gerar o novo arquivo, e não depois de compartilhar: assim
+ * o vídeo que o usuário ainda pode estar vendo ou baixando na tela de
+ * postagem nunca é o que se apaga. Best-effort — falhar aqui não pode
+ * atrapalhar a exportação, que é o que o usuário pediu.
+ */
+function limparPacotesAntigos(dir: Directory): void {
+  try {
+    for (const item of dir.list()) {
+      if (item instanceof File && item.name.endsWith('.mp4')) item.delete();
+    }
+  } catch (error) {
+    console.warn('[videoMuxer] nao deu para limpar pacotes antigos:', error);
+  }
+}
+
 export async function muxImageAndAudio(params: {
   imageUri: string;
   audioUri: string;
@@ -32,6 +55,7 @@ export async function muxImageAndAudio(params: {
 
     const outputDir = new Directory(Paths.cache, 'synesthesia-video');
     if (!outputDir.exists) outputDir.create({ intermediates: true });
+    limparPacotesAntigos(outputDir);
     const output = new File(outputDir, `pacote-${Date.now()}.mp4`);
 
     if (params.onProgresso) {

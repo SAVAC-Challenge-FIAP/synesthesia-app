@@ -202,9 +202,42 @@ aparece no `adb logcat`. O logcat só serve para o nativo (`VideoMuxer`, `Androi
 > neles; `s.medias` reagia a qualquer mídia quando só a capa é usada.
 > **Correção**: seletores fatiados (`s.filtroAutomatico`, `s.gradeComposicao`, `s.medias[0]`,
 > `s.session !== null`). Nenhuma mudança de comportamento — só de quantas vezes se redesenha.
-- [ ] T039 [P] Verificar fluidez do preview com filtro ativo em `src/components/FilterLayer.tsx`; registrar o resultado
-- [ ] T040 [P] Verificar acúmulo de memória abrindo e fechando `src/components/CaptureSheet.tsx` 20 vezes seguidas
-- [ ] T041 **Não regressão obrigatória**: gerar um pacote completo e confirmar trilhas `vide`+`soun`, codecs `avc1`+`mp4a` e duração igual ao trecho aprovado, conforme [quickstart.md](./quickstart.md) (FR-Q16, SC-Q07)
+- [X] T039 [P] Verificar fluidez do preview com filtro ativo em `src/components/FilterLayer.tsx`; registrar o resultado
+
+> **Medido** com `dumpsys gfxinfo` sob carga de UI (16 varreduras do carrossel). O preview em si
+> não passa pelo pipeline da janela — é Surface composta pelo SurfaceFlinger, e por isso um
+> visor parado marca `Total frames rendered: 0`. A medição válida é com a UI trabalhando:
+>
+> | | Frames | Janky | p90 | p95 |
+> |---|---|---|---|---|
+> | Com filtro (Vivid) | 606 | 2,81% | 14 ms | 15 ms |
+> | Sem filtro (Original) | 633 | 1,26% | 13 ms | 14 ms |
+>
+> O filtro custa **~1 ms por frame** e o p95 fica dentro do orçamento de 16,7 ms (60 fps).
+> **Sem queda perceptível** — o `FilterLayer` são duas `View` com `backgroundColor`, sem shader.
+
+- [X] T040 [P] Verificar acúmulo de memória abrindo e fechando `src/components/CaptureSheet.tsx` 20 vezes seguidas
+
+> **Sem vazamento.** Após 20 ciclos de abrir/descartar: `Views` 121 → **121**, `Activities` 1 → 1,
+> `AppContexts` 7 → 7, Java Heap 27,8 → 26,2 MB. O Native Heap subiu 415,9 → 491,9 MB, mas um
+> `am send-trim-memory RUNNING_CRITICAL` devolveu para **237,5 MB** — era cache recuperável, não
+> retenção. O `CaptureSheet` desmonta limpo.
+>
+> **Achado colateral, e é o mais grave da fase**: o `du` do cache mostrou
+> **`cache/synesthesia-video` com 834 MB**, de 1,27 GB de cache total. Cada exportação escrevia
+> um `pacote-<timestamp>.mp4` de ~15 MB e **nada nunca apagava** — o app acumulava quase 1 GB no
+> aparelho, sem o usuário ter como saber nem como limpar fora das configurações do Android.
+> **Corrigido** em `src/services/videoMuxer.ts`: os .mp4 anteriores são apagados **antes** de
+> gerar o novo (e não depois de compartilhar — assim o vídeo que o usuário ainda pode estar
+> baixando na tela de postagem nunca é o que se apaga). Best-effort: falhar na limpeza não
+> atrapalha a exportação. **Medido no device: 834 MB → 15 MB**, restando só o pacote da vez.
+> `cache/Camera` (431 MB) fica para uma próxima — é gerenciado pelo `expo-camera` e uma sessão
+> em andamento aponta para lá, então limpar exige mais cuidado que esta rodada comporta.
+
+- [X] T041 **Não regressão obrigatória**: gerar um pacote completo e confirmar trilhas `vide`+`soun`, codecs `avc1`+`mp4a` e duração igual ao trecho aprovado, conforme [quickstart.md](./quickstart.md) (FR-Q16, SC-Q07)
+
+> Conferido no pacote gerado após todas as mudanças da rodada: `vide`+`soun`, `avc1`+`mp4a`,
+> **30,00 s**, 15,1 MB. SC-Q07 mantido.
 - [ ] T042 Atualizar `README.md` com os screenshots novos, se as telas mudaram visualmente
 - [ ] T043 Rodar `npm run typecheck` e revisar o diff completo da rodada antes do commit final
 
