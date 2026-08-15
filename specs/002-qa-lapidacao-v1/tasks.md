@@ -40,8 +40,8 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 
 > Bloqueia as fases seguintes: sem o provedor de insets no lugar certo, nenhuma correção de layout se sustenta.
 
-- [ ] T005 Confirmar que `react-native-safe-area-context` está disponível na árvore de dependências; se não estiver, instalar com a versão alinhada ao SDK 54 via `npx expo install`
-- [ ] T006 Garantir que o provider de safe area envolve a árvore de navegação em `app/_layout.tsx`, sem alterar layout existente
+- [X] T005 Confirmar que `react-native-safe-area-context` está disponível na árvore de dependências; se não estiver, instalar com a versão alinhada ao SDK 54 via `npx expo install`
+- [X] T006 Garantir que o provider de safe area envolve a árvore de navegação em `app/_layout.tsx`, sem alterar layout existente
 
 ---
 

@@ -10,6 +10,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme/tokens';
 
@@ -27,20 +28,25 @@ export default function RootLayout() {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
   }, []);
 
-  if (!fontsLoaded) {
-    return <View style={{ flex: 1, backgroundColor: colors.ink }} />;
-  }
-
+  // O provider precisa envolver TUDO (inclusive o estado de fontes carregando):
+  // sem ele, useSafeAreaInsets() lança, e é dele que vêm os insets reais do
+  // aparelho que as barras de ação usam no lugar de espaçamento fixo.
+  // `initialWindowMetrics` entrega os insets já no primeiro render, evitando o
+  // salto de layout enquanto a medição nativa não chega.
   return (
-    <>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.ink },
-          animation: 'fade',
-        }}
-      />
-    </>
+      {fontsLoaded ? (
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.ink },
+            animation: 'fade',
+          }}
+        />
+      ) : (
+        <View style={{ flex: 1, backgroundColor: colors.ink }} />
+      )}
+    </SafeAreaProvider>
   );
 }
