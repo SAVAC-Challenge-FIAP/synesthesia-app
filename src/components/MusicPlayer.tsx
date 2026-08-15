@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import React, { useEffect } from 'react';
@@ -56,7 +57,11 @@ export function MusicPlayer({ musica, trechoInicio, onTrechoInicio }: Props) {
     <View style={styles.wrap}>
       <View style={styles.row}>
         <Pressable onPress={toggle} hitSlop={hitSlops.botao} style={styles.playBtn}>
-          <Text style={styles.playIcon}>{status.playing ? '❚❚' : '▶'}</Text>
+          <Ionicons
+            name={status.playing ? 'pause' : 'play'}
+            size={17}
+            color={colors.ink}
+          />
         </Pressable>
         <View style={styles.sliderWrap}>
           <Slider
@@ -102,11 +107,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.amber,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  playIcon: {
-    color: colors.ink,
-    fontSize: 15,
-    fontFamily: fonts.monoMedium,
   },
   sliderWrap: {
     flex: 1,

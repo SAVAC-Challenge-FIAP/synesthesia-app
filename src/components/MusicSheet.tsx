@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import React, { useEffect, useState } from 'react';
 import {
@@ -122,7 +123,11 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
                       hitSlop={8}
                       style={[styles.playBtn, !m.previewUrl && { opacity: 0.3 }]}
                     >
-                      <Text style={styles.playIcon}>{tocando ? '❚❚' : '▶'}</Text>
+                      <Ionicons
+                        name={tocando ? 'pause' : 'play'}
+                        size={15}
+                        color={colors.parchment}
+                      />
                     </Pressable>
                   </Pressable>
                 );
@@ -237,10 +242,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ruby,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  playIcon: {
-    color: colors.parchment,
-    fontSize: 12,
   },
   actions: {
     flexDirection: 'row',

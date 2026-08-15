@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
@@ -18,7 +19,7 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Text style={styles.back}>‹</Text>
+          <Ionicons name="chevron-back" size={30} color={colors.parchment} />
         </Pressable>
         <Text style={styles.title}>Ajustes.</Text>
       </View>

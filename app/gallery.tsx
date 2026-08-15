@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -50,7 +51,7 @@ export default function GalleryScreen() {
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Text style={styles.back}>‹</Text>
+          <Ionicons name="chevron-back" size={30} color={colors.parchment} />
         </Pressable>
         <Text style={styles.title}>Galeria.</Text>
         <Text style={styles.count}>
@@ -85,12 +86,17 @@ export default function GalleryScreen() {
                   <Text style={styles.metaVibe}>
                     {vibe.emoji} {vibe.nome.toUpperCase()}
                   </Text>
-                  <Text style={styles.metaMusic} numberOfLines={1}>
-                    {item.musica ? `🎵 ${item.musica.titulo}` : 'SEM ÁUDIO'}
-                  </Text>
+                  <View style={styles.metaMusicRow}>
+                    {item.musica ? (
+                      <Ionicons name="musical-notes" size={11} color={colors.parchment50} />
+                    ) : null}
+                    <Text style={styles.metaMusic} numberOfLines={1}>
+                      {item.musica ? item.musica.titulo : 'SEM ÁUDIO'}
+                    </Text>
+                  </View>
                 </View>
                 <Pressable style={styles.trash} hitSlop={hitSlops.icone} onPress={() => excluir(item)}>
-                  <Text style={styles.trashIcon}>🗑️</Text>
+                  <Ionicons name="trash-outline" size={15} color={colors.parchment} />
                 </Pressable>
               </Pressable>
             );
@@ -162,7 +168,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 1,
   },
+  metaMusicRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   metaMusic: {
+    flex: 1,
     color: colors.parchment50,
     fontFamily: fonts.monoLight,
     fontSize: 10,
@@ -174,9 +186,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(9,5,6,0.6)',
     borderRadius: 14,
     padding: 5,
-  },
-  trashIcon: {
-    fontSize: 13,
   },
   empty: {
     flex: 1,

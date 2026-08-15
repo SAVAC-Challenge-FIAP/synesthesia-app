@@ -361,3 +361,77 @@ vez de sumir — se sumisse, o carrossel inteiro pularia de largura.
 > a escala muda pelas configurações do sistema. Depois de recarregar o app, tudo volta ao
 > lugar. Vale como nota para quem for testar acessibilidade: reabra o app depois de mexer
 > na escala, senão você mede um artefato.
+
+---
+
+## T029 — Mapa dos emojis: o que é controle e o que é linguagem do produto
+
+O critério do [research.md](./research.md) R5: nos filtros e vibes o emoji é **conteúdo**,
+parte da identidade; nos controles ele é **interface**, e interface precisa ser previsível e
+tingível com a paleta.
+
+### Migrados para `@expo/vector-icons` (Ionicons 15.1.1, já vinha com o Expo)
+
+| Onde | Antes | Depois |
+|---|---|---|
+| `camera.tsx` · galeria | 🏞️ | `images-outline` |
+| `camera.tsx` · virar câmera | 🔄 | `camera-reverse-outline` |
+| `camera.tsx` · voltar ao automático | ↺ | `refresh` |
+| `gallery.tsx` · voltar | ‹ | `chevron-back` |
+| `gallery.tsx` · excluir | 🗑️ | `trash-outline` |
+| `gallery.tsx` · trilha do card | 🎵 | `musical-notes` |
+| `settings.tsx` · voltar | ‹ | `chevron-back` |
+| `CaptureSheet` · fechar | ✕ | `close` |
+| `CaptureSheet` · curadoria em curso | ⏳ | `hourglass-outline` |
+| `MusicPlayer` · play/pause | ▶ ❚❚ | `play` / `pause` |
+| `MusicSheet` · play/pause | ▶ ❚❚ | `play` / `pause` |
+| `PostSheet` · baixar / salvo | ⬇️ ✓ | `download-outline` / `checkmark` |
+| `PostSheet` · enviar áudio | 🎵 | `musical-notes` |
+| `PostSheet` · enviar legenda | ✍️ | `create-outline` |
+| `FilterCarousel` · voltar ao início | ↺ | `refresh` |
+
+### Preservados de propósito (T031)
+
+- **Os 8 filtros**: Vivid 🌟 · Neon 🌈 · Love ❤️ · Eclipse 🌒 · Retro 📼 · Vintage 🧡 ·
+  Arctic ❄️ · Honey 🍯 — e o chip 📷 ORIGINAL.
+- **As vibes**: 💭 sonhadora, 💘 romântica, ⚡ energética, 🌙 noturna e as demais.
+- **Ilustrações de onboarding** (📸 câmera, 🏞️ galeria, 🔒 privacidade) e o emoji grande do
+  resultado da postagem (🎬 / 📦 / 🖼️): são expressivos, não controles.
+- **Destinos de compartilhamento** (Instagram, TikTok, WhatsApp, LinkedIn, X): marcas, fora
+  do escopo "ícone de controle".
+
+Confirmado no dispositivo: `docs/preview/us5/depois-camera.png` mostra 🧡 VINTAGE, ❄️ ARCTIC
+e 🍯 HONEY intactos ao lado dos controles já vetoriais.
+
+---
+
+## Achado da Fase 7: o `force-dark` do Android reescrevia a paleta
+
+Ao conferir o ícone de play, ele saía **branco** sobre o círculo âmbar, embora o código
+pedisse `colors.ink`. A investigação:
+
+| Cor pedida | Cor renderizada |
+|---|---|
+| `#FF00FF` (clara) | magenta ✅ |
+| `colors.ink` (`#090506`) | **branco (255,254,255)** ❌ |
+| `'#090506'` literal | **branco** ❌ |
+
+Não era o React Native: `cmd uimode night` respondeu **`Night mode: yes`**, e o tema gerado
+é `Theme.AppCompat.DayNight.NoActionBar` sem `forceDarkAllowed`. Com o sistema em modo
+noturno, o **force-dark do Android reescrevia sozinho toda cor escura sobre fundo claro** —
+o ícone de play e também o texto de "Postar agora".
+
+O `app.json` já declarava `userInterfaceStyle: "dark"`, mas isso não desliga o force-dark.
+A correção é no tema:
+
+```xml
+<item name="android:forceDarkAllowed" tools:targetApi="29">false</item>
+```
+
+Depois do rebuild, medido no mesmo pixel: círculo `(171,112,9)` = âmbar `#F8A20D` exato, e
+o triângulo em `ink`. "Postar agora" voltou a ser escuro sobre âmbar.
+
+> Isto é uma violação do Princípio VI **maior que a dos emojis**: os emojis mudavam de
+> desenho entre fabricantes; o force-dark mudava a *paleta inteira* conforme uma
+> configuração do aparelho, e mudaria na mão do avaliador sem ninguém entender por quê.
+> Só apareceu porque a US5 obrigou a conferir cor de ícone pixel a pixel.

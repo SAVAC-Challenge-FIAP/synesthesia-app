@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -280,7 +281,7 @@ export function CaptureSheet() {
           <View style={styles.header}>
             <Text style={styles.title}>{editando ? 'Lapidar.' : 'Captura.'}</Text>
             <Pressable onPress={descartar} hitSlop={12}>
-              <Text style={styles.close}>✕</Text>
+              <Ionicons name="close" size={24} color={colors.parchment50} />
             </Pressable>
           </View>
 
@@ -373,9 +374,12 @@ export function CaptureSheet() {
             {/* O motivo fica visível junto da ação, não escondido num toque
                 que não responde (FR-Q05) */}
             {curando ? (
-              <Text style={styles.motivoBloqueio}>
-                ⏳ {TEXTO_ETAPA[etapa]} POSTAR LIBERA QUANDO A TRILHA CHEGAR. SALVAR JÁ FUNCIONA.
-              </Text>
+              <View style={styles.motivoLinha}>
+                <Ionicons name="hourglass-outline" size={12} color={colors.amber} />
+                <Text style={styles.motivoBloqueio}>
+                  {TEXTO_ETAPA[etapa]} POSTAR LIBERA QUANDO A TRILHA CHEGAR. SALVAR JÁ FUNCIONA.
+                </Text>
+              </View>
             ) : null}
             <View style={styles.actionsRow}>
               {/* RV-02: salvar é acionável em TODOS os estados — a foto nunca
@@ -446,11 +450,6 @@ const styles = StyleSheet.create({
     color: colors.parchment,
     fontFamily: fonts.display,
     fontSize: 26,
-  },
-  close: {
-    color: colors.parchment50,
-    fontSize: 20,
-    padding: 4,
   },
   scroll: {
     paddingBottom: 16,
@@ -569,7 +568,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
+  motivoLinha: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
   motivoBloqueio: {
+    flex: 1,
     color: colors.amber,
     fontFamily: fonts.monoLight,
     fontSize: 10,

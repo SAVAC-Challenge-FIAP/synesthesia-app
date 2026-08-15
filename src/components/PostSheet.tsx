@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import React, { useState } from 'react';
 import { Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
@@ -137,8 +138,13 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
               disabled={baixando}
               onPress={baixarVideo}
             >
+              <Ionicons
+                name={baixado ? 'checkmark' : 'download-outline'}
+                size={14}
+                color={baixado ? 'rgba(9,5,6,0.5)' : colors.ruby}
+              />
               <Text style={styles.baixarBtnText}>
-                {baixando ? 'BAIXANDO...' : baixado ? '✓ SALVO NA GALERIA' : '⬇️ BAIXAR VÍDEO'}
+                {baixando ? 'BAIXANDO...' : baixado ? 'SALVO NA GALERIA' : 'BAIXAR VÍDEO'}
               </Text>
             </Pressable>
           ) : null}
@@ -151,12 +157,14 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
               <View style={styles.trilhaActions}>
                 {pacote.audioUri ? (
                   <Pressable style={styles.trilhaBtn} hitSlop={hitSlops.chip} onPress={compartilharAudio}>
-                    <Text style={styles.trilhaBtnText}>🎵 ENVIAR ÁUDIO (30S)</Text>
+                    <Ionicons name="musical-notes" size={12} color={colors.ruby} />
+                    <Text style={styles.trilhaBtnText}>ENVIAR ÁUDIO (30S)</Text>
                   </Pressable>
                 ) : null}
                 {pacote.caption ? (
                   <Pressable style={styles.trilhaBtn} hitSlop={hitSlops.chip} onPress={compartilharLegenda}>
-                    <Text style={styles.trilhaBtnText}>✍️ ENVIAR LEGENDA</Text>
+                    <Ionicons name="create-outline" size={13} color={colors.ruby} />
+                    <Text style={styles.trilhaBtnText}>ENVIAR LEGENDA</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -252,6 +260,9 @@ const styles = StyleSheet.create({
   },
   baixarBtn: {
     width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
     borderWidth: 1,
     borderColor: colors.ruby,
     borderRadius: radii.card,
@@ -290,6 +301,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   trilhaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderWidth: 1,
     borderColor: colors.ruby,
     borderRadius: radii.chip,

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
@@ -171,9 +172,11 @@ export function FilterCarousel({ ativo, onSelect, autoAtivo }: Props) {
           })
         }
       >
-        <Text style={[styles.contadorTexto, noFim && styles.contadorFim]}>
-          {restantes > 0 ? `+${restantes}` : '↺'}
-        </Text>
+        {restantes > 0 ? (
+          <Text style={styles.contadorTexto}>+{restantes}</Text>
+        ) : (
+          <Ionicons name="refresh" size={16} color={colors.amber} />
+        )}
       </Pressable>
     </View>
   );
@@ -237,8 +240,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.monoMedium,
     fontSize: 11,
     letterSpacing: 0.5,
-  },
-  contadorFim: {
-    fontSize: 14,
   },
 });

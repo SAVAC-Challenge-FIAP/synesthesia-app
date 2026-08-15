@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Redirect, useRouter } from 'expo-router';
@@ -125,7 +126,8 @@ export default function CameraScreen() {
               hitSlop={hitSlops.chip}
               onPress={() => setManualFiltro(null)}
             >
-              <Text style={styles.autoBtnText}>↺ VOLTAR AO AUTOMÁTICO</Text>
+              <Ionicons name="refresh" size={12} color={colors.amber} />
+              <Text style={styles.autoBtnText}>VOLTAR AO AUTOMÁTICO</Text>
             </Pressable>
           ) : null}
 
@@ -141,7 +143,7 @@ export default function CameraScreen() {
                   style={styles.thumb}
                 />
               ) : (
-                <Text style={styles.sideIcon}>🏞️</Text>
+                <Ionicons name="images-outline" size={22} color={colors.parchment} />
               )}
             </Pressable>
 
@@ -153,7 +155,7 @@ export default function CameraScreen() {
             </Pressable>
 
             <Pressable style={styles.sideBtn} onPress={flip}>
-              <Text style={styles.sideIcon}>🔄</Text>
+              <Ionicons name="camera-reverse-outline" size={24} color={colors.parchment} />
             </Pressable>
           </View>
         </View>
@@ -236,6 +238,9 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   autoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     alignSelf: 'center',
     backgroundColor: 'rgba(9,5,6,0.55)',
     borderRadius: 15,
@@ -267,9 +272,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     backgroundColor: 'rgba(9,5,6,0.4)',
-  },
-  sideIcon: {
-    fontSize: 20,
   },
   thumb: {
     width: 48,

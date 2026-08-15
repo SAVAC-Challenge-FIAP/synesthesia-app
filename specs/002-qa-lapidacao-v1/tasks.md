@@ -113,10 +113,10 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 
 > Emoji de **filtro** e de **vibe** é linguagem do produto e **permanece**. Só os ícones de **controle** migram.
 
-- [ ] T029 [US5] Mapear todos os emojis usados como ícone de controle em `app/camera.tsx`, `app/gallery.tsx`, `app/index.tsx`, `src/components/CaptureSheet.tsx`, `src/components/MusicPlayer.tsx` e `src/components/MusicSheet.tsx`, separando-os dos emojis de filtro/vibe
-- [ ] T030 [US5] Substituir os ícones de controle mapeados em T029 por `@expo/vector-icons`, tingidos com os tokens de `src/theme` (sem dependência nova — já vem com o Expo)
-- [ ] T031 [US5] Confirmar que os emojis de filtros (Vivid 🌟, Neon 🌈, Love ❤️, Eclipse 🌒, Retro 📼, Vintage 🧡, Arctic ❄️, Honey 🍯) e das vibes permanecem intactos
-- [ ] T032 [US5] Validar no dispositivo; anexar screenshots em `docs/preview/us5/`
+- [X] T029 [US5] Mapear todos os emojis usados como ícone de controle em `app/camera.tsx`, `app/gallery.tsx`, `app/index.tsx`, `src/components/CaptureSheet.tsx`, `src/components/MusicPlayer.tsx` e `src/components/MusicSheet.tsx`, separando-os dos emojis de filtro/vibe
+- [X] T030 [US5] Substituir os ícones de controle mapeados em T029 por `@expo/vector-icons`, tingidos com os tokens de `src/theme` (sem dependência nova — já vem com o Expo)
+- [X] T031 [US5] Confirmar que os emojis de filtros (Vivid 🌟, Neon 🌈, Love ❤️, Eclipse 🌒, Retro 📼, Vintage 🧡, Arctic ❄️, Honey 🍯) e das vibes permanecem intactos
+- [X] T032 [US5] Validar no dispositivo; anexar screenshots em `docs/preview/us5/`
 
 ---
 
