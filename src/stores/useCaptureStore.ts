@@ -43,11 +43,20 @@ export interface CaptureSession {
   curadoria: EstadoCuradoria;
   trechoInicio: number;
   trechoFim: number;
+  /**
+   * Trilha arquivada: continua **escolhida**, mas fora do pacote — a exportação
+   * sai só com imagem e filtro.
+   *
+   * É diferente de `musica: null`. Zerar a faixa obrigaria a curadoria a rodar
+   * de novo (e o Gemini junto) se o usuário mudasse de ideia; arquivar guarda a
+   * escolha na sessão, e desarquivar é instantâneo e de graça.
+   */
+  trilhaArquivada: boolean;
 }
 
 interface CaptureState {
   session: CaptureSession | null;
-  start: (s: Omit<CaptureSession, 'sugestoes' | 'curadoria'>) => void;
+  start: (s: Omit<CaptureSession, 'sugestoes' | 'curadoria' | 'trilhaArquivada'>) => void;
   patch: (p: Partial<CaptureSession>) => void;
   clear: () => void;
 }
@@ -59,6 +68,7 @@ export const useCaptureStore = create<CaptureState>()((set) => ({
       session: {
         ...s,
         sugestoes: [],
+        trilhaArquivada: false,
         // Abre em `carregando`, nunca em `indisponivel`: enquanto não se sabe
         // se há trilha, a postagem fica bloqueada em vez de sair sem áudio.
         // Reabrir da galeria uma mídia que já tem trilha entra direto em `pronta`.

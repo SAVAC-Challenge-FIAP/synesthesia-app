@@ -474,6 +474,44 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   ficou comentado para ninguém "reforçar" de novo.
   **Evidência**: ciclo completo de abrir → tocar sugestão → confirmar, com zero erros no logcat.
 
+- [X] T052 [DESIGN] **Arquivar a trilha em vez de removê-la.**
+  "Remover áudio" apagava a escolha: mudar de ideia obrigava a curadoria a rodar de novo, com o
+  Gemini junto. Agora "Trocar música" ocupa toda a largura que sobra (Figma, nó 303:417) e um
+  quadrado ruby de 50×50 com lixeira fica fixo no canto.
+  **Feito**: `trilhaArquivada` na sessão — a faixa **continua escolhida**, só não entra no
+  pacote. Arquivada, o player e a linha de ações somem, a identidade da faixa esmaece e escorrega
+  para o espaço que sobrou, e o botão de reativar (power, amber) fica ao lado dela. Reativar é
+  instantâneo, sem rede. A transição usa `LayoutAnimation` (é a altura do card inteiro que muda,
+  não uma propriedade só) mais um `Animated` para o esmaecer.
+  Cuidados que o estado exigiu:
+  - **A chave da pré-geração trata arquivada como "sem música"** — sem isso, o vídeo com trilha
+    já pronto seria servido para um pacote de onde o usuário acabou de tirar a música.
+  - **Postar não pede confirmação** quando a trilha está arquivada: tirar a música com as
+    próprias mãos já é a confirmação explícita que a RV-01 exige.
+  - **A mídia salva na galeria reflete o pacote** — arquivada, o registro vai sem trilha.
+  - O botão de reativar fica **fora** do bloco que esmaece; era o único controle acionável do
+    estado, e apareceria apagado.
+  **Evidência**: arquivar → player e "Trocar música" somem, foto ganha a área; reativar → tudo
+  volta ao lugar; postar arquivada → "Pacote só com a imagem — sem trilha", instantâneo e sem
+  gerar vídeo. Zero erros no logcat nos três caminhos.
+
+- [X] T053 [DESIGN] **Tirar o chip "+N" do carrossel de filtros.**
+  A pedido do Sávio: virou peso visual numa faixa já densa. Com ele saiu toda a medição de
+  larguras que existia só para calcular o número — o `FilterCarousel` voltou a ser uma
+  `FlatList` e perdeu ~60 linhas, incluindo um `noFim` que já era código morto.
+  O carrossel segue igual no visor e no modal de captura, com os chips de emoji.
+
+  > ⚠️ **Isto reabre o SC-Q05** ("uma pessoa que nunca usou o app identifica que existem mais de
+  > quatro filtros só olhando a tela"), que o T025 tinha fechado justamente com o "+N". A
+  > affordance agora é só o chip cortado na borda — que foi o que a US4 classificou como
+  > ambíguo. Foi decisão de produto do Sávio, registrada aqui para não ser "corrigida" por
+  > engano depois. **O critério fica não atingido de propósito.**
+  >
+  > Uma ideia de miniatura com o filtro já aplicado chegou a ser desenhada e aprovada
+  > (prévia em `docs/preview/fase11/`), mas foi descartada em seguida: **na tela da câmera não
+  > existe foto capturada** para miniaturizar, e um carrossel diferente em cada tela seria pior
+  > que o problema.
+
 ---
 
 ## Dúvidas para o Sávio

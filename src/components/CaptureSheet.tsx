@@ -3,13 +3,18 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  LayoutAnimation,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  UIManager,
   View,
 } from 'react-native';
+import type { LayoutAnimationConfig } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
@@ -48,6 +53,27 @@ const LIMITE_CURADORIA_MS = 30_000;
  * é o que torna a antecipação barata.
  */
 const ESPERA_QUIETUDE_MS = 2_500;
+
+// Na arquitetura antiga do Android o LayoutAnimation vem desligado. Ligar é
+// idempotente e barato; sem isso, arquivar a trilha seria um corte seco.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+/**
+ * Transição de arquivar/reativar a trilha: o player e a linha de ações somem, e
+ * a identidade da faixa escorrega para o espaço que sobrou.
+ *
+ * `LayoutAnimation` anima a mudança de layout inteira numa tacada — o que é
+ * exatamente o caso aqui, porque o que se move não é uma propriedade só, é a
+ * altura do card e a posição de tudo que está dentro dele.
+ */
+const TRANSICAO_TRILHA: LayoutAnimationConfig = {
+  duration: 260,
+  create: { type: 'easeInEaseOut', property: 'opacity' },
+  update: { type: 'easeInEaseOut' },
+  delete: { type: 'easeInEaseOut', property: 'opacity' },
+};
 
 /**
  * Texto de cada etapa da curadoria (FR-Q08). Substitui o rótulo único que
@@ -115,6 +141,31 @@ export function CaptureSheet() {
     (inicio: number, fim: number) => patch({ trechoInicio: inicio, trechoFim: fim }),
     [patch],
   );
+
+  /**
+   * Arquiva ou reativa a trilha. A faixa **continua escolhida** nos dois casos;
+   * o que muda é se ela entra no pacote. Por isso reativar é instantâneo — não
+   * há nada para buscar de novo, nem no Deezer nem no Gemini.
+   */
+  const alternarArquivo = useCallback(
+    (arquivar: boolean) => {
+      LayoutAnimation.configureNext(TRANSICAO_TRILHA);
+      patch({ trilhaArquivada: arquivar });
+    },
+    [patch],
+  );
+
+  // O `LayoutAnimation` cuida do movimento; o esmaecer da faixa arquivada é uma
+  // propriedade só, e sai mais suave (e na GPU) por `Animated`.
+  const trilhaArquivada = session?.trilhaArquivada ?? false;
+  const opacidadeInfo = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.timing(opacidadeInfo, {
+      toValue: trilhaArquivada ? 0.38 : 1,
+      duration: 240,
+      useNativeDriver: true,
+    }).start();
+  }, [trilhaArquivada, opacidadeInfo]);
 
   const photoUri = session?.photoUri;
 
@@ -208,7 +259,10 @@ export function CaptureSheet() {
     ? preExport.chavePacote({
         photoUri: session.photoUri,
         filtroId: session.filtroId,
-        musicaId: session.musica?.id ?? null,
+        // Arquivada entra como "sem música" na chave: o pacote resultante é
+        // outro, e servir o vídeo com trilha aqui seria entregar o que o
+        // usuário acabou de tirar.
+        musicaId: session.trilhaArquivada ? null : (session.musica?.id ?? null),
         trechoInicio: session.trechoInicio,
         trechoFim: session.trechoFim,
       })
@@ -232,7 +286,7 @@ export function CaptureSheet() {
         const s = useCaptureStore.getState().session;
         return {
           imageUri: await renderizarComFiltro(),
-          musica: s?.musica ?? null,
+          musica: s?.trilhaArquivada ? null : (s?.musica ?? null),
           trechoInicio: s?.trechoInicio ?? 0,
           trechoFim: s?.trechoFim ?? 30,
         };
@@ -248,6 +302,8 @@ export function CaptureSheet() {
 
   // Enquanto a curadoria corre, ninguém consegue postar um pacote pela metade
   const curando = session.curadoria === 'carregando';
+  // Trilha escolhida mas fora do pacote: exporta só imagem + filtro
+  const arquivada = session.trilhaArquivada;
   const filtro = session.filtroId ? filterById(session.filtroId) : null;
   const vibe = vibeById(session.vibeId);
   const editando = session.mediaId !== null;
@@ -256,6 +312,9 @@ export function CaptureSheet() {
     if (salvando) return null;
     setSalvando(true);
     try {
+      // A mídia gravada reflete o pacote: com a trilha arquivada, o registro
+      // sai sem música, igual ao que foi exportado.
+      const musicaDoPacote = session.trilhaArquivada ? null : session.musica;
       let media: Media;
       if (session.mediaId) {
         media = {
@@ -263,7 +322,7 @@ export function CaptureSheet() {
           photoUri: session.photoUri,
           filtroId: session.filtroId,
           vibeId: session.vibeId,
-          musica: session.musica,
+          musica: musicaDoPacote,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
           criadaEm: 0,
@@ -272,7 +331,7 @@ export function CaptureSheet() {
         update(session.mediaId, {
           filtroId: session.filtroId,
           vibeId: session.vibeId,
-          musica: session.musica,
+          musica: musicaDoPacote,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
         });
@@ -291,7 +350,7 @@ export function CaptureSheet() {
           photoUri: uriPersistente,
           filtroId: session.filtroId,
           vibeId: session.vibeId,
-          musica: session.musica,
+          musica: musicaDoPacote,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
           criadaEm: Date.now(),
@@ -346,7 +405,7 @@ export function CaptureSheet() {
         (emVoo ? await emVoo : null) ??
         (await exportPackage({
           imageUri: await renderizarComFiltro(),
-          musica: session.musica,
+          musica: arquivada ? null : session.musica,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
           onProgresso: setProgresso,
@@ -377,7 +436,9 @@ export function CaptureSheet() {
     // Também aqui, e não só em `exportar()`: sem isto o alerta de "postar sem
     // trilha" empilharia uma cópia por toque enquanto a exportação corre.
     if (postandoRef.current) return;
-    if (session.curadoria === 'indisponivel') {
+    // Arquivar já é a confirmação explícita de ir sem trilha (RV-01): o
+    // usuário tirou a música com as próprias mãos, não faz sentido perguntar.
+    if (session.curadoria === 'indisponivel' && !arquivada) {
       Alert.alert(
         'Postar sem trilha?',
         'Este pacote vai só com a imagem — sem a metade sonora. Você pode esperar a curadoria, escolher uma faixa ou seguir assim mesmo.',
@@ -447,44 +508,82 @@ export function CaptureSheet() {
                 </View>
               ) : session.musica ? (
                 <>
-                  <View style={styles.musicHeader}>
-                    <Text style={styles.musicEmoji}>{session.musica.emoji}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.musicTitle} numberOfLines={1}>
-                        {session.musica.titulo}
-                      </Text>
-                      <Text style={styles.musicArtist} numberOfLines={1}>
-                        {session.musica.artista}
-                      </Text>
-                    </View>
+                  {/* Identidade da faixa. Arquivada, ela apaga e escorrega para
+                      baixo — o espaço do player e do "Trocar música" fecha, e
+                      ela fica lado a lado com o botão de reativar. */}
+                  <View style={[styles.musicHeader, arquivada && styles.musicHeaderArquivada]}>
+                    {/* Só a identidade da faixa esmaece — o botão de reativar
+                        fica fora daqui, senão o único controle acionável do
+                        estado arquivado apareceria apagado. */}
+                    <Animated.View style={[styles.musicIdent, { opacity: opacidadeInfo }]}>
+                      <Text style={styles.musicEmoji}>{session.musica.emoji}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.musicTitle} numberOfLines={1}>
+                          {session.musica.titulo}
+                        </Text>
+                        <Text style={styles.musicArtist} numberOfLines={1}>
+                          {session.musica.artista}
+                        </Text>
+                        {arquivada ? (
+                          <Text style={styles.musicReason} numberOfLines={2}>
+                            {session.musica.justificativa}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </Animated.View>
+
+                    {/* Arquivada, o botão de reativar sobe para cá — a linha de
+                        ações inteira sai da tela e o card encolhe. */}
+                    {arquivada ? (
+                      <Pressable
+                        style={styles.btnReativar}
+                        hitSlop={hitSlops.botao}
+                        accessibilityRole="button"
+                        accessibilityLabel="Reativar trilha no pacote"
+                        onPress={() => alternarArquivo(false)}
+                      >
+                        <Ionicons name="power" size={20} color={colors.ink} />
+                      </Pressable>
+                    ) : null}
                   </View>
-                  <Text style={styles.musicReason}>{session.musica.justificativa}</Text>
-                  <MusicPlayer
-                    key={session.musica.id}
-                    musica={session.musica}
-                    // Com o modal de música aberto, o dono da saída de áudio é
-                    // ele — este player fica montado por baixo, mas calado (T044)
-                    ativo={!showMusic}
-                    trechoInicio={session.trechoInicio}
-                    trechoFim={session.trechoFim}
-                    // O fim agora vem do usuário. Antes era fixado em 30 aqui,
-                    // e por isso todo vídeo saía com a prévia inteira.
-                    onTrecho={aplicarTrecho}
-                  />
-                  <View style={styles.musicActions}>
-                    <Pressable style={styles.musicBtn} hitSlop={hitSlops.chip} onPress={() => setShowMusic(true)}>
-                      <Text style={styles.musicBtnText}>TROCAR MÚSICA</Text>
-                    </Pressable>
-                    <Pressable
-                      style={styles.musicBtn}
-                      hitSlop={hitSlops.chip}
-                      onPress={() => patch({ musica: null, curadoria: 'indisponivel' })}
-                    >
-                      <Text style={[styles.musicBtnText, { color: colors.parchment50 }]}>
-                        REMOVER ÁUDIO
-                      </Text>
-                    </Pressable>
-                  </View>
+
+                  {/* Tudo que só existe com a trilha ativa */}
+                  {arquivada ? null : (
+                    <>
+                      <Text style={styles.musicReason}>{session.musica.justificativa}</Text>
+                      <MusicPlayer
+                        key={session.musica.id}
+                        musica={session.musica}
+                        // Com o modal de música aberto, o dono da saída de áudio
+                        // é ele — este player fica montado por baixo, mas calado
+                        ativo={!showMusic}
+                        trechoInicio={session.trechoInicio}
+                        trechoFim={session.trechoFim}
+                        // O fim agora vem do usuário. Antes era fixado em 30 aqui,
+                        // e por isso todo vídeo saía com a prévia inteira.
+                        onTrecho={aplicarTrecho}
+                      />
+                      <View style={styles.musicActions}>
+                        <Pressable
+                          style={styles.btnTrocar}
+                          hitSlop={hitSlops.botao}
+                          onPress={() => setShowMusic(true)}
+                        >
+                          <Ionicons name="musical-notes" size={16} color={colors.parchment} />
+                          <Text style={styles.btnTrocarText}>Trocar música</Text>
+                        </Pressable>
+                        <Pressable
+                          style={styles.btnArquivar}
+                          hitSlop={hitSlops.botao}
+                          accessibilityRole="button"
+                          accessibilityLabel="Arquivar trilha e exportar só a imagem"
+                          onPress={() => alternarArquivo(true)}
+                        >
+                          <Ionicons name="trash" size={19} color={colors.parchment} />
+                        </Pressable>
+                      </View>
+                    </>
+                  )}
                 </>
               ) : (
                 <View style={styles.semAudio}>
@@ -695,9 +794,56 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontStyle: 'italic',
   },
+  // Arquivada, a identidade da faixa passa a dividir a linha com o botão de
+  // reativar — é ela que ocupa o espaço que era do "Trocar música".
+  musicHeaderArquivada: {
+    alignItems: 'center',
+  },
+  musicIdent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   musicActions: {
     flexDirection: 'row',
     gap: 10,
+  },
+  // "Trocar música" toma toda a largura que sobra (Figma, nó 303:417); o
+  // arquivar fica quadrado e fixo no canto.
+  btnTrocar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    height: 50,
+    borderWidth: 1,
+    borderColor: colors.parchment25,
+    borderRadius: radii.card,
+  },
+  btnTrocarText: {
+    color: colors.parchment,
+    fontFamily: fonts.labelForte,
+    fontSize: 13,
+    letterSpacing: 1,
+  },
+  btnArquivar: {
+    width: 50,
+    height: 50,
+    borderRadius: radii.card,
+    backgroundColor: colors.ruby,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Reativar é ação positiva, então amber — e não o ruby do arquivar.
+  btnReativar: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.card,
+    backgroundColor: colors.amber,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   musicBtn: {
     borderWidth: 1,
