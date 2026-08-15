@@ -51,7 +51,7 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 **Princípio**: II (Redução do Atrito de Decisão) · **FR**: Q01, Q02, Q03
 **Teste independente**: tocar na borda inferior de cada botão primário e confirmar que dispara.
 
-- [ ] T007 [US1] Substituir espaçamento inferior fixo por inset real do dispositivo na barra de ações de `src/components/CaptureSheet.tsx` (botões Salvar / Postar agora)
+- [X] T007 [US1] Substituir espaçamento inferior fixo por inset real do dispositivo na barra de ações de `src/components/CaptureSheet.tsx` (botões Salvar / Postar agora)
 - [ ] T008 [P] [US1] Aplicar inset inferior real nos controles de `app/camera.tsx` (captura, galeria, virar câmera)
 - [ ] T009 [P] [US1] Aplicar inset inferior real em `src/components/PostSheet.tsx` (grade de destinos, Baixar vídeo, Fechar)
 - [ ] T010 [P] [US1] Aplicar inset inferior real em `src/components/MusicSheet.tsx` (Cancelar / Confirmar escolha)

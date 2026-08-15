@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
 import { FilterCarousel } from '@/components/FilterCarousel';
@@ -41,6 +42,11 @@ export function CaptureSheet() {
   const sugestaoAutomatica = useSettingsStore((s) => s.sugestaoAutomatica);
   const deteccaoTempoReal = useSettingsStore((s) => s.deteccaoTempoReal);
 
+  // Um <Modal> desenha na própria janela, sem o SafeAreaView da tela por baixo:
+  // o espaçamento inferior tem de vir do inset real, senão a barra de navegação
+  // come a metade de baixo de "Salvar" e "Postar agora" (medido: 130px em
+  // navegação por botões, 44px em gestos — ver baseline.md T004).
+  const insets = useSafeAreaInsets();
   const previewRef = useRef<View>(null);
   const [showMusic, setShowMusic] = useState(false);
   const [sharePkg, setSharePkg] = useState<SharePackage | null>(null);
@@ -284,7 +290,7 @@ export function CaptureSheet() {
             </View>
           </ScrollView>
 
-          <View style={styles.actions}>
+          <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom + 8, 20) }]}>
             <Pressable
               style={[styles.action, styles.actionSalvar]}
               disabled={salvando}
