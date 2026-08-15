@@ -108,6 +108,14 @@ export function CaptureSheet() {
     [patch],
   );
 
+  // Estável também: o `status` do áudio muda a cada tick e re-renderiza o
+  // player; se este callback fosse recriado junto, os `PanResponder` das
+  // bolinhas do recorte seriam refeitos no meio do arraste.
+  const aplicarTrecho = useCallback(
+    (inicio: number, fim: number) => patch({ trechoInicio: inicio, trechoFim: fim }),
+    [patch],
+  );
+
   const photoUri = session?.photoUri;
 
   // Análise sensorial fora do caminho crítico do frame (constituição III):
@@ -461,9 +469,7 @@ export function CaptureSheet() {
                     trechoFim={session.trechoFim}
                     // O fim agora vem do usuário. Antes era fixado em 30 aqui,
                     // e por isso todo vídeo saía com a prévia inteira.
-                    onTrecho={(inicio, fim) =>
-                      patch({ trechoInicio: inicio, trechoFim: fim })
-                    }
+                    onTrecho={aplicarTrecho}
                   />
                   <View style={styles.musicActions}>
                     <Pressable style={styles.musicBtn} hitSlop={hitSlops.chip} onPress={() => setShowMusic(true)}>

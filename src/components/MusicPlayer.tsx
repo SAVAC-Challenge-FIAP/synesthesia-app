@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, fonts, hitSlops } from '@/theme/tokens';
+import { RangeSlider } from '@/components/RangeSlider';
+import { colors, fonts, hitSlops, radii } from '@/theme/tokens';
 import { MusicSuggestion } from '@/types';
 
 /** A prévia do Deezer tem 30s — é o teto do que dá para recortar. */
@@ -12,6 +12,13 @@ export const TRECHO_MAX_S = 30;
 
 /** Piso do recorte: abaixo disso o vídeo não dá tempo de ser visto. */
 export const TRECHO_MIN_S = 5;
+
+/** `0:07`, `1:05` — o formato das marcas no Figma (nó 462-926). */
+export function mmss(s: number): string {
+  const m = Math.floor(s / 60);
+  const seg = Math.floor(s % 60);
+  return `${m}:${String(seg).padStart(2, '0')}`;
+}
 
 interface Props {
   musica: MusicSuggestion;
@@ -28,18 +35,15 @@ interface Props {
 }
 
 /**
- * Player do trecho sonoro (FR-006/FR-008): recorta a prévia de 30s da faixa no
- * pedaço que vai virar vídeo. Monte com `key={musica.id}` para recriar o player
- * ao trocar de faixa.
+ * Player do trecho sonoro (FR-006/FR-008): recorta a prévia de 30s no pedaço
+ * que vira vídeo. Monte com `key={musica.id}` para recriar o player ao trocar
+ * de faixa.
  *
- * O desenho mudou depois do QA de uso real: antes havia **um slider só**, que
- * definia o início e ficava parado enquanto a música tocava. Ele parecia uma
- * barra de progresso e não era — e não havia como escolher onde o trecho
- * termina, então todo vídeo saía com 30s. Agora são coisas separadas:
- *
- * - uma **barra de progresso** (não interativa) que anda com a reprodução;
- * - **dois sliders**, início e fim, que definem o recorte;
- * - a duração do vídeo, que é a diferença entre eles, em destaque.
+ * Segue o Figma (nó 462-926): **um trilho com duas bolinhas**, marcas de tempo
+ * embaixo e a legenda `Trecho · 0:00 → 0:15`. Duas versões anteriores erraram
+ * aqui — primeiro um slider único que definia só o início e ficava parado
+ * enquanto a música tocava, depois dois sliders empilhados, que resolviam a
+ * função mas não são o padrão que o mercado usa nem o que o design pede.
  */
 export function MusicPlayer({
   musica,
@@ -53,7 +57,7 @@ export function MusicPlayer({
 
   // A reprodução respeita o FIM ESCOLHIDO, não os 30s da prévia: era isso que
   // fazia a música seguir tocando para além do recorte e parar sozinha no fim
-  // do arquivo, em vez de demarcar o trecho que o usuário selecionou.
+  // do arquivo, em vez de demarcar o trecho selecionado.
   useEffect(() => {
     if (status.playing && status.currentTime >= trechoFim) {
       player.pause();
@@ -61,12 +65,19 @@ export function MusicPlayer({
     }
   }, [status.playing, status.currentTime, player, trechoInicio, trechoFim]);
 
-  // Perdeu a vez: cala a boca na hora. Silenciar na subida de `ativo=false`
-  // (e não só no toque que abre o modal) cobre também o caminho em que o modal
-  // aparece por outra via — o dono da saída é sempre um só.
+  // Perdeu a vez: cala a boca na hora (T044).
   useEffect(() => {
     if (!ativo) player.pause();
   }, [ativo, player]);
+
+  // Estável para não recriar os PanResponder do RangeSlider a cada tick do status
+  const aplicarTrecho = useCallback(
+    (inicio: number, fim: number) => {
+      onTrecho(inicio, fim);
+      player.seekTo(inicio).catch(() => {});
+    },
+    [onTrecho, player],
+  );
 
   if (!musica.previewUrl) {
     return (
@@ -82,7 +93,7 @@ export function MusicPlayer({
     if (status.playing) {
       player.pause();
     } else {
-      // Fora do recorte? Começa do início dele — tocar é ouvir o trecho, não a faixa.
+      // Fora do recorte? Começa do início dele — tocar é ouvir o trecho.
       if (status.currentTime < trechoInicio || status.currentTime >= trechoFim) {
         player.seekTo(trechoInicio).catch(() => {});
       }
@@ -90,82 +101,35 @@ export function MusicPlayer({
     }
   };
 
-  /** Início não pode encostar no fim: sempre sobra o piso de duração. */
-  const mudarInicio = (v: number) => {
-    const inicio = Math.min(Math.max(0, Math.round(v)), trechoFim - TRECHO_MIN_S);
-    onTrecho(inicio, trechoFim);
-    player.seekTo(inicio).catch(() => {});
-  };
-
-  const mudarFim = (v: number) => {
-    const fim = Math.max(Math.min(TRECHO_MAX_S, Math.round(v)), trechoInicio + TRECHO_MIN_S);
-    onTrecho(trechoInicio, fim);
-    // Se a cabeça de leitura ficou fora do novo recorte, traz de volta
-    if (status.currentTime >= fim) player.seekTo(trechoInicio).catch(() => {});
-  };
-
-  // Posição da reprodução DENTRO do recorte, 0–1. É isto que faltava se mexer.
-  const andamento =
-    duracao > 0
-      ? Math.min(1, Math.max(0, (status.currentTime - trechoInicio) / duracao))
-      : 0;
-  const decorrido = Math.max(0, Math.min(duracao, status.currentTime - trechoInicio));
-
   return (
     <View style={styles.wrap}>
-      <View style={styles.row}>
+      <View style={styles.linha}>
         <Pressable onPress={toggle} hitSlop={hitSlops.botao} style={styles.playBtn}>
-          <Ionicons name={status.playing ? 'pause' : 'play'} size={17} color={colors.ink} />
+          <Ionicons name={status.playing ? 'pause' : 'play'} size={20} color={colors.ruby} />
         </Pressable>
 
-        <View style={styles.corpo}>
-          {/* Progresso REAL da reprodução dentro do trecho — não é seletor */}
-          <View style={styles.trilho}>
-            <View style={[styles.preenchido, { width: `${andamento * 100}%` }]} />
-          </View>
-          <View style={styles.legendRow}>
-            <Text style={styles.legend}>
-              {Math.floor(decorrido)}s / {duracao}s
-            </Text>
-            <Text style={styles.legendForte}>VÍDEO DE {duracao}s</Text>
+        <View style={styles.controle}>
+          <RangeSlider
+            min={0}
+            max={TRECHO_MAX_S}
+            step={1}
+            minGap={TRECHO_MIN_S}
+            inicio={trechoInicio}
+            fim={trechoFim}
+            progresso={status.currentTime}
+            onChange={aplicarTrecho}
+          />
+          <View style={styles.marcas}>
+            <Text style={styles.marca}>{mmss(0)}</Text>
+            <Text style={styles.marca}>{mmss(TRECHO_MAX_S / 2)}</Text>
+            <Text style={styles.marca}>{mmss(TRECHO_MAX_S)}</Text>
           </View>
         </View>
       </View>
 
-      {/* Recorte: onde começa e onde termina o pedaço que vira vídeo */}
-      <View style={styles.recorte}>
-        <View style={styles.linhaSlider}>
-          <Text style={styles.slidLabel}>INÍCIO</Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={TRECHO_MAX_S - TRECHO_MIN_S}
-            step={1}
-            value={trechoInicio}
-            minimumTrackTintColor={colors.parchment25}
-            maximumTrackTintColor={colors.parchment25}
-            thumbTintColor={colors.amber}
-            onSlidingComplete={mudarInicio}
-          />
-          <Text style={styles.slidValor}>{trechoInicio}s</Text>
-        </View>
-
-        <View style={styles.linhaSlider}>
-          <Text style={styles.slidLabel}>FIM</Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={TRECHO_MIN_S}
-            maximumValue={TRECHO_MAX_S}
-            step={1}
-            value={trechoFim}
-            minimumTrackTintColor={colors.parchment25}
-            maximumTrackTintColor={colors.parchment25}
-            thumbTintColor={colors.amber}
-            onSlidingComplete={mudarFim}
-          />
-          <Text style={styles.slidValor}>{trechoFim}s</Text>
-        </View>
-      </View>
+      <Text style={styles.trecho}>
+        Trecho · {mmss(trechoInicio)} → {mmss(trechoFim)}  ·  vídeo de {duracao}s
+      </Text>
     </View>
   );
 }
@@ -173,80 +137,43 @@ export function MusicPlayer({
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
-    gap: 10,
+    gap: 4,
   },
-  row: {
+  linha: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
+  // Quadrado arredondado amber com o ícone em ruby — como no Figma
   playBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 48,
+    height: 48,
+    borderRadius: radii.card,
     backgroundColor: colors.amber,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  corpo: {
+  controle: {
     flex: 1,
-    gap: 6,
   },
-  trilho: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.parchment25,
-    overflow: 'hidden',
-  },
-  preenchido: {
-    height: '100%',
-    backgroundColor: colors.amber,
-  },
-  legendRow: {
+  marcas: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: -6,
   },
-  legend: {
-    color: colors.amber,
-    fontFamily: fonts.labelLight,
-    fontSize: 10,
-    letterSpacing: 1,
-  },
-  legendForte: {
-    color: colors.amber,
-    fontFamily: fonts.labelForte,
-    fontSize: 10,
-    letterSpacing: 1,
-  },
-  recorte: {
-    gap: 2,
-    borderTopWidth: 1,
-    borderTopColor: colors.parchment25,
-    paddingTop: 6,
-  },
-  linhaSlider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  slidLabel: {
+  marca: {
     color: colors.parchment50,
     fontFamily: fonts.labelLight,
-    fontSize: 9,
-    letterSpacing: 1,
-    width: 42,
-  },
-  slider: {
-    flex: 1,
-    height: 28,
-  },
-  slidValor: {
-    color: colors.parchment,
-    fontFamily: fonts.labelForte,
     fontSize: 10,
     letterSpacing: 1,
-    width: 30,
-    textAlign: 'right',
+  },
+  trecho: {
+    color: colors.amber,
+    fontFamily: fonts.labelForte,
+    fontSize: 11,
+    letterSpacing: 1,
+    textAlign: 'center',
+    marginTop: 2,
   },
   offline: {
     color: colors.parchment50,

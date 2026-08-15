@@ -388,11 +388,16 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   **Diagnóstico**: o modelo **já suportava** recorte arbitrário — `trechoFim` existe em
   `CaptureSession`, alimenta `durationSeconds` em [`sharePackage.ts`](../../src/services/sharePackage.ts)
   e entra na legenda. Só a interface é que nunca deixava mexer nele.
-  **Feito** em [`MusicPlayer.tsx`](../../src/components/MusicPlayer.tsx): separou-se o que era
-  uma coisa só em três — uma **barra de progresso** não interativa que anda com a reprodução,
-  **dois sliders** (início e fim) e a **duração do vídeo** em destaque. A reprodução agora
-  respeita o fim escolhido e volta ao início do trecho. Piso de 5 s (`TRECHO_MIN_S`), que já
-  era o implícito no antigo `maximumValue={TRECHO_MAX_S - 5}`.
+  **Feito** em [`MusicPlayer.tsx`](../../src/components/MusicPlayer.tsx): a reprodução passou a
+  respeitar o fim escolhido e a voltar ao início do trecho, com piso de 5 s (`TRECHO_MIN_S`),
+  que já era o implícito no antigo `maximumValue={TRECHO_MAX_S - 5}`.
+
+  > ⚠️ **A primeira solução foi rejeitada pelo Sávio e substituída.** Eu havia posto uma barra
+  > de progresso separada **mais dois sliders empilhados** (início e fim). Resolvia a função,
+  > mas não é o padrão que o mercado usa nem o que o design pede — "duas barrinhas não é nada
+  > ortodoxo". O certo é **um trilho só com duas bolinhas**, conforme o Figma
+  > (nó [462-926](https://www.figma.com/design/3yJ1nLbHljozr8qqfrQ6yX/JOVI-Challenge---FIAP-2026?node-id=462-926&m=dev)).
+  > Ver **T050**.
   O recorte **sobrevive à troca de faixa** (toda prévia do Deezer tem 30 s, então "quero 10 s
   de vídeo" continua valendo) — antes o `MusicSheet` resetava para 0–30 e jogava a escolha fora.
   **Evidência**: recorte 10 s→20 s exibindo "VÍDEO DE 10s"; barra andando 2s/10s → 8s/10s;
@@ -431,6 +436,43 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   trocado por `approximateDurationMs`.
   Esse warning rendeu ainda a **correção de leitura registrada no T045**: `durationMs` é a
   duração do vídeo, não o tempo de exportação.
+
+- [X] T050 [DESIGN] **Trocar as duas barrinhas por um seletor de faixa do Figma.**
+  Duas barras empilhadas não são o padrão do mercado para recortar um trecho. O design
+  (nó [462-926](https://www.figma.com/design/3yJ1nLbHljozr8qqfrQ6yX/JOVI-Challenge---FIAP-2026?node-id=462-926&m=dev))
+  pede **um trilho com duas bolinhas**, marcas `0:00 / 0:15 / 0:30` embaixo e a legenda
+  `Trecho · 0:00 → 0:15`, com o play num quadrado arredondado amber e ícone ruby.
+  **Feito**: [`RangeSlider.tsx`](../../src/components/RangeSlider.tsx), novo, construído com
+  `PanResponder`. O `@react-native-community/slider` só tem um thumb, e trazer uma biblioteca de
+  range slider seria desvio da stack do `CLAUDE.md`; como o desenho é dois círculos sobre um
+  trilho pintado, fazer à mão custa menos que mais uma dependência.
+  Decisões que valem registro:
+  - **`onChange` só no release**, não a cada pixel: cada mudança de recorte invalida o vídeo
+    pré-gerado (T048), e emitir durante o arraste faria a chave do pacote mudar dezenas de vezes
+    por gesto. Durante o arraste o componente se desenha com estado local.
+  - **O andamento da reprodução vive dentro da faixa selecionada** (pintado em amber sobre o
+    branco), em vez de numa segunda barra. Assim o "movimento" que faltava acontece no próprio
+    trilho, sem contrariar o design.
+  - Bolinhas de 22 dp com `hitSlop` de 16 em volta, chegando ao alvo de 48 dp da FR-Q02.
+  - **Paleta**: o card no Figma está sobre um gradiente laranja claro; aqui ele vive dentro do
+    modal de captura, que é `ink`. Mantive a estrutura e as formas do design com os tokens
+    escuros do modal — trocar o fundo do card sozinho brigaria com o resto da tela. **Se a
+    intenção era o card laranja, é só dizer que eu troco.**
+  **Evidência**: recorte `0:10 → 0:20` exibindo "vídeo de 10s", andamento preenchendo dentro da
+  faixa, parada no fim do trecho, e `.mp4` de **10,00 s** (4,7 MB) pré-gerado sozinho.
+
+- [X] T051 [BUG] **Trocar de música estourava com tela vermelha.**
+  `ERR_USING_RELEASED_SHARED_OBJECT` — *Cannot use shared object that was already released*,
+  apontando `MusicSheet.tsx:40`.
+  **Foi regressão minha, introduzida no T044**: eu havia acrescentado
+  `useEffect(() => () => player.pause(), [player])` como reforço para o caso de o modal fechar
+  por um caminho inesperado. No unmount, porém, o `useAudioPlayer` libera o player **antes**
+  desse cleanup rodar, e chamar `pause()` num objeto já liberado lança.
+  **Feito**: cleanup removido. Ele também era desnecessário — liberar o player já interrompe a
+  reprodução, e o silêncio nos caminhos normais vem do `pause()` explícito de `cancelar()` e
+  `confirmar()`, com o botão físico de voltar caindo em `cancelar` via `onRequestClose`. O lugar
+  ficou comentado para ninguém "reforçar" de novo.
+  **Evidência**: ciclo completo de abrir → tocar sugestão → confirmar, com zero erros no logcat.
 
 ---
 
