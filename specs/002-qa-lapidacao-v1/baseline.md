@@ -115,3 +115,44 @@ Inset superior (status bar): 76 px = 27,6 dp em ambos os modos.
 > Alternar o modo por `settings put global force_fsg_nav_bar` reinicia a SystemUI e tira o
 > app do primeiro plano. Ao automatizar a verificação da US1, relançar o app depois de
 > trocar de modo.
+
+---
+
+## T013 — Verificação da US1 depois da correção
+
+Medido por análise de pixel sobre a captura de tela (limites reais de cada botão) e por
+toque real na **borda inferior** de cada botão primário — a faixa que antes não respondia.
+Evidência em [`docs/preview/us1/`](../../docs/preview/us1/).
+
+### Limites dos botões
+
+| Superfície | Antes (y) | Depois (y) | Folga até o sistema |
+|---|---|---|---|
+| Captura · "Salvar" / "Postar agora" | 2162 – **2266** | 2052 – **2184** | **26 px** |
+| Música · "Cancelar" / "Confirmar escolha" | 2141 – **2256** | 2057 – **2187** | **23 px** |
+| Postagem · "Fechar" | flush até **2266** | termina em **2183** | **27 px** |
+| Visor · obturador (já correto) | — | termina em **2149** | **61 px** |
+
+Antes, 56 px de cada botão (≈45% da altura) ficavam sob a barra de navegação. Agora nenhum
+pixel de botão primário cai na área do sistema.
+
+### Toques na borda inferior — os quatro dispararam
+
+| Modo | Botão | Toque | Resultado |
+|---|---|---|---|
+| Botões | Música · Cancelar | `tap 251 2185` | ✅ fechou o modal |
+| Botões | Captura · Postar agora | `tap 790 2180` | ✅ gerou o `.mp4` (29 966 ms) e abriu a postagem |
+| Botões | Postagem · Fechar | `tap 540 2180` | ✅ fechou e voltou ao visor |
+| **Gestos** | Captura · Salvar | `tap 290 2266` | ✅ salvou e fechou |
+
+### O layout acompanha o modo de navegação
+
+Mesmo botão "Salvar", mesma build, só trocando o modo do sistema:
+
+| Modo | Inset | Botão termina em | Folga |
+|---|---|---|---|
+| Por botões | 130 px | y = 2184 | 26 px |
+| Por gestos | 44 px | y = 2270 | 26 px |
+
+**A folga é idêntica nos dois modos** — é o que prova que o valor vem do aparelho e não de
+uma constante. Um `paddingBottom` fixo não conseguiria os dois números ao mesmo tempo.

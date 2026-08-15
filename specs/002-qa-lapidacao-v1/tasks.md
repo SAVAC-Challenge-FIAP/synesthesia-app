@@ -57,7 +57,7 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 - [X] T010 [P] [US1] Aplicar inset inferior real em `src/components/MusicSheet.tsx` (Cancelar / Confirmar escolha)
 - [X] T011 [P] [US1] Aplicar inset inferior real em `app/gallery.tsx`
 - [X] T012 [US1] Garantir área de toque mínima de 48dp em todos os controles interativos das telas acima, sem alterar o tamanho visual dos elementos
-- [ ] T013 [US1] Validar no dispositivo: tocar na borda inferior de cada botão primário em navegação por botões **e** por gestos; anexar screenshots do antes/depois em `docs/preview/us1/`
+- [X] T013 [US1] Validar no dispositivo: tocar na borda inferior de cada botão primário em navegação por botões **e** por gestos; anexar screenshots do antes/depois em `docs/preview/us1/`
 
 ---
 
