@@ -1,0 +1,6 @@
+--------- beginning of main
+--------- beginning of system
+08-15 12:04:11.608  8758  8758 D VideoMuxer: progresso=0 estado=iniciando t=0ms
+08-15 12:04:11.888  8758  8758 D VideoMuxer: progresso=100 estado=exportando t=280ms
+08-15 12:04:21.404  8758  8758 I VideoMuxer: mp4 pronto: /data/user/0/com.savioomiodev.synesthesia/cache/synesthesia-video/pacote-1786806251574.mp4 (29966ms, 14754185 bytes)
+08-15 12:04:21.404  8758  8758 D VideoMuxer: progresso=100 estado=concluido t=9796ms

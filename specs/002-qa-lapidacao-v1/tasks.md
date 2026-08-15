@@ -155,11 +155,30 @@ aparece no `adb logcat`. O logcat só serve para o nativo (`VideoMuxer`, `Androi
 **Princípio**: III · **FR**: Q09, Q10 · **Contrato**: [contracts/video-muxer.md](./contracts/video-muxer.md)
 **Teste independente**: acionar a exportação e observar se o indicador avança proporcionalmente.
 
-- [ ] T033 [US6] Emitir evento de progresso do módulo nativo em `modules/video-muxer/android/src/main/java/expo/modules/videomuxer/VideoMuxerModule.kt`, consultando o progresso do Transformer conforme o contrato (C-01 a C-04)
-- [ ] T034 [US6] Expor o evento e seus tipos em `modules/video-muxer/src/VideoMuxerModule.ts` e `VideoMuxer.types.ts`
-- [ ] T035 [US6] Consumir o progresso em `src/services/videoMuxer.ts` e apresentá-lo em `src/components/PostSheet.tsx`, mantendo o indicador indefinido como fallback (C-04)
-- [ ] T036 [US6] Confirmar que a Promise continua sendo a fonte da verdade de sucesso/falha e que ignorar o evento mantém o comportamento do v1 (C-01)
-- [ ] T037 [US6] Validar no dispositivo com `./scripts/dev-android.sh log`: progresso monotônico, chega a 100, interface responsiva; anexar screenshots em `docs/preview/us6/`
+- [X] T033 [US6] Emitir evento de progresso do módulo nativo em `modules/video-muxer/android/src/main/java/expo/modules/videomuxer/VideoMuxerModule.kt`, consultando o progresso do Transformer conforme o contrato (C-01 a C-04)
+- [X] T034 [US6] Expor o evento e seus tipos em `modules/video-muxer/src/VideoMuxerModule.ts` e `VideoMuxer.types.ts`
+- [X] T035 [US6] Consumir o progresso em `src/services/videoMuxer.ts` e apresentá-lo em `src/components/PostSheet.tsx`, mantendo o indicador indefinido como fallback (C-04)
+- [X] T036 [US6] Confirmar que a Promise continua sendo a fonte da verdade de sucesso/falha e que ignorar o evento mantém o comportamento do v1 (C-01)
+- [X] T037 [US6] Validar no dispositivo com `./scripts/dev-android.sh log`: progresso monotônico, chega a 100, interface responsiva; anexar screenshots em `docs/preview/us6/`
+
+> **Achado da Fase 8 — o `getProgress` do Media3 não é fiel para esta composição.**
+> Medido: ele devolve **100% aos 280 ms** de uma exportação de ~10 s, porque reporta o avanço da
+> *sequência de entrada* — e a nossa entrada de vídeo é uma **imagem parada**, um frame só,
+> consumido de imediato. O tempo real está no encoding dos 30 s de saída, que esse número não vê.
+> Uma barra cravada em 100% por 9,5 s mente mais que um indicador indefinido, e o FR-Q09 pede
+> progresso proporcional ao trabalho real.
+> **Resolução**: o módulo passou a **qualificar a fonte antes de confiar nela** (regra **C-05**,
+> acrescentada ao [contrato](./contracts/video-muxer.md)): observa 1 s sem emitir e, se o valor já
+> estiver ≥95%, descarta a fonte e não emite nada — a interface fica no indicador indefinido
+> (C-04). A regra é genérica: um device com progresso fiel passa na qualificação e ganha a barra
+> determinada, sem hard-code de aparelho.
+> **Consequência**: neste device a barra determinada **não aparece**, por decisão de honestidade.
+> Toda a infraestrutura está pronta e ligada — se o Media3 passar a informar progresso real, a
+> barra funciona sem nenhuma mudança de código.
+> **Desvio de local do T035**: a task mandava apresentar o progresso no `PostSheet.tsx`, mas o
+> `PostSheet` só é montado **depois** da exportação terminar — a espera acontece no
+> `CaptureSheet`, que é onde o indicador foi posto (o T045 já tinha antecipado isso).
+> Evidências e as duas curvas de log em `docs/preview/us6/`.
 
 ---
 

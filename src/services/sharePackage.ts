@@ -70,8 +70,10 @@ export async function exportPackage(params: {
   musica: MusicSuggestion | null;
   trechoInicio: number;
   trechoFim: number;
+  /** Progresso real da geração do .mp4, 0–100 (FR-Q09). Opcional. */
+  onProgresso?: (progresso: number) => void;
 }): Promise<SharePackage> {
-  const { imageUri, musica, trechoInicio, trechoFim } = params;
+  const { imageUri, musica, trechoInicio, trechoFim, onProgresso } = params;
   if (!musica) {
     return { videoUri: null, imageUri, audioUri: null, caption: null, musica: null };
   }
@@ -81,6 +83,7 @@ export async function exportPackage(params: {
         imageUri,
         audioUri,
         durationSeconds: Math.max(1, trechoFim - trechoInicio),
+        onProgresso,
       })
     : null;
   return {

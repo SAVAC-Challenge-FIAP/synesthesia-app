@@ -84,6 +84,12 @@ export function CaptureSheet() {
   const [postando, setPostando] = useState(false);
   /** Espelho síncrono de `postando`: dois toques seguidos chegam antes do re-render. */
   const postandoRef = useRef(false);
+  /**
+   * Progresso real da geração do .mp4, 0–100 (FR-Q09/T035). `null` significa
+   * "o device não sabe informar" — e aí o indicador fica indefinido em vez de
+   * fingir avanço (contrato C-04).
+   */
+  const [progresso, setProgresso] = useState<number | null>(null);
 
   // Estável pelo mesmo motivo do visor: mantém a memoização dos chips de pé
   const escolherFiltro = useCallback(
@@ -244,6 +250,7 @@ export function CaptureSheet() {
     if (postandoRef.current) return;
     postandoRef.current = true;
     setPostando(true);
+    setProgresso(null);
     try {
       const renderizada = await renderizarComFiltro();
       await salvar(false);
@@ -254,6 +261,7 @@ export function CaptureSheet() {
         musica: session.musica,
         trechoInicio: session.trechoInicio,
         trechoFim: session.trechoFim,
+        onProgresso: setProgresso,
       });
       setSharePkg(pacote);
     } catch {
@@ -266,6 +274,7 @@ export function CaptureSheet() {
     } finally {
       postandoRef.current = false;
       setPostando(false);
+      setProgresso(null);
     }
   };
 
@@ -417,13 +426,28 @@ export function CaptureSheet() {
               </View>
             ) : postando ? (
               /* A geração do .mp4 leva 20–30s. Um botão mudo nesse intervalo é
-                 o que fazia o usuário tocar de novo (T045); o progresso real
-                 chega na Fase 8 (T033–T037) e substitui este texto. */
-              <View style={styles.motivoLinha}>
-                <ActivityIndicator size="small" color={colors.amber} />
-                <Text style={styles.motivoBloqueio}>
-                  MONTANDO O PACOTE — GERANDO O VÍDEO. ISSO LEVA ALGUNS SEGUNDOS.
-                </Text>
+                 o que fazia o usuário tocar de novo (T045). Com progresso real
+                 (T033–T037) a barra avança proporcionalmente ao trabalho; sem
+                 ele — device que não sabe informar — cai no indicador
+                 indefinido em vez de fingir avanço (C-04). */
+              <View style={styles.progressoBloco}>
+                <View style={styles.motivoLinha}>
+                  {progresso === null ? (
+                    <ActivityIndicator size="small" color={colors.amber} />
+                  ) : (
+                    <Ionicons name="film-outline" size={12} color={colors.amber} />
+                  )}
+                  <Text style={styles.motivoBloqueio}>
+                    {progresso === null
+                      ? 'MONTANDO O PACOTE — GERANDO O VÍDEO. ISSO LEVA ALGUNS SEGUNDOS.'
+                      : `GERANDO O VÍDEO — ${progresso}%`}
+                  </Text>
+                </View>
+                {progresso === null ? null : (
+                  <View style={styles.barraTrilho}>
+                    <View style={[styles.barraPreenchida, { width: `${progresso}%` }]} />
+                  </View>
+                )}
               </View>
             ) : null}
             <View style={styles.actionsRow}>
@@ -623,6 +647,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 6,
+  },
+  progressoBloco: {
+    gap: 6,
+  },
+  barraTrilho: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.parchment25,
+    overflow: 'hidden',
+  },
+  barraPreenchida: {
+    height: '100%',
+    backgroundColor: colors.amber,
   },
   motivoBloqueio: {
     flex: 1,

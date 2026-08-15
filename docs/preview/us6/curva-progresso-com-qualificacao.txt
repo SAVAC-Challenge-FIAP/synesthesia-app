@@ -1,0 +1,5 @@
+--------- beginning of main
+--------- beginning of system
+08-15 12:07:34.508 10033 10033 D VideoMuxer: progresso=0 estado=iniciando t=0ms
+08-15 12:07:35.582 10033 10033 I VideoMuxer: progresso do Transformer nao e fiel aqui (100% em 1074ms) — caindo para indicador indefinido
+08-15 12:07:44.683 10033 10033 I VideoMuxer: mp4 pronto: /data/user/0/com.savioomiodev.synesthesia/cache/synesthesia-video/pacote-1786806454440.mp4 (29966ms, 14476636 bytes)
