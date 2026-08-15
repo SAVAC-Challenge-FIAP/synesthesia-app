@@ -86,8 +86,8 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 
 - [X] T020 [US3] Instrumentar com marcações de tempo as três etapas de `analyzePhotoAndSuggest` em `src/services/music.ts` (redução da imagem, chamada ao Gemini, resolução das faixas) e registrar os números em `baseline.md`
 - [X] T021 [US3] Atacar a etapa dominante identificada em T020 — hipóteses na ordem de [research.md](./research.md) R3: antecipar a redução da imagem para o instante da captura; reduzir o payload enviado; só então considerar troca de modelo
-- [ ] T022 [P] [US3] Substituir o texto estático da curadoria por progresso por etapa ("lendo a cena" → "buscando faixas") em `src/components/CaptureSheet.tsx` (FR-Q08)
-- [ ] T023 [US3] Medir novamente 5 capturas e registrar em `baseline.md` a redução obtida; se não atingir 40%, documentar o que foi medido e qual a próxima hipótese — **não** marcar ✅ com número inventado
+- [X] T022 [P] [US3] Substituir o texto estático da curadoria por progresso por etapa ("lendo a cena" → "buscando faixas") em `src/components/CaptureSheet.tsx` (FR-Q08)
+- [X] T023 [US3] Medir novamente 5 capturas e registrar em `baseline.md` a redução obtida; se não atingir 40%, documentar o que foi medido e qual a próxima hipótese — **não** marcar ✅ com número inventado
 - [ ] T024 [US3] Confirmar que a degradação graciosa (Gemini falhou → pipeline por vibe → Deezer → catálogo local) continua íntegra após as mudanças
 
 ---

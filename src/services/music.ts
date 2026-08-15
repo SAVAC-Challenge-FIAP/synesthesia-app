@@ -222,6 +222,13 @@ async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<
   return resolved.filter((s): s is MusicSuggestion => s !== null);
 }
 
+/**
+ * Etapa corrente da curadoria, para a interface comunicar progresso real em
+ * vez de um texto parado (FR-Q08). Cada valor corresponde a uma etapa medida
+ * no T020, então o que a tela mostra é o que está de fato acontecendo.
+ */
+export type EtapaCuradoria = 'preparando' | 'lendo' | 'buscando';
+
 export interface PhotoAnalysis {
   /** Vibe real inferida da imagem; null quando o Gemini não pôde analisar */
   vibeId: VibeId | null;
@@ -237,6 +244,7 @@ export interface PhotoAnalysis {
 export async function analyzePhotoAndSuggest(
   photoUri: string,
   fallbackVibe: Vibe,
+  onEtapa?: (etapa: EtapaCuradoria) => void,
 ): Promise<PhotoAnalysis> {
   // Instrumentação das três etapas (T020). O research R3 descartou por inspeção
   // a hipótese "o Deezer está em série"; estes números dizem qual etapa domina
@@ -245,6 +253,7 @@ export async function analyzePhotoAndSuggest(
   let tImagem = 0;
   let tGemini = 0;
   let bytes = 0;
+  let expirou = false;
   const registrar = (etapaFinal: string, tDeezer: number) =>
     console.log(
       `[music][tempo] imagem=${tImagem}ms gemini=${tGemini}ms deezer=${tDeezer}ms ` +
@@ -252,11 +261,13 @@ export async function analyzePhotoAndSuggest(
     );
 
   try {
+    onEtapa?.('preparando');
     const marcoImagem = Date.now();
     const base64 = await photoToBase64(photoUri);
     tImagem = Date.now() - marcoImagem;
     bytes = base64.length;
 
+    onEtapa?.('lendo');
     const marcoGemini = Date.now();
     const scene = await askGeminiWithPhoto(base64);
     tGemini = Date.now() - marcoGemini;
@@ -268,6 +279,7 @@ export async function analyzePhotoAndSuggest(
           (vibeReal ? '' : ' (id inválido, mantendo vibe heurística)'),
       );
       const vibe = vibeReal ?? fallbackVibe;
+      onEtapa?.('buscando');
       const marcoDeezer = Date.now();
       const sugestoes = await resolveWithDeezer(scene.musicas ?? [], vibe);
       const tDeezer = Date.now() - marcoDeezer;
@@ -277,14 +289,15 @@ export async function analyzePhotoAndSuggest(
         return { vibeId: vibeReal?.id ?? null, sugestoes };
       }
       // Cena lida mas faixas não resolveram → pipeline por vibe, já com a vibe real
-      const porVibe = await getSuggestions(vibe);
+      const porVibe = await getSuggestions(vibe, onEtapa);
       registrar('pipeline-por-vibe', tDeezer);
       return { vibeId: vibeReal?.id ?? null, sugestoes: porVibe };
     }
   } catch (e) {
     console.log('[music] análise da foto falhou (caiu para pipeline por vibe):', e);
+    expirou = e instanceof Error && e.name === 'AbortError';
   }
-  const degradado = await getSuggestions(fallbackVibe);
+  const degradado = await getSuggestions(fallbackVibe, onEtapa, expirou);
   registrar('degradado', 0);
   return { vibeId: null, sugestoes: degradado };
 }
@@ -293,14 +306,27 @@ export async function analyzePhotoAndSuggest(
  * Busca até 4 sugestões para a vibe. Nunca rejeita: em falha total devolve o
  * catálogo local (sem preview), preservando o fluxo de salvar (SC-004).
  */
-export async function getSuggestions(vibe: Vibe): Promise<MusicSuggestion[]> {
+export async function getSuggestions(
+  vibe: Vibe,
+  onEtapa?: (etapa: EtapaCuradoria) => void,
+  /**
+   * Pula a etapa 1 quando o Gemini acabou de estourar o tempo. Sem isso a
+   * degradação gasta outros 22s batendo no mesmo serviço que já não respondeu,
+   * e o total passa dos 30s que a interface espera — o usuário veria a
+   * postagem liberar "sem trilha" enquanto a busca ainda estava viva.
+   */
+  pularGemini = false,
+): Promise<MusicSuggestion[]> {
   console.log(`[music] getSuggestions vibe="${vibe.id}" geminiKey=${GEMINI_KEY ? 'presente' : 'ausente'}`);
 
   // 1) Gemini cura, Deezer resolve o preview
   try {
+    if (pularGemini) throw new Error('Gemini pulado (tempo limite anterior)');
+    onEtapa?.('lendo');
     const ideas = await askGemini(vibe);
     console.log(`[music] Gemini retornou ${ideas.length} ideia(s)`, ideas);
     if (ideas.length > 0) {
+      onEtapa?.('buscando');
       const ok = await resolveWithDeezer(ideas, vibe);
       if (ok.length > 0) {
         console.log(`[music] ORIGEM=gemini — ${ok.length} sugestão(ões) usadas`);
@@ -313,6 +339,7 @@ export async function getSuggestions(vibe: Vibe): Promise<MusicSuggestion[]> {
 
   // 2) Deezer direto pelas keywords da vibe
   try {
+    onEtapa?.('buscando');
     const perKeyword = await Promise.all(
       vibe.musicaKeywords.slice(0, 2).map((kw) => searchDeezer(kw, 3).catch(() => [])),
     );

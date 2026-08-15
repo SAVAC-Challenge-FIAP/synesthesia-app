@@ -19,7 +19,7 @@ import { MusicSheet } from '@/components/MusicSheet';
 import { PostSheet } from '@/components/PostSheet';
 import { filterById } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
-import { analyzePhotoAndSuggest, getSuggestions } from '@/services/music';
+import { analyzePhotoAndSuggest, EtapaCuradoria, getSuggestions } from '@/services/music';
 import { persistPhoto } from '@/services/mediaStorage';
 import { exportPackage, SharePackage } from '@/services/sharePackage';
 import { saveToSystemGallery } from '@/services/systemGallery';
@@ -36,6 +36,17 @@ import { Media } from '@/types';
  * usuário — nunca para encurtar uma curadoria que está progredindo.
  */
 const LIMITE_CURADORIA_MS = 30_000;
+
+/**
+ * Texto de cada etapa da curadoria (FR-Q08). Substitui o rótulo único que
+ * ficava parado por até 30s — o Princípio III trata percepção de latência como
+ * defeito, e um texto imóvel é o que faz a espera parecer travamento.
+ */
+const TEXTO_ETAPA: Record<EtapaCuradoria, string> = {
+  preparando: 'PREPARANDO A CENA...',
+  lendo: 'LENDO A CENA...',
+  buscando: 'BUSCANDO AS FAIXAS...',
+};
 
 /**
  * Modal de Captura (US3/US4/US5): pacote sensorial em edição — foto + filtro
@@ -59,6 +70,7 @@ export function CaptureSheet() {
   const [showMusic, setShowMusic] = useState(false);
   const [sharePkg, setSharePkg] = useState<SharePackage | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [etapa, setEtapa] = useState<EtapaCuradoria>('preparando');
 
   const photoUri = session?.photoUri;
 
@@ -86,10 +98,10 @@ export function CaptureSheet() {
     patch({ curadoria: 'carregando' });
 
     // Transição "carregando --(tempo limite)--> indisponivel" do data-model.
-    // Sem ela o bloqueio da postagem vira armadilha: `callGemini` não tem
-    // timeout, e uma requisição pendurada deixaria `carregando` para sempre —
-    // observado no device durante a validação da US2. Se a resposta chegar
-    // depois, o `.then` abaixo ainda repõe a trilha e volta para `pronta`.
+    // Rede curta em `music.ts` (22s no Gemini, 8s no Deezer) já cobre o caso
+    // normal; este limite é a rede de segurança da interface, para qualquer
+    // caminho que ainda assim não devolva — sem ele o bloqueio da postagem
+    // vira armadilha, como se observou no device na validação da US2.
     const limite = setTimeout(() => {
       if (useCaptureStore.getState().session?.curadoria === 'carregando') {
         patch({ curadoria: 'indisponivel' });
@@ -97,8 +109,11 @@ export function CaptureSheet() {
     }, LIMITE_CURADORIA_MS);
 
     const analise = deteccaoTempoReal
-      ? analyzePhotoAndSuggest(s.photoUri, vibeById(s.vibeId))
-      : getSuggestions(vibeById(s.vibeId)).then((sugestoes) => ({ vibeId: null, sugestoes }));
+      ? analyzePhotoAndSuggest(s.photoUri, vibeById(s.vibeId), setEtapa)
+      : getSuggestions(vibeById(s.vibeId), setEtapa).then((sugestoes) => ({
+          vibeId: null,
+          sugestoes,
+        }));
     analise
       .then(({ vibeId: vibeReal, sugestoes }) => {
         clearTimeout(limite);
@@ -295,11 +310,7 @@ export function CaptureSheet() {
               {session.curadoria === 'carregando' ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator color={colors.amber} />
-                  <Text style={styles.loadingText}>
-                    {deteccaoTempoReal
-                      ? 'LENDO A CENA E CURANDO A TRILHA...'
-                      : 'CURANDO A TRILHA DA SUA VIBE...'}
-                  </Text>
+                  <Text style={styles.loadingText}>{TEXTO_ETAPA[etapa]}</Text>
                 </View>
               ) : session.musica ? (
                 <>
@@ -360,7 +371,7 @@ export function CaptureSheet() {
                 que não responde (FR-Q05) */}
             {curando ? (
               <Text style={styles.motivoBloqueio}>
-                ⏳ CURANDO A TRILHA — POSTAR LIBERA QUANDO A TRILHA CHEGAR. SALVAR JÁ FUNCIONA.
+                ⏳ {TEXTO_ETAPA[etapa]} POSTAR LIBERA QUANDO A TRILHA CHEGAR. SALVAR JÁ FUNCIONA.
               </Text>
             ) : null}
             <View style={styles.actionsRow}>

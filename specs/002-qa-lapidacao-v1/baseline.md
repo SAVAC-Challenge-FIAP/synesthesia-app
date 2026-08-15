@@ -90,7 +90,98 @@ Consequências para a Fase 5 (US3), registradas em "Dúvidas para o Sávio" no
 
 ### Decomposição por etapa (T020)
 
-_A preencher após a instrumentação de `analyzePhotoAndSuggest`._
+Instrumentando as três etapas de `analyzePhotoAndSuggest`, com a foto de 640px/q0.6 (~71 KB)
+que era o envio original:
+
+| Execução | Reduzir imagem | Gemini | Deezer | Total |
+|---|---|---|---|---|
+| 1 | 654 ms | **20 942 ms** | 564 ms | 22 165 ms |
+| 2 | 483 ms | **3 554 ms** | 397 ms | 4 439 ms |
+| 3 | 552 ms | **3 594 ms** | 395 ms | 4 544 ms |
+| 4 | 497 ms | **31 676 ms** | 549 ms | 32 725 ms |
+| 5 | 522 ms | **122 987 ms** | 361 ms | 123 874 ms |
+
+**O Gemini é 80–99% do tempo.** A redução da imagem custa meio segundo e o Deezer,
+0,4 s — ou seja, o research R3 estava certo ao descartar a paralelização do Deezer, e as
+duas etapas locais somadas nem chegam a 1 s.
+
+O que os números mostram e a spec não previa: **a variância é o defeito, não a mediana.**
+A mesma foto, na mesma rede, no mesmo aparelho, levou de **2,9 s a 123 s**. Os "30–45 s"
+da spec não são uma linha de base — são uma amostra tirada de uma janela ruim do serviço.
+
+---
+
+## T021 — O que foi atacado
+
+### Payload cortado pela metade, sem perder leitura de cena
+
+640px/q0.6 → **448px/q0.45**, de ~71 KB para ~35 KB. As cinco leituras seguintes
+continuaram descrevendo a cena corretamente e classificando a vibe como `romantica`:
+
+> "Laptop exibindo desenho com corações e declaração de amor." · "laptop com desenho de
+> corações e mensagem de amor" · "Laptop com desenho romântico fixado na tela"
+
+Melhor caso do Gemini caiu de 3 554 ms para **2 929 ms**. É ganho real, mas pequeno perto
+da variância — metade de 71 KB some no ruído de uma resposta que oscila 40×.
+
+### A correção que importou: a requisição nunca era abandonada
+
+`callGemini` e `searchDeezer` usavam `fetch` sem `AbortController`. A requisição de **123 s**
+seguiu viva muito depois de o usuário desistir e ter descartado a captura. Agora há teto de
+**22 s no Gemini** e **8 s no Deezer**.
+
+O teto do Gemini é menor que os 30 s da interface **de propósito**: assim a degradação
+graciosa ainda roda dentro da janela e o usuário recebe alguma trilha, em vez de a
+interface desistir sozinha com a requisição pendurada.
+
+> Efeito colateral que precisou de correção: ao estourar, a degradação chamava
+> `askGemini` de novo — outros 22 s no mesmo serviço que acabara de não responder, somando
+> 44 s e furando o limite da interface. Quando a falha é `AbortError`, a etapa do Gemini
+> agora é pulada e a busca vai direto ao Deezer por keywords.
+
+---
+
+## T023 — Medição depois das mudanças
+
+Cinco capturas com o código final (payload reduzido + tetos de rede + progresso por etapa):
+
+| Execução | Gemini | Total | Saída |
+|---|---|---|---|
+| 1 | 3 325 ms | 4 101 ms | gemini-foto |
+| 2 | 3 949 ms | 4 827 ms | gemini-foto |
+| 3 | 14 544 ms | 15 362 ms | gemini-foto |
+| 4 | 4 650 ms | 5 469 ms | gemini-foto |
+| 5 | estourou 22 s | 23 111 ms | **degradado — e com trilha** |
+
+**Mediana: 5 469 ms**, contra 6 020 ms da linha de base. **Redução de 9% — não os 40% do
+SC-Q03.** Não vou marcar essa meta como atingida.
+
+### Por que 40% não era alcançável, e o que melhorou de fato
+
+A meta foi calibrada sobre uma linha de base de 30–45 s que não se reproduz. Sobre a
+mediana real de 6 s, ela exigiria chegar a 3,6 s — e o T020 mostra que **95% do tempo está
+dentro da chamada ao Gemini**, fora do alcance do cliente. Só a troca de modelo mexeria
+nesse número, e o research a classificou como adiada por afetar a leitura de cena, que é o
+diferencial do produto.
+
+O que mudou de verdade é o **pior caso**, que é o que o usuário sente:
+
+| | Antes | Depois |
+|---|---|---|
+| Mediana | 6,02 s | 5,47 s |
+| Pior caso observado | **123 s**, interface presa em "carregando" | **23,1 s**, e ainda entrega trilha |
+| Requisição após desistência | seguia viva | abortada em 22 s |
+| Feedback durante a espera | texto único parado | 3 etapas reais |
+
+A execução 5 é a prova: o Gemini estourou, a degradação assumiu, e o usuário recebeu uma
+trilha em 23,1 s — dentro do limite de 30 s da interface. Antes, esse mesmo caso ficaria
+pendurado por 1 a 2 minutos com a postagem bloqueada.
+
+### Próxima hipótese, se alguém quiser perseguir a mediana
+
+Trocar `gemini-3.1-flash-lite` por um modelo mais rápido e medir a qualidade da leitura de
+cena lado a lado, em 20 fotos variadas — não em 5 da mesma cena. É decisão de produto, não
+de implementação: registrada como **D1** em [tasks.md](./tasks.md).
 
 ---
 
