@@ -29,10 +29,10 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 
 > Sem medir, otimizar é chute. Esta fase só coleta números e evidências; não altera comportamento.
 
-- [ ] T001 Confirmar ambiente e device respondendo, registrando a saída de `adb devices` em `specs/002-qa-lapidacao-v1/baseline.md`
-- [ ] T002 [P] Capturar screenshots da linha de base de todas as telas afetadas (câmera, captura, música, postagem, galeria) em `docs/preview/baseline/` via `./scripts/dev-android.sh shot`
-- [ ] T003 [P] Medir e registrar em `specs/002-qa-lapidacao-v1/baseline.md` o tempo entre disparo e trilha visível, em 5 capturas, com mediana — é a linha de base do SC-Q03
-- [ ] T004 [P] Registrar em `baseline.md` o menor valor de `y` que ainda aciona os botões primários (linha de base medida: y=2180 aciona, y=2213 não), em navegação por botões **e** por gestos
+- [X] T001 Confirmar ambiente e device respondendo, registrando a saída de `adb devices` em `specs/002-qa-lapidacao-v1/baseline.md`
+- [X] T002 [P] Capturar screenshots da linha de base de todas as telas afetadas (câmera, captura, música, postagem, galeria) em `docs/preview/baseline/` via `./scripts/dev-android.sh shot`
+- [X] T003 [P] Medir e registrar em `specs/002-qa-lapidacao-v1/baseline.md` o tempo entre disparo e trilha visível, em 5 capturas, com mediana — é a linha de base do SC-Q03
+- [X] T004 [P] Registrar em `baseline.md` o menor valor de `y` que ainda aciona os botões primários (linha de base medida: y=2180 aciona, y=2213 não), em navegação por botões **e** por gestos
 
 ---
 
@@ -181,4 +181,23 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
 
 > Preencher aqui qualquer decisão de produto que aparecer durante a execução autônoma, em vez de inventar. Implementar a alternativa mais conservadora e seguir.
 
-- _(vazio no início)_
+### D1 — A linha de base de 30–45 s da US3 não se reproduz (Fase 1, T003)
+
+Medido hoje no mesmo aparelho e na mesma rede, o tempo entre o disparo e a trilha visível
+tem **mediana de 6,02 s** (5 capturas: 5,65 / 6,02 / 6,02 / 6,19 / 7,31), contra os
+**30–45 s** que a spec assume. Nenhuma linha de código mudou entre as duas medições — a
+diferença é de ambiente. Números completos em [baseline.md](./baseline.md).
+
+Isso esvazia o SC-Q03: reduzir 40% sobre 6,02 s exigiria chegar a 3,6 s, o que só se
+alcança trocando o modelo do Gemini — a alternativa que o [research.md](./research.md) R3
+classificou como **adiada** por afetar a qualidade da leitura de cena, que é o diferencial
+do produto.
+
+**Decisão conservadora adotada** (a que menos altera comportamento): manter o modelo e o
+payload atuais; entregar da Fase 5 apenas o que é ganho puro e sem risco — a instrumentação
+(T020) e o progresso por etapa (T022, FR-Q08) — e registrar a medição real em vez de
+perseguir uma meta calibrada para um ambiente que não existe mais. **T021 fica sem ação de
+otimização**, com a medição documentando por quê.
+
+**Para o Sávio decidir**: recalibrar o SC-Q03 para a faixa real (~6 s) ou manter o alvo de
+3,6 s e autorizar a troca de modelo, aceitando o impacto na leitura de cena.
