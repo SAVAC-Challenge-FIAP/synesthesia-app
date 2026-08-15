@@ -57,8 +57,11 @@ const Chip = React.memo(function Chip({
 });
 
 /**
- * Carrossel horizontal dos filtros (chips do Figma, radius 15) — o mesmo no
- * visor e no modal de captura.
+ * Carrossel horizontal dos filtros (chips do Figma, radius 15) — **só no
+ * visor da câmera**. O modal de captura usa o `FilterThumbs`, que mostra a
+ * foto com cada filtro aplicado; aqui não há foto capturada para miniaturizar,
+ * só o preview ao vivo, e por isso os dois carrosséis divergem de propósito
+ * (T054).
  *
  * Já teve um chip "+N" na borda, que contava quantos filtros ainda não tinham
  * cabido na tela (US4/T025). Foi retirado a pedido do Sávio: virou peso visual

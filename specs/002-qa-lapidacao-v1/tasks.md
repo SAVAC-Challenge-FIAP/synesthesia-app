@@ -511,16 +511,22 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   > (prévia em `docs/preview/fase11/`), mas foi descartada em seguida: **na tela da câmera não
   > existe foto capturada** para miniaturizar, e um carrossel diferente em cada tela seria pior
   > que o problema.
+  >
+  > ✅ **Atualização (T054, 2026-08-15): o SC-Q05 voltou a ser atingido.** A ideia da miniatura
+  > foi retomada **restrita ao modal de captura**, onde a foto existe; a câmera ficou com os
+  > chips. "Um carrossel diferente em cada tela" deixou de ser o problema e virou a solução —
+  > as duas telas têm matéria-prima diferente. As duas frases acima descrevem o estado entre o
+  > T053 e o T054, e ficam aqui por isso.
 
 ---
 
 ## Fase 12 — Miniaturas de filtro (passada de bola, 2026-08-15)
 
-> **Esta fase é de outro chat.** Foi especificada pelo Sávio e **nada foi implementado** — a
-> sessão que a registrou parou aqui de propósito. O que está no código hoje é o carrossel de
-> chips de emoji (ver T053), que continua valendo até esta task ser feita.
+> **Passada de bola cumprida em 2026-08-15.** A fase foi especificada por uma sessão que parou
+> de propósito antes de implementar; esta sessão assumiu e fechou o T054. O carrossel de chips
+> de emoji continua no visor da câmera — só o modal de captura mudou.
 
-- [ ] T054 [DESIGN] **Trocar os chips de emoji por miniaturas com o filtro aplicado, no modal de
+- [X] T054 [DESIGN] **Trocar os chips de emoji por miniaturas com o filtro aplicado, no modal de
   captura.**
 
   **O que o Sávio pediu**, nas palavras dele: os filtros "seria em forma de tubs [thumbs] com o
@@ -599,6 +605,52 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   — **nunca** EAS), commit em pt-BR no imperativo. Ambiente e comandos: seção "Como retomar"
   no topo deste arquivo.
 
+> **Implementado e validado no device (2026-08-15).** Redmi Note 8 Pro, build debug + Metro.
+> Evidência em [`docs/preview/fase12/`](../../docs/preview/fase12/).
+>
+> **Como ficou**: componente novo `src/components/FilterThumbs.tsx` — o `FilterCarousel` não
+> foi tocado no comportamento, só ganhou um comentário dizendo que agora é exclusivo do visor.
+> Miniatura 70×93 (Figma 468:950), intervalo 10, `radii.card`, `FilteredImage` em
+> `absoluteFill` com a foto da sessão, véu `rgba(9,5,6,0.28)` para o texto ler sobre qualquer
+> cena, emoji 24 ao centro, nome 9px embaixo. Selecionada: borda `amber` + nome `amber`. A
+> borda existe sempre, transparente quando não selecionada — senão a seleção empurraria as
+> vizinhas 2px a cada troca. `Original 📷` segue na frente.
+>
+> **Armadilha 3 — as nove imagens medidas, não supostas.** `dumpsys gfxinfo`, mesma tela, mesmo
+> roteiro, com e sem a mudança (A/B feito trocando só o import do `CaptureSheet`):
+>
+> | Roteiro | | Frames | Janky | p90 | p95 |
+> |---|---|---|---|---|---|
+> | 16 varreduras do carrossel | chips (antes) | 737 | 2,71% | 15 ms | 16 ms |
+> | 16 varreduras do carrossel | **miniaturas** | 708 | **8,76%** | 16 ms | **17 ms** |
+> | 12 trocas de filtro | chips (antes) | 12 | 100% | 34 ms | 36 ms |
+> | 12 trocas de filtro | **miniaturas** | 15 | 93% | 48 ms | **61 ms** |
+>
+> Leitura honesta: rolar o carrossel **custa mais** — o jank triplica, mas p90/p95 ficam em
+> 16–17 ms, na borda do orçamento de 16,7 ms, e a rolagem continua lisa a olho nu. Já a
+> **troca de filtro já estourava antes** da mudança (100% de frames janky com chips): o custo
+> ali é o `FilteredImage` grande do preview sendo redesenhado, não o carrossel. As miniaturas
+> acrescentam ~1 frame perdido por troca (p95 36 → 61 ms). O cache do RN segurou as nove
+> imagens da mesma URI, como o T054 supunha — se não segurasse, os números da varredura não
+> teriam ficado a 1 ms dos chips.
+>
+> **Armadilha 5 — acessibilidade verificada de verdade**, com `settings put system font_scale
+> 1.45`. Acima de 1.3 o nome sai de todas as miniaturas menos da selecionada (a alternativa
+> que o próprio T054 combinou), e nada trunca no carrossel — ver
+> `04-fonte-ampliada-nome-so-na-selecionada.png`. Achado colateral registrado em **D6**: com a
+> fonte ampliada o **resto** do modal trunca feio ("Cant", "FILT", "Salv"), e isso é anterior a
+> esta task.
+>
+> **Armadilhas 1, 2 e 4 respeitadas**: nenhum chip "+N" voltou; o `FilterCarousel` da câmera
+> está intacto; o `previewShot`/`captureRef` não foi tocado. Não regressão do pacote conferida
+> pelo roteiro do [quickstart.md](./quickstart.md) com um vídeo exportado depois da mudança —
+> `trilhas: ['soun', 'vide']`, `avc1` presente, `mp4a` presente, `duracao: 30.00s`, batendo com
+> o trecho aprovado na tela.
+>
+> **SC-Q05**: fecha, como o T054 previa. Nos screenshots as oito miniaturas mostram a própria
+> foto tratada e a nona fica recortada na borda — não há mais como achar que o app tem quatro
+> filtros. O registro do T053 fica com a ressalva de que o critério passou a ser atingido aqui.
+
 ---
 
 ## Dúvidas para o Sávio
@@ -650,3 +702,19 @@ branch e não tocar na documentação.
 `CLAUDE.md`, a constituição (emenda **1.1.0**) e o `tokens.ts` no mesmo commit. O Figma e o
 `kite_camera_style_guide.html` seguem mostrando Syne + DM Mono e **estão desatualizados**: a
 partir daqui o `CLAUDE.md` é a fonte da verdade da tipografia. **D2 encerrada.**
+
+### D6 — Com a fonte do sistema ampliada, o modal de captura trunca (achado no T054)
+
+Testando a armadilha 5 do T054 com `settings put system font_scale 1.45`, o carrossel de
+miniaturas se comportou (o nome sai de todas menos da selecionada, nada trunca). O **resto**
+do modal, não: o título vira "Cant", a label da seção vira "FILT", os botões viram "Salv" e
+"Aguarde a", e o aviso de bloqueio corta no meio da segunda linha. Ver
+`docs/preview/fase12/04-fonte-ampliada-nome-so-na-selecionada.png`.
+
+Isso é **anterior ao T054** — nada da Fase 12 causou. Mas é o mesmo defeito de fundo que a US1
+atacou (controle que não entrega o que promete), agora por tipografia em vez de área de toque.
+
+**Não foi corrigido aqui** porque sairia do escopo da task e mexeria em `CaptureSheet`,
+`PostSheet`, `MusicSheet` e `camera.tsx` — decisão de produto sobre até que ampliação o app se
+compromete a suportar. **Para o Sávio decidir**: vale uma fase própria de tipografia
+responsiva, ou o app declara suporte só até ~1.3?

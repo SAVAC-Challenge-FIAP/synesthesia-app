@@ -18,8 +18,8 @@ import type { LayoutAnimationConfig } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
-import { FilterCarousel } from '@/components/FilterCarousel';
 import { FilteredImage } from '@/components/FilteredImage';
+import { FilterThumbs } from '@/components/FilterThumbs';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicSheet } from '@/components/MusicSheet';
 import { PostSheet } from '@/components/PostSheet';
@@ -492,8 +492,14 @@ export function CaptureSheet() {
                 {vibe.nome.toUpperCase()}
               </Text>
             </View>
+            {/* Aqui existe foto: cada filtro se mostra aplicado nela, em vez
+                de se anunciar por um emoji (T054). */}
             <View style={styles.carouselWrap}>
-              <FilterCarousel ativo={session.filtroId} onSelect={escolherFiltro} />
+              <FilterThumbs
+                photoUri={session.photoUri}
+                ativo={session.filtroId}
+                onSelect={escolherFiltro}
+              />
             </View>
 
             {/* Música: a outra metade do pacote sensorial */}
