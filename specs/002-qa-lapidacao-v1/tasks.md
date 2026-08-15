@@ -227,7 +227,7 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   modal aberto → **0**; play numa sugestão → 1; após Cancelar → 0. Nunca 2.
   Screenshots em `docs/preview/t044/`.
 
-- [ ] T045 [BUG] **"Postar agora" parece travado e mostra o modal errado antes do vídeo.**
+- [X] T045 [BUG] **"Postar agora" parece travado e mostra o modal errado antes do vídeo.**
   Depois de aplicar a música, tocar em Postar não dá retorno nenhum; o usuário toca várias
   vezes; abre a tela de pacote "em duas partes" (a que diz que o vídeo único chega na versão
   final); e só uns 20 s depois aparece a tela com o vídeo.
@@ -244,6 +244,16 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   progresso mostraria várias exportações concorrentes.
   **Nota**: é o mesmo defeito de fundo da US2 — ação de saída disparando sem o usuário saber
   em que pé está —, só que no outro extremo do fluxo.
+  **Feito**: estado `postando` + `postandoRef` (espelho síncrono, porque dois toques chegam
+  antes do re-render) envolvendo **toda** a `exportar()`, inclusive o `exportPackage`. Botão
+  vira "Postando..." desabilitado, com spinner e o motivo à vista; `exportar()` ganhou
+  `try/catch` — antes uma falha ficava calada. O tempo real medido no logcat foi **29966 ms**,
+  o que confirma o diagnóstico dos 20–30 s.
+  **Evidência**: cinco toques em rajada em "Postar agora" → **1 única** linha
+  `VideoMuxer: mp4 pronto (29966ms)` no logcat (antes seriam 5 exportações concorrentes), e a
+  tela final foi direto "Vídeo gerado!", sem passar pela de "duas partes".
+  Não regressão do pacote: `vide`+`soun`, `avc1`+`mp4a`, duração 30,00 s.
+  Screenshots em `docs/preview/t045/`.
 
 - [ ] T046 [DESIGN] **Trocar a tipografia para Lato e Nunito.** Hoje são Syne (display) e
   DM Mono (labels técnicas). Envolve `@expo-google-fonts/lato` e `@expo-google-fonts/nunito`,

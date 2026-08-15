@@ -73,6 +73,18 @@ export function CaptureSheet() {
   const [salvando, setSalvando] = useState(false);
   const [etapa, setEtapa] = useState<EtapaCuradoria>('preparando');
 
+  /**
+   * Exportação em curso (T045). `salvando` não servia para isto: ele é ligado
+   * e já desligado dentro de `salvar()`, *antes* de `exportPackage()` rodar — e
+   * é `exportPackage` que leva os 20–30s da geração do .mp4. Nesse intervalo o
+   * botão ficava habilitado e mudo, então cada toque disparava uma exportação
+   * nova em paralelo; a que resolvia sem vídeo abria a tela de pacote "em duas
+   * partes", e a mais lenta sobrescrevia depois. Daí a sensação de travamento.
+   */
+  const [postando, setPostando] = useState(false);
+  /** Espelho síncrono de `postando`: dois toques seguidos chegam antes do re-render. */
+  const postandoRef = useRef(false);
+
   // Estável pelo mesmo motivo do visor: mantém a memoização dos chips de pé
   const escolherFiltro = useCallback(
     (id: FilterId | null) => patch({ filtroId: id, filtroAuto: false }),
@@ -227,17 +239,34 @@ export function CaptureSheet() {
   };
 
   const exportar = async () => {
-    const renderizada = await renderizarComFiltro();
-    await salvar(false);
-    // O pacote leva a unidade aprovada: imagem + trilha + trecho (RN-001).
-    // No Expo Go sai como imagem + áudio + legenda; no dev build, .mp4 (T-07).
-    const pacote = await exportPackage({
-      imageUri: renderizada,
-      musica: session.musica,
-      trechoInicio: session.trechoInicio,
-      trechoFim: session.trechoFim,
-    });
-    setSharePkg(pacote);
+    // Guarda de reentrada: uma exportação por vez. Sem isto, cada toque no
+    // botão mudo abria uma geração de vídeo concorrente (T045).
+    if (postandoRef.current) return;
+    postandoRef.current = true;
+    setPostando(true);
+    try {
+      const renderizada = await renderizarComFiltro();
+      await salvar(false);
+      // O pacote leva a unidade aprovada: imagem + trilha + trecho (RN-001).
+      // No Expo Go sai como imagem + áudio + legenda; no dev build, .mp4 (T-07).
+      const pacote = await exportPackage({
+        imageUri: renderizada,
+        musica: session.musica,
+        trechoInicio: session.trechoInicio,
+        trechoFim: session.trechoFim,
+      });
+      setSharePkg(pacote);
+    } catch {
+      // Falhar calado é o mesmo defeito de fundo da US2: ação de saída sem o
+      // usuário saber em que pé está. A foto já foi salva por `salvar(false)`.
+      Alert.alert(
+        'Não deu para montar o pacote',
+        'A imagem está salva na galeria. Tente postar de novo em instantes.',
+      );
+    } finally {
+      postandoRef.current = false;
+      setPostando(false);
+    }
   };
 
   /**
@@ -248,6 +277,9 @@ export function CaptureSheet() {
    */
   const postar = async () => {
     if (session.curadoria === 'carregando') return;
+    // Também aqui, e não só em `exportar()`: sem isto o alerta de "postar sem
+    // trilha" empilharia uma cópia por toque enquanto a exportação corre.
+    if (postandoRef.current) return;
     if (session.curadoria === 'indisponivel') {
       Alert.alert(
         'Postar sem trilha?',
@@ -383,28 +415,44 @@ export function CaptureSheet() {
                   {TEXTO_ETAPA[etapa]} POSTAR LIBERA QUANDO A TRILHA CHEGAR. SALVAR JÁ FUNCIONA.
                 </Text>
               </View>
+            ) : postando ? (
+              /* A geração do .mp4 leva 20–30s. Um botão mudo nesse intervalo é
+                 o que fazia o usuário tocar de novo (T045); o progresso real
+                 chega na Fase 8 (T033–T037) e substitui este texto. */
+              <View style={styles.motivoLinha}>
+                <ActivityIndicator size="small" color={colors.amber} />
+                <Text style={styles.motivoBloqueio}>
+                  MONTANDO O PACOTE — GERANDO O VÍDEO. ISSO LEVA ALGUNS SEGUNDOS.
+                </Text>
+              </View>
             ) : null}
             <View style={styles.actionsRow}>
-              {/* RV-02: salvar é acionável em TODOS os estados — a foto nunca
-                  pode ser perdida nem bloqueada pela espera da trilha */}
+              {/* RV-02: salvar é acionável em TODOS os estados da curadoria — a
+                  foto nunca pode ser perdida nem bloqueada pela espera da
+                  trilha. Durante a exportação ele descansa porque a foto já foi
+                  salva por `exportar()`; tocar de novo só duplicaria o registro. */}
               <Pressable
-                style={[styles.action, styles.actionSalvar]}
-                disabled={salvando}
+                style={[styles.action, styles.actionSalvar, postando && styles.actionDesabilitada]}
+                disabled={salvando || postando}
                 onPress={() => salvar(true)}
               >
                 <Text style={styles.actionText}>{salvando ? 'Salvando...' : 'Salvar'}</Text>
               </Pressable>
               <Pressable
-                style={[styles.action, styles.actionPostar, curando && styles.actionDesabilitada]}
-                disabled={salvando || curando}
-                accessibilityState={{ disabled: curando }}
+                style={[
+                  styles.action,
+                  styles.actionPostar,
+                  (curando || postando) && styles.actionDesabilitada,
+                ]}
+                disabled={salvando || curando || postando}
+                accessibilityState={{ disabled: curando || postando, busy: postando }}
                 accessibilityHint={
                   curando ? 'Disponível quando a curadoria da trilha terminar' : undefined
                 }
                 onPress={postar}
               >
                 <Text style={[styles.actionText, { color: colors.ink }]}>
-                  {curando ? 'Aguarde a trilha' : 'Postar agora'}
+                  {curando ? 'Aguarde a trilha' : postando ? 'Postando...' : 'Postar agora'}
                 </Text>
               </Pressable>
             </View>
