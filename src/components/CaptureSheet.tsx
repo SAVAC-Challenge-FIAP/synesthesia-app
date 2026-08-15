@@ -106,6 +106,8 @@ export function CaptureSheet() {
 
   if (!session) return null;
 
+  // Enquanto a curadoria corre, ninguém consegue postar um pacote pela metade
+  const curando = session.curadoria === 'carregando';
   const filtro = session.filtroId ? filterById(session.filtroId) : null;
   const vibe = vibeById(session.vibeId);
   const editando = session.mediaId !== null;
@@ -178,7 +180,7 @@ export function CaptureSheet() {
     }
   };
 
-  const postar = async () => {
+  const exportar = async () => {
     const renderizada = await renderizarComFiltro();
     await salvar(false);
     // O pacote leva a unidade aprovada: imagem + trilha + trecho (RN-001).
@@ -190,6 +192,29 @@ export function CaptureSheet() {
       trechoFim: session.trechoFim,
     });
     setSharePkg(pacote);
+  };
+
+  /**
+   * Postar nunca sai calado sem a metade sonora (constituição I):
+   * - `carregando`: a ação nem chega aqui, está desabilitada com o motivo à vista;
+   * - `indisponivel`: só segue depois de o usuário confirmar que aceita ir sem trilha;
+   * - `pronta`: segue direto.
+   */
+  const postar = async () => {
+    if (session.curadoria === 'carregando') return;
+    if (session.curadoria === 'indisponivel') {
+      Alert.alert(
+        'Postar sem trilha?',
+        'Este pacote vai só com a imagem — sem a metade sonora. Você pode esperar a curadoria, escolher uma faixa ou seguir assim mesmo.',
+        [
+          { text: 'Escolher música', onPress: () => setShowMusic(true) },
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Postar sem trilha', style: 'destructive', onPress: exportar },
+        ],
+      );
+      return;
+    }
+    await exportar();
   };
 
   const descartar = () => {
@@ -307,20 +332,37 @@ export function CaptureSheet() {
           </ScrollView>
 
           <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom + 8, 20) }]}>
-            <Pressable
-              style={[styles.action, styles.actionSalvar]}
-              disabled={salvando}
-              onPress={() => salvar(true)}
-            >
-              <Text style={styles.actionText}>{salvando ? 'Salvando...' : 'Salvar'}</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.action, styles.actionPostar]}
-              disabled={salvando}
-              onPress={postar}
-            >
-              <Text style={[styles.actionText, { color: colors.ink }]}>Postar agora</Text>
-            </Pressable>
+            {/* O motivo fica visível junto da ação, não escondido num toque
+                que não responde (FR-Q05) */}
+            {curando ? (
+              <Text style={styles.motivoBloqueio}>
+                ⏳ CURANDO A TRILHA — POSTAR LIBERA QUANDO A TRILHA CHEGAR. SALVAR JÁ FUNCIONA.
+              </Text>
+            ) : null}
+            <View style={styles.actionsRow}>
+              {/* RV-02: salvar é acionável em TODOS os estados — a foto nunca
+                  pode ser perdida nem bloqueada pela espera da trilha */}
+              <Pressable
+                style={[styles.action, styles.actionSalvar]}
+                disabled={salvando}
+                onPress={() => salvar(true)}
+              >
+                <Text style={styles.actionText}>{salvando ? 'Salvando...' : 'Salvar'}</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.action, styles.actionPostar, curando && styles.actionDesabilitada]}
+                disabled={salvando || curando}
+                accessibilityState={{ disabled: curando }}
+                accessibilityHint={
+                  curando ? 'Disponível quando a curadoria da trilha terminar' : undefined
+                }
+                onPress={postar}
+              >
+                <Text style={[styles.actionText, { color: colors.ink }]}>
+                  {curando ? 'Aguarde a trilha' : 'Postar agora'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </View>
@@ -480,11 +522,24 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   actions: {
-    flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: colors.parchment25,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  motivoBloqueio: {
+    color: colors.amber,
+    fontFamily: fonts.monoLight,
+    fontSize: 10,
+    letterSpacing: 1,
+    lineHeight: 15,
+  },
+  actionDesabilitada: {
+    opacity: 0.4,
   },
   action: {
     flex: 1,

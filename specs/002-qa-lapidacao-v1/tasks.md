@@ -68,10 +68,10 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 **Teste independente**: capturar e tentar postar imediatamente, com a curadoria em andamento.
 
 - [X] T014 [US2] Tornar explícito o estado da curadoria (`carregando` / `pronta` / `indisponivel`) no store de sessão em `src/stores/`, conforme [data-model.md](./data-model.md) — hoje `musica === null` significa duas coisas diferentes, e é essa ambiguidade que causa o defeito
-- [ ] T015 [US2] Consumir o estado em `src/components/CaptureSheet.tsx`: desabilitar a ação de postar enquanto `carregando`, com indicação visível do motivo
-- [ ] T016 [US2] Manter "Salvar" acionável em **todos** os estados em `src/components/CaptureSheet.tsx` (RV-02 — a foto nunca pode ser perdida nem bloqueada)
-- [ ] T017 [US2] Exigir confirmação explícita antes de postar quando o estado for `indisponivel`, deixando claro que o pacote sairá sem trilha, em `src/components/CaptureSheet.tsx`
-- [ ] T018 [US2] Revisar os textos de conclusão em `src/components/PostSheet.tsx` para que nenhuma mensagem declare "pronto" sem dizer o que o pacote contém (FR-Q07)
+- [X] T015 [US2] Consumir o estado em `src/components/CaptureSheet.tsx`: desabilitar a ação de postar enquanto `carregando`, com indicação visível do motivo
+- [X] T016 [US2] Manter "Salvar" acionável em **todos** os estados em `src/components/CaptureSheet.tsx` (RV-02 — a foto nunca pode ser perdida nem bloqueada)
+- [X] T017 [US2] Exigir confirmação explícita antes de postar quando o estado for `indisponivel`, deixando claro que o pacote sairá sem trilha, em `src/components/CaptureSheet.tsx`
+- [X] T018 [US2] Revisar os textos de conclusão em `src/components/PostSheet.tsx` para que nenhuma mensagem declare "pronto" sem dizer o que o pacote contém (FR-Q07)
 - [ ] T019 [US2] Validar no dispositivo os quatro cenários de aceite da US2 (carregando, pronta, indisponível, salvar sempre); anexar screenshots em `docs/preview/us2/`
 
 ---

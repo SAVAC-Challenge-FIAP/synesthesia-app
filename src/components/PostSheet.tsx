@@ -30,6 +30,34 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
   const insets = useSafeAreaInsets();
   const temVideo = pacote.videoUri !== null;
   const temTrilha = pacote.musica !== null;
+
+  /**
+   * Nenhuma variante anuncia "pronto" sem declarar o que o pacote leva
+   * (FR-Q07). O caso sem trilha diz isso no próprio título, em vez de esconder
+   * a perda num parágrafo de rodapé.
+   */
+  const resultado = temVideo
+    ? {
+        emoji: '🎬',
+        titulo: 'Vídeo gerado!',
+        conteudo: 'IMAGEM + TRILHA NUM SÓ ARQUIVO',
+        detalhe: 'Escolha o destino:',
+      }
+    : temTrilha
+      ? {
+          emoji: '📦',
+          titulo: 'Pacote pronto, em duas partes.',
+          conteudo: 'IMAGEM + ÁUDIO DE 30S + LEGENDA, SEPARADOS',
+          detalhe:
+            'A imagem vai pelo destino escolhido; a trilha segue nas ações abaixo. O vídeo único imagem+trilha chega na versão final do app.',
+        }
+      : {
+          emoji: '🖼️',
+          titulo: 'Pacote só com a imagem.',
+          conteudo: 'SEM TRILHA — A METADE SONORA NÃO ENTROU',
+          detalhe:
+            'Você pode fechar, escolher uma música e postar de novo para levar o pacote completo.',
+        };
   const [baixando, setBaixando] = useState(false);
   const [baixado, setBaixado] = useState(false);
 
@@ -84,15 +112,14 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 8, 32) }]}>
-          <Text style={styles.emoji}>{temVideo ? '🎬' : '📦'}</Text>
-          <Text style={styles.title}>{temVideo ? 'Vídeo gerado!' : 'Pacote pronto!'}</Text>
-          <Text style={styles.subtitle}>
-            {temVideo
-              ? 'Imagem e trilha unidas num só vídeo. Escolha o destino:'
-              : temTrilha
-                ? 'A imagem vai pelo destino escolhido; a trilha segue como áudio e legenda logo abaixo. O vídeo único imagem+trilha chega na versão final do app.'
-                : 'Sua captura vai como imagem, sem trilha. Escolha o destino:'}
+          <Text style={styles.emoji}>{resultado.emoji}</Text>
+          <Text style={styles.title}>{resultado.titulo}</Text>
+          {/* FR-Q07: o que o pacote contém fica ao lado do "pronto", não
+              escondido num parágrafo — inclusive quando falta a trilha */}
+          <Text style={[styles.conteudo, !temTrilha && styles.conteudoSemTrilha]}>
+            {resultado.conteudo}
           </Text>
+          <Text style={styles.subtitle}>{resultado.detalhe}</Text>
 
           <View style={styles.grid}>
             {DESTINOS.map((d) => (
@@ -173,6 +200,21 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     fontSize: 26,
     marginBottom: 6,
+  },
+  conteudo: {
+    color: colors.ruby,
+    fontFamily: fonts.monoMedium,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  conteudoSemTrilha: {
+    borderWidth: 1,
+    borderColor: colors.ruby,
+    borderRadius: radii.chip,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   subtitle: {
     color: 'rgba(9,5,6,0.6)',
