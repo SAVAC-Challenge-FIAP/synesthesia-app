@@ -514,6 +514,93 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
 
 ---
 
+## Fase 12 — Miniaturas de filtro (passada de bola, 2026-08-15)
+
+> **Esta fase é de outro chat.** Foi especificada pelo Sávio e **nada foi implementado** — a
+> sessão que a registrou parou aqui de propósito. O que está no código hoje é o carrossel de
+> chips de emoji (ver T053), que continua valendo até esta task ser feita.
+
+- [ ] T054 [DESIGN] **Trocar os chips de emoji por miniaturas com o filtro aplicado, no modal de
+  captura.**
+
+  **O que o Sávio pediu**, nas palavras dele: os filtros "seria em forma de tubs [thumbs] com o
+  filtro já aplicado, o emoji no centro, o nome do filtro aplicado", e **"eles vão ficar em cima
+  da parte de escolher música"**.
+
+  ### Onde, exatamente
+
+  Só no **modal de captura** ([`CaptureSheet.tsx`](../../src/components/CaptureSheet.tsx)), na
+  posição em que o carrossel já está: abaixo da foto, **acima do bloco `TRILHA SONORA`**. É a
+  mesma ordem do Figma — o nó pai `462:926` ("Filtro / Música") contém `276:413`
+  ("Filtros disponiveis") em cima e `294:24` ("Música") embaixo.
+
+  ⚠️ **Na tela da câmera ([`camera.tsx`](../../app/camera.tsx)) o carrossel de chips permanece
+  como está.** Não existe foto capturada ali para miniaturizar — só o visor ao vivo. Foi
+  justamente por isso que a ideia de miniatura foi descartada uma vez; ela volta **restrita à
+  captura**, onde a foto existe. Os dois carrosséis passam a ser diferentes de propósito, e isso
+  não é inconsistência a ser "corrigida".
+
+  ### Especificação visual
+
+  Fonte: Figma nó
+  [462-926](https://www.figma.com/design/3yJ1nLbHljozr8qqfrQ6yX/JOVI-Challenge---FIAP-2026?node-id=462-926&m=dev),
+  frames `468:950` a `468:945`.
+
+  - Miniatura de **70×93**, cantos arredondados, **10 px** de intervalo, rolagem horizontal.
+  - Conteúdo: a **foto da sessão com aquele filtro aplicado**, o **emoji ao centro** e o **nome
+    do filtro** embaixo.
+  - Selecionada: borda `amber`; nome em `amber`. As demais sem borda.
+  - Continua havendo o item **"Original"** (📷) na frente, como hoje — a foto sem filtro é
+    escolha de primeira classe (T-0B).
+  - Prévia aprovada pelo Sávio, com a foto real e os oito filtros: `docs/preview/fase11/` e o
+    artifact publicado na conversa de 2026-08-15.
+
+  ### O que reusar (não reescrever)
+
+  - [`FilteredImage`](../../src/components/FilteredImage.tsx) **já faz exatamente o render
+    necessário**: aplica `imageFilter` (brightness/saturate/contrast/sepia) via style `filter` do
+    RN e sobrepõe os `FilterLayer` de identidade. Uma miniatura é
+    `<FilteredImage uri={session.photoUri} filtroId={f.id} />` num container de 70×93.
+  - [`FILTERS`](../../src/constants/filters.ts) tem nome, emoji e parâmetros dos oito.
+  - O `Chip` memoizado de [`FilterCarousel.tsx`](../../src/components/FilterCarousel.tsx) já
+    resolve o problema de re-render (ver a nota lá: sem memo, trocar de filtro redesenhava os
+    nove). **Mantenha a memoização** na versão em miniatura — com imagem no lugar de texto, o
+    custo de redesenhar é maior, não menor.
+
+  ### Armadilhas conhecidas
+
+  1. **Não reintroduza o chip "+N"**. Ele foi removido a pedido do Sávio no T053; voltar com ele
+     seria desfazer decisão de produto.
+  2. **`FilterCarousel` é compartilhado** entre câmera e captura. Ou se cria um componente novo
+     para as miniaturas, ou se adiciona uma variante — mas **sem** mudar o comportamento na
+     câmera.
+  3. **Nove imagens da mesma URI na tela.** Meça antes de afirmar que está fluido: o roteiro do
+     T038 (contador de render lido em `adb logcat ReactNativeJS:V`) e o `dumpsys gfxinfo` do T039
+     servem para isto. A foto é a mesma, então o cache do RN deve segurar — mas isso é hipótese
+     até ser medida.
+  4. **Não confunda com o `previewShot`.** A exportação renderiza a foto grande com filtro via
+     `captureRef` sobre um `FilteredImage` separado; as miniaturas são só de seleção e não podem
+     interferir nesse caminho.
+  5. **Acessibilidade**: em 70 px de largura o nome do filtro cai para ~8 px. Verifique com fonte
+     do sistema ampliada (era o pedido do T026). Se quebrar, a alternativa combinada é mostrar o
+     nome **só na miniatura selecionada**.
+
+  ### Efeito colateral desejável
+
+  Isto provavelmente **fecha o SC-Q05**, que o T053 deixou em aberto de propósito: com oito
+  miniaturas visíveis e recortadas na borda, alguém que nunca viu o app percebe que há muito
+  mais que quatro filtros. Vale refazer o teste de aceite da US4 depois de implementar e
+  atualizar o registro do T053.
+
+  ### Como validar
+
+  Regras da rodada valem inteiras: `npm run typecheck` passando, evidência em dispositivo real
+  (não vale "compila"), screenshots em `docs/preview/`, build local apenas (`./scripts/dev-android.sh build`
+  — **nunca** EAS), commit em pt-BR no imperativo. Ambiente e comandos: seção "Como retomar"
+  no topo deste arquivo.
+
+---
+
 ## Dúvidas para o Sávio
 
 > Preencher aqui qualquer decisão de produto que aparecer durante a execução autônoma, em vez de inventar. Implementar a alternativa mais conservadora e seguir.
