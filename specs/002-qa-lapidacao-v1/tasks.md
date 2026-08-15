@@ -101,7 +101,7 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 - [X] T025 [US4] Dar affordance de rolagem horizontal ao carrossel em `src/components/FilterCarousel.tsx` (peek/fade/indicador), garantindo que nenhum item fique cortado de forma ambígua em repouso
 - [X] T026 [P] [US4] Verificar o carrossel em fonte do sistema ampliada (acessibilidade) e em tela estreita, sem quebra de layout
 - [X] T027 [US4] Medir o atraso na troca de filtro; se houver atraso perceptível, corrigir e registrar em `baseline.md`
-- [ ] T028 [US4] Validar no dispositivo; anexar screenshots em `docs/preview/us4/`
+- [X] T028 [US4] Validar no dispositivo; anexar screenshots em `docs/preview/us4/`
 
 ---
 

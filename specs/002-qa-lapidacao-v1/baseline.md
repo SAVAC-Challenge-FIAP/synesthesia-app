@@ -334,3 +334,30 @@ redesenhava os nove chips. O p90 caiu **32%**, de 113 ms para 77 ms.
 seria 1 ou 2, e o p95 continua em 200 ms. A memoização dos chips não explica esse resto —
 ele está no re-render da tela do visor inteira a cada mudança de `manualFiltro`. Investigar
 isso é exatamente o **T038** da Fase 9, e é lá que ele foi atacado.
+
+---
+
+## T028 — Verificação da US4 no dispositivo
+
+Evidência em [`docs/preview/us4/`](../../docs/preview/us4/).
+
+| Posição | O que aparece | Contador |
+|---|---|---|
+| Início | ORIGINAL · VIVID · NEON | **+7** |
+| Meio | ECLIPSE · RETRO · VINTAGE | **+2** |
+| Fim | VINTAGE · ARCTIC · HONEY | **↺** (volta ao início) |
+
+O contador acerta em cada posição, e no fim da lista vira o controle de voltar ao começo em
+vez de sumir — se sumisse, o carrossel inteiro pularia de largura.
+
+| Verificação | Resultado |
+|---|---|
+| Fonte do sistema em 1.15 e 1.30 | ✅ sem quebra, rótulos inteiros, contador legível |
+| Tela de 720×1560 @320dpi | ✅ layout íntegro, contador presente |
+| Modal de captura (fundo ink) | ✅ mesmo comportamento do visor |
+
+> A truncagem que aparecia logo após mudar a escala da fonte ("ORIGIN", "+") **não é
+> defeito**: é layout obsoleto, porque o React Native não remede o texto já montado quando
+> a escala muda pelas configurações do sistema. Depois de recarregar o app, tudo volta ao
+> lugar. Vale como nota para quem for testar acessibilidade: reabra o app depois de mexer
+> na escala, senão você mede um artefato.
