@@ -36,11 +36,18 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
   // Busca sob demanda quando o usuário abriu sem sugestões prontas
   useEffect(() => {
     const s = useCaptureStore.getState().session;
-    if (!s || s.sugestoes.length > 0 || s.carregandoSugestoes) return;
-    patch({ carregandoSugestoes: true });
+    if (!s || s.sugestoes.length > 0 || s.curadoria === 'carregando') return;
+    patch({ curadoria: 'carregando' });
     getSuggestions(vibeById(s.vibeId))
-      .then((sugestoes) => patch({ sugestoes, carregandoSugestoes: false }))
-      .catch(() => patch({ carregandoSugestoes: false }));
+      .then((sugestoes) =>
+        patch({
+          sugestoes,
+          // A busca traz opções, não uma escolha: sem trilha aplicada o estado
+          // continua `indisponivel` e a postagem segue exigindo confirmação.
+          curadoria: useCaptureStore.getState().session?.musica ? 'pronta' : 'indisponivel',
+        }),
+      )
+      .catch(() => patch({ curadoria: 'indisponivel' }));
   }, [patch]);
 
   if (!session) return null;
@@ -60,7 +67,7 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
 
   const confirmar = () => {
     player.pause();
-    if (escolhida) patch({ musica: escolhida, trechoInicio: 0, trechoFim: 30 });
+    if (escolhida) patch({ musica: escolhida, curadoria: 'pronta', trechoInicio: 0, trechoFim: 30 });
     onClose();
   };
 
@@ -79,7 +86,7 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
           <Text style={styles.title}>Escolha a vibe sonora.</Text>
 
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-            {session.carregandoSugestoes ? (
+            {session.curadoria === 'carregando' ? (
               <View style={styles.loading}>
                 <ActivityIndicator color={colors.ruby} />
                 <Text style={styles.loadingText}>BUSCANDO SUGESTÕES...</Text>

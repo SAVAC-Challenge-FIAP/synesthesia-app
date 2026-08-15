@@ -58,12 +58,24 @@ export function CaptureSheet() {
   // com "Detecção em tempo real" ativa, a PRÓPRIA FOTO vai ao Gemini, que
   // infere a vibe real da cena e cura as faixas numa só chamada (T-0A/T-0B);
   // desativada, nada sai do aparelho e a curadoria usa a vibe heurística.
+  // Guarda de disparo único por foto. Antes esse papel era do próprio
+  // `carregandoSugestoes`, o que impedia a sessão de já nascer "carregando" —
+  // e era nessa janela que a postagem escapava sem trilha.
+  const analisada = useRef<string | null>(null);
   useEffect(() => {
-    if (!photoUri) return;
+    if (!photoUri || analisada.current === photoUri) return;
     const { session: s } = useCaptureStore.getState();
-    if (!s || s.sugestoes.length > 0 || s.carregandoSugestoes) return;
-    if (!sugestaoAutomatica && !deteccaoTempoReal) return;
-    patch({ carregandoSugestoes: true });
+    if (!s || s.sugestoes.length > 0) return;
+    analisada.current = photoUri;
+
+    // Curadoria desligada nos ajustes: não há o que esperar. Sai de
+    // `carregando` na hora, senão a postagem ficaria bloqueada para sempre.
+    if (!sugestaoAutomatica && !deteccaoTempoReal) {
+      patch({ curadoria: s.musica ? 'pronta' : 'indisponivel' });
+      return;
+    }
+
+    patch({ curadoria: 'carregando' });
     const analise = deteccaoTempoReal
       ? analyzePhotoAndSuggest(s.photoUri, vibeById(s.vibeId))
       : getSuggestions(vibeById(s.vibeId)).then((sugestoes) => ({ vibeId: null, sugestoes }));
@@ -73,20 +85,23 @@ export function CaptureSheet() {
         if (!atual || atual.photoUri !== photoUri) return;
         const primeira =
           sugestoes.find((m) => m.previewUrl) ?? sugestoes[0] ?? null;
+        // Redução do atrito: o sistema decide, o usuário refina (US3)
+        const escolheSozinho =
+          sugestaoAutomatica && atual.musica === null && atual.mediaId === null;
+        const musicaFinal = escolheSozinho ? primeira : atual.musica;
         patch({
           sugestoes,
-          carregandoSugestoes: false,
+          // `pronta` só quando existe trilha de fato; caso contrário a
+          // postagem passa a exigir confirmação em vez de sair calada (RV-01)
+          curadoria: musicaFinal ? 'pronta' : 'indisponivel',
           // A vibe real da foto substitui a prévia do visor (T-0A)
           ...(vibeReal ? { vibeId: vibeReal } : {}),
           // Filtro acompanha a vibe real enquanto o usuário não escolher um
           ...(vibeReal && atual.filtroAuto ? { filtroId: vibeById(vibeReal).filtro } : {}),
-          // Redução do atrito: o sistema decide, o usuário refina (US3)
-          ...(sugestaoAutomatica && atual.musica === null && atual.mediaId === null
-            ? { musica: primeira }
-            : {}),
+          ...(escolheSozinho ? { musica: primeira } : {}),
         });
       })
-      .catch(() => patch({ carregandoSugestoes: false }));
+      .catch(() => patch({ curadoria: 'indisponivel' }));
   }, [photoUri, sugestaoAutomatica, deteccaoTempoReal, patch]);
 
   if (!session) return null;
@@ -228,7 +243,7 @@ export function CaptureSheet() {
               TRILHA SONORA
             </Text>
             <View style={styles.musicBox}>
-              {session.carregandoSugestoes ? (
+              {session.curadoria === 'carregando' ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator color={colors.amber} />
                   <Text style={styles.loadingText}>
@@ -266,7 +281,7 @@ export function CaptureSheet() {
                     <Pressable
                       style={styles.musicBtn}
                       hitSlop={hitSlops.chip}
-                      onPress={() => patch({ musica: null })}
+                      onPress={() => patch({ musica: null, curadoria: 'indisponivel' })}
                     >
                       <Text style={[styles.musicBtnText, { color: colors.parchment50 }]}>
                         REMOVER ÁUDIO

@@ -67,7 +67,7 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 **Princípio**: I (Multimodalidade Primeiro) · **FR**: Q04, Q05, Q06, Q07
 **Teste independente**: capturar e tentar postar imediatamente, com a curadoria em andamento.
 
-- [ ] T014 [US2] Tornar explícito o estado da curadoria (`carregando` / `pronta` / `indisponivel`) no store de sessão em `src/stores/`, conforme [data-model.md](./data-model.md) — hoje `musica === null` significa duas coisas diferentes, e é essa ambiguidade que causa o defeito
+- [X] T014 [US2] Tornar explícito o estado da curadoria (`carregando` / `pronta` / `indisponivel`) no store de sessão em `src/stores/`, conforme [data-model.md](./data-model.md) — hoje `musica === null` significa duas coisas diferentes, e é essa ambiguidade que causa o defeito
 - [ ] T015 [US2] Consumir o estado em `src/components/CaptureSheet.tsx`: desabilitar a ação de postar enquanto `carregando`, com indicação visível do motivo
 - [ ] T016 [US2] Manter "Salvar" acionável em **todos** os estados em `src/components/CaptureSheet.tsx` (RV-02 — a foto nunca pode ser perdida nem bloqueada)
 - [ ] T017 [US2] Exigir confirmação explícita antes de postar quando o estado for `indisponivel`, deixando claro que o pacote sairá sem trilha, em `src/components/CaptureSheet.tsx`
