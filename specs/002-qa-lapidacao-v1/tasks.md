@@ -25,6 +25,34 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 
 ---
 
+## Como retomar (ambiente)
+
+Descoberto na marra na rodada de 2026-08-15 — não repita a busca:
+
+```bash
+# 1. adb NÃO está no PATH padrão
+export PATH="/opt/homebrew/share/android-commandlinetools/platform-tools:$PATH"
+adb connect 192.168.15.3:5555      # o modo Wi-Fi cai sozinho; reconecte sempre
+
+# 2. Metro precisa estar de pé — sem ele o app roda o último bundle em memória
+#    e suas mudanças de JS não aparecem (isso já enganou a rodada uma vez)
+npx expo start --dev-client --host lan > /tmp/metro.log 2>&1 &
+
+# 3. abrir o app apontando para o Metro — CONFIRA o IP do Mac, ele muda
+ipconfig getifaddr en0
+adb shell am start -a android.intent.action.VIEW \
+  -d "synesthesia://expo-development-client/?url=http%3A%2F%2F<IP>%3A8081"
+```
+
+**Mudança de JS recarrega sozinha; mudança nativa (Kotlin, `styles.xml`, `app.json`) exige
+`./scripts/dev-android.sh build`.** O APK instalado hoje já tem o `forceDarkAllowed=false`
+compilado — sem ele o modo noturno do sistema reescreve a paleta inteira (ver Fase 7).
+
+Para ler os logs do JS use o `/tmp/metro.log`: com o Metro conectado, `console.log` **não**
+aparece no `adb logcat`. O logcat só serve para o nativo (`VideoMuxer`, `AndroidRuntime`).
+
+---
+
 ## Fase 1 — Setup e linha de base
 
 > Sem medir, otimizar é chute. Esta fase só coleta números e evidências; não altera comportamento.
