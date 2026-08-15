@@ -20,6 +20,34 @@ import { MusicSuggestion, Vibe, VibeId } from '@/types';
 
 const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
+/**
+ * Limites de rede. Medindo o T020 no aparelho, a chamada ao Gemini variou de
+ * **2,9s a 123s** com a mesma foto e a mesma rede — e sem `AbortController` a
+ * requisição de 123s continuava viva muito depois de o usuário desistir.
+ *
+ * O teto do Gemini é menor que os 30s que a interface espera (`CaptureSheet`),
+ * de propósito: assim a degradação graciosa (vibe → Deezer → catálogo local)
+ * ainda roda dentro da janela e o usuário recebe alguma trilha, em vez de a
+ * interface simplesmente desistir com a requisição pendurada.
+ */
+const LIMITE_GEMINI_MS = 22_000;
+const LIMITE_DEEZER_MS = 8_000;
+
+/** `fetch` que realmente desiste — sem isso uma resposta lenta nunca é abandonada. */
+async function fetchComLimite(
+  url: string,
+  init: RequestInit,
+  limiteMs: number,
+): Promise<Response> {
+  const abortador = new AbortController();
+  const timer = setTimeout(() => abortador.abort(), limiteMs);
+  try {
+    return await fetch(url, { ...init, signal: abortador.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const EMOJIS_MOOD = ['🎧', '🎸', '🎹', '🎷', '🥁', '🎻'];
 
 interface DeezerTrack {
@@ -30,8 +58,10 @@ interface DeezerTrack {
 }
 
 async function searchDeezer(query: string, limit: number): Promise<DeezerTrack[]> {
-  const res = await fetch(
+  const res = await fetchComLimite(
     `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+    {},
+    LIMITE_DEEZER_MS,
   );
   if (!res.ok) throw new Error(`Deezer ${res.status}`);
   const json = (await res.json()) as { data?: DeezerTrack[] };
@@ -54,11 +84,15 @@ type GeminiPart = { type: 'text'; text: string } | { type: 'image'; data: string
 // Interactions API (endpoint atual — o antigo v1beta/models/{model}:generateContent está deprecado)
 async function callGemini(input: GeminiPart[]): Promise<string> {
   if (!GEMINI_KEY) return '';
-  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
-    body: JSON.stringify({ model: GEMINI_MODEL, input }),
-  });
+  const res = await fetchComLimite(
+    'https://generativelanguage.googleapis.com/v1beta/interactions',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
+      body: JSON.stringify({ model: GEMINI_MODEL, input }),
+    },
+    LIMITE_GEMINI_MS,
+  );
   if (!res.ok) throw new Error(`Gemini ${res.status}`);
   const json = await res.json();
   return (
@@ -78,15 +112,23 @@ async function askGemini(vibe: Vibe): Promise<GeminiTrackIdea[]> {
   return JSON.parse(match[0]) as GeminiTrackIdea[];
 }
 
+/** Largura e compressão do envio ao Gemini — ver T021 em baseline.md. */
+const ENVIO_LARGURA = 448;
+const ENVIO_COMPRESSAO = 0.45;
+
 /**
- * Reduz a foto para envio ao Gemini (~640px, JPEG comprimido): corta latência
- * e tráfego sem perder o que importa para inferir a atmosfera.
+ * Reduz a foto para envio ao Gemini: corta tráfego sem perder o que importa
+ * para inferir a atmosfera.
  */
 async function photoToBase64(uri: string): Promise<string> {
   const context = ImageManipulator.manipulate(uri);
-  context.resize({ width: 640 });
+  context.resize({ width: ENVIO_LARGURA });
   const image = await context.renderAsync();
-  const saved = await image.saveAsync({ compress: 0.6, format: SaveFormat.JPEG, base64: true });
+  const saved = await image.saveAsync({
+    compress: ENVIO_COMPRESSAO,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
   if (!saved.base64) throw new Error('manipulator sem base64');
   return saved.base64;
 }
@@ -196,9 +238,29 @@ export async function analyzePhotoAndSuggest(
   photoUri: string,
   fallbackVibe: Vibe,
 ): Promise<PhotoAnalysis> {
+  // Instrumentação das três etapas (T020). O research R3 descartou por inspeção
+  // a hipótese "o Deezer está em série"; estes números dizem qual etapa domina
+  // de fato, para que a otimização não seja palpite.
+  const t0 = Date.now();
+  let tImagem = 0;
+  let tGemini = 0;
+  let bytes = 0;
+  const registrar = (etapaFinal: string, tDeezer: number) =>
+    console.log(
+      `[music][tempo] imagem=${tImagem}ms gemini=${tGemini}ms deezer=${tDeezer}ms ` +
+        `total=${Date.now() - t0}ms payload=${Math.round(bytes / 1024)}KB saida=${etapaFinal}`,
+    );
+
   try {
+    const marcoImagem = Date.now();
     const base64 = await photoToBase64(photoUri);
+    tImagem = Date.now() - marcoImagem;
+    bytes = base64.length;
+
+    const marcoGemini = Date.now();
     const scene = await askGeminiWithPhoto(base64);
+    tGemini = Date.now() - marcoGemini;
+
     if (scene) {
       const vibeReal = VIBES.find((v) => v.id === scene.vibe) ?? null;
       console.log(
@@ -206,18 +268,25 @@ export async function analyzePhotoAndSuggest(
           (vibeReal ? '' : ' (id inválido, mantendo vibe heurística)'),
       );
       const vibe = vibeReal ?? fallbackVibe;
+      const marcoDeezer = Date.now();
       const sugestoes = await resolveWithDeezer(scene.musicas ?? [], vibe);
+      const tDeezer = Date.now() - marcoDeezer;
       if (sugestoes.length > 0) {
         console.log(`[music] ORIGEM=gemini-foto — ${sugestoes.length} sugestão(ões) da cena real`);
+        registrar('gemini-foto', tDeezer);
         return { vibeId: vibeReal?.id ?? null, sugestoes };
       }
       // Cena lida mas faixas não resolveram → pipeline por vibe, já com a vibe real
-      return { vibeId: vibeReal?.id ?? null, sugestoes: await getSuggestions(vibe) };
+      const porVibe = await getSuggestions(vibe);
+      registrar('pipeline-por-vibe', tDeezer);
+      return { vibeId: vibeReal?.id ?? null, sugestoes: porVibe };
     }
   } catch (e) {
     console.log('[music] análise da foto falhou (caiu para pipeline por vibe):', e);
   }
-  return { vibeId: null, sugestoes: await getSuggestions(fallbackVibe) };
+  const degradado = await getSuggestions(fallbackVibe);
+  registrar('degradado', 0);
+  return { vibeId: null, sugestoes: degradado };
 }
 
 /**
