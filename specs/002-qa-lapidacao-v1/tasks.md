@@ -54,7 +54,7 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 - [X] T007 [US1] Substituir espaçamento inferior fixo por inset real do dispositivo na barra de ações de `src/components/CaptureSheet.tsx` (botões Salvar / Postar agora)
 - [ ] T008 [P] [US1] Aplicar inset inferior real nos controles de `app/camera.tsx` (captura, galeria, virar câmera)
 - [X] T009 [P] [US1] Aplicar inset inferior real em `src/components/PostSheet.tsx` (grade de destinos, Baixar vídeo, Fechar)
-- [ ] T010 [P] [US1] Aplicar inset inferior real em `src/components/MusicSheet.tsx` (Cancelar / Confirmar escolha)
+- [X] T010 [P] [US1] Aplicar inset inferior real em `src/components/MusicSheet.tsx` (Cancelar / Confirmar escolha)
 - [ ] T011 [P] [US1] Aplicar inset inferior real em `app/gallery.tsx`
 - [ ] T012 [US1] Garantir área de toque mínima de 48dp em todos os controles interativos das telas acima, sem alterar o tamanho visual dos elementos
 - [ ] T013 [US1] Validar no dispositivo: tocar na borda inferior de cada botão primário em navegação por botões **e** por gestos; anexar screenshots do antes/depois em `docs/preview/us1/`

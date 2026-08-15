@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { vibeById } from '@/constants/vibes';
 import { getSuggestions } from '@/services/music';
@@ -24,6 +25,9 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
   const session = useCaptureStore((s) => s.session);
   const patch = useCaptureStore((s) => s.patch);
 
+  // Modal na própria janela: Cancelar / Confirmar escolha só ficam inteiramente
+  // tocáveis com o inset real do aparelho (ver baseline.md T004).
+  const insets = useSafeAreaInsets();
   const [escolhida, setEscolhida] = useState<MusicSuggestion | null>(session?.musica ?? null);
   const [tocandoId, setTocandoId] = useState<string | null>(null);
   const player = useAudioPlayer(null);
@@ -68,7 +72,7 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
   return (
     <Modal visible transparent animationType="slide" onRequestClose={cancelar}>
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 8, 28) }]}>
           <Text style={styles.kicker}>
             {vibe.emoji} VIBE {vibe.nome.toUpperCase()}
           </Text>
