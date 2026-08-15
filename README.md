@@ -92,7 +92,7 @@ Utilitários de desenvolvimento em [`scripts/dev-android.sh`](scripts/dev-androi
 | Ink | `#090506` | Fundo |
 | Parchment | `#F5EEDE` | Texto claro |
 
-Tipografia: **Syne** (display) + **DM Mono** (labels técnicas). Filtros: Vivid 🌟 · Neon 🌈 · Love ❤️ · Eclipse 🌒 · Retro 📼 · Vintage 🧡 · Arctic ❄️ · Honey 🍯.
+Tipografia: **Nunito** (display) + **Lato** (labels técnicas). Filtros: Vivid 🌟 · Neon 🌈 · Love ❤️ · Eclipse 🌒 · Retro 📼 · Vintage 🧡 · Arctic ❄️ · Honey 🍯.
 
 ## 🗂️ Estrutura
 
@@ -106,7 +106,7 @@ Tipografia: **Syne** (display) + **DM Mono** (labels técnicas). Filtros: Vivid 
 │   ├── constants/                # 8 filtros + vibes
 │   ├── services/                 # vibeEngine (contexto), music (Gemini/Deezer), mediaStorage
 │   ├── stores/                   # zustand: ajustes, galeria, sessão de captura
-│   └── theme/                    # Design tokens (ruby/amber/ink/parchment, Syne + DM Mono)
+│   └── theme/                    # Design tokens (ruby/amber/ink/parchment, Nunito + Lato)
 ├── CLAUDE.md                     # Guia para agentes de código
 ├── docs/                         # Documentos-fonte (requisitos + arquitetura)
 ├── specs/001-synesthesia-mvp/    # Especificação (Spec Kit)

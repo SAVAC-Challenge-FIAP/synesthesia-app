@@ -91,15 +91,30 @@ class VideoMuxerModule : Module() {
 
   private fun detalhe(e: Exception) = e.message ?: e.cause?.message ?: e::class.java.simpleName
 
+  // --- Estado da exportação em curso ---------------------------------------
+  // O módulo é um singleton, então este estado pressupõe **uma exportação por
+  // vez**. Quem garante isso é a guarda de reentrada do CaptureSheet (T045);
+  // sem ela, duas exportações concorrentes embaralhariam estes campos.
+
   /** Último valor emitido, para garantir progresso monotônico (C-03). */
   private var ultimoProgresso = 0
+
+  /** Instante do `start`, base para medir a janela de qualificação. */
+  private var inicioMs = 0L
+
+  /** Enquanto true, o polling continua reagendando a si mesmo. */
+  private var emExportacao = false
+
+  /** A janela de qualificação já foi avaliada nesta exportação? */
+  private var fonteQualificada = false
+
+  /** A fonte de progresso deste device diz algo proporcional ao trabalho real? */
+  private var fonteConfiavel = true
 
   private fun emitir(progresso: Int, estado: String) {
     Log.d(TAG, "progresso=$progresso estado=$estado t=${System.currentTimeMillis() - inicioMs}ms")
     sendEvent(EVENTO_PROGRESSO, bundleOf("progresso" to progresso, "estado" to estado))
   }
-
-  private var inicioMs = 0L
 
   /**
    * Consulta periódica do progresso (C-02: nunca bloqueia a exportação — só lê
@@ -135,6 +150,9 @@ class VideoMuxerModule : Module() {
               Log.i(TAG, "progresso do Transformer nao e fiel aqui ($valor% em ${decorrido}ms) — caindo para indicador indefinido")
               return
             }
+            // Sem esta linha, `ultimoProgresso` ficaria no valor observado
+            // durante a janela e o próximo tick reemitiria o mesmo número.
+            ultimoProgresso = valor
             emitir(valor, "exportando")
           } else if (valor != ultimoProgresso) {
             ultimoProgresso = valor
@@ -145,15 +163,6 @@ class VideoMuxerModule : Module() {
       }
     })
   }
-
-  /** A janela de qualificação já foi avaliada nesta exportação? */
-  private var fonteQualificada = false
-
-  /** A fonte de progresso deste device diz algo proporcional ao trabalho real? */
-  private var fonteConfiavel = true
-
-  /** Enquanto true, o polling continua reagendando a si mesmo. */
-  private var emExportacao = false
 
   private fun exportar(imagePath: String, audioPath: String, outputPath: String, duracaoMs: Long, promise: Promise) {
     val contexto = appContext.reactContext

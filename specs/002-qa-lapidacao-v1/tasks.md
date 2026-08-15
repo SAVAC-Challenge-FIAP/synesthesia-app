@@ -48,8 +48,21 @@ adb shell am start -a android.intent.action.VIEW \
 `./scripts/dev-android.sh build`.** O APK instalado hoje já tem o `forceDarkAllowed=false`
 compilado — sem ele o modo noturno do sistema reescreve a paleta inteira (ver Fase 7).
 
-Para ler os logs do JS use o `/tmp/metro.log`: com o Metro conectado, `console.log` **não**
-aparece no `adb logcat`. O logcat só serve para o nativo (`VideoMuxer`, `AndroidRuntime`).
+Para ler os logs do JS, use o **logcat com a tag `ReactNativeJS`**:
+
+```bash
+adb logcat ReactNativeJS:V '*:S'     # console.log do JS
+adb logcat VideoMuxer:V '*:S'        # log do modulo nativo
+```
+
+⚠️ **Correção de 2026-08-15**: a versão anterior desta seção afirmava que `console.log` **não**
+aparece no logcat e mandava usar o `/tmp/metro.log`. Isso está **errado** — o `console.log`
+aparece sim, sob `ReactNativeJS`, e foi assim que o T038 foi medido. Já o `/tmp/metro.log` só
+tem conteúdo se **esta** sessão tiver iniciado o Metro redirecionando para lá; se o Metro já
+estava de pé de outra sessão, o arquivo fica vazio e engana.
+
+Note também que `adb logcat -d` (dump) às vezes volta vazio neste aparelho; o que funciona de
+forma confiável é o modo streaming redirecionado para arquivo, com `&`, e `kill` no fim.
 
 ---
 
@@ -238,8 +251,19 @@ aparece no `adb logcat`. O logcat só serve para o nativo (`VideoMuxer`, `Androi
 
 > Conferido no pacote gerado após todas as mudanças da rodada: `vide`+`soun`, `avc1`+`mp4a`,
 > **30,00 s**, 15,1 MB. SC-Q07 mantido.
-- [ ] T042 Atualizar `README.md` com os screenshots novos, se as telas mudaram visualmente
-- [ ] T043 Rodar `npm run typecheck` e revisar o diff completo da rodada antes do commit final
+- [X] T042 Atualizar `README.md` com os screenshots novos, se as telas mudaram visualmente
+- [X] T043 Rodar `npm run typecheck` e revisar o diff completo da rodada antes do commit final
+
+> A revisão do diff **pegou dois defeitos** no Kotlin novo, ambos corrigidos:
+> 1. Ao qualificar a fonte como confiável, `ultimoProgresso` não era atualizado antes de emitir —
+>    o tick seguinte reemitiria o mesmo número.
+> 2. Estado do módulo declarado espalhado depois dos métodos que o usam. Reagrupado, com a nota
+>    de que o módulo é singleton e pressupõe **uma exportação por vez** — garantia que vem da
+>    guarda de reentrada do T045.
+>
+> Recompilado e revalidado no device depois da refatoração: qualificação da fonte funcionando
+> (descartada em 1066 ms), limpeza de cache ativa (só o pacote da vez, 15 MB) e pacote sem
+> regressão (`vide`+`soun`, `avc1`+`mp4a`, 30,00 s).
 
 ---
 
