@@ -156,3 +156,32 @@ Mesmo botão "Salvar", mesma build, só trocando o modo do sistema:
 
 **A folga é idêntica nos dois modos** — é o que prova que o valor vem do aparelho e não de
 uma constante. Um `paddingBottom` fixo não conseguiria os dois números ao mesmo tempo.
+
+---
+
+## T019 — Verificação da US2
+
+Os quatro cenários de aceite, no aparelho. Evidência em [`docs/preview/us2/`](../../docs/preview/us2/).
+
+| # | Cenário | O que foi feito | Resultado |
+|---|---|---|---|
+| 1 | `carregando` | capturar e tocar em "Postar agora" imediatamente | ✅ ação desabilitada, rótulo "Aguarde a trilha" e motivo à vista; **nada foi exportado** (logcat sem linha do VideoMuxer) |
+| 2 | `pronta` | esperar a curadoria | ✅ botão volta a "Postar agora" em âmbar, vibe e filtro atualizados para a cena real |
+| 3 | `indisponivel` | remover o áudio e tocar em "Postar agora" | ✅ alerta "Postar sem trilha?" com *Postar sem trilha* / *Cancelar* / *Escolher música* |
+| 4 | salvar sempre | tocar em "Salvar" durante a curadoria | ✅ pacote na galeria como "SONHADORA · SEM ÁUDIO" — a foto não se perde |
+
+### Achado durante a verificação: `carregando` sem tempo limite prendia o usuário
+
+Em duas execuções a chamada ao Gemini **ficou pendurada e nunca respondeu**. Como
+`callGemini` em `src/services/music.ts` não tem timeout, a promessa nunca se resolvia e o
+estado ficava em `carregando` indefinidamente — ou seja, **o bloqueio da postagem introduzido
+pela US2 virava armadilha**, um comportamento pior do que o defeito original.
+
+O [data-model.md](./data-model.md) já previa a transição
+`carregando ──(falha / sem resultado / tempo limite)──> indisponivel`; faltava implementá-la.
+Foi adicionado um limite de **30 s** em `CaptureSheet` — 5× o pior caso medido (7,31 s) —
+depois do qual a postagem é liberada com confirmação. Se a resposta chegar atrasada, o
+`.then` ainda repõe a trilha e o estado volta a `pronta`.
+
+> A causa raiz (requisição HTTP sem timeout) continua em `music.ts` e está anotada como
+> candidata da Fase 5, junto da instrumentação do T020.

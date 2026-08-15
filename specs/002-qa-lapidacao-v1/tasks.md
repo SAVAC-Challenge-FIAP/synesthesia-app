@@ -72,7 +72,7 @@ Este backlog é executado **em loop, sem ninguém para responder perguntas no me
 - [X] T016 [US2] Manter "Salvar" acionável em **todos** os estados em `src/components/CaptureSheet.tsx` (RV-02 — a foto nunca pode ser perdida nem bloqueada)
 - [X] T017 [US2] Exigir confirmação explícita antes de postar quando o estado for `indisponivel`, deixando claro que o pacote sairá sem trilha, em `src/components/CaptureSheet.tsx`
 - [X] T018 [US2] Revisar os textos de conclusão em `src/components/PostSheet.tsx` para que nenhuma mensagem declare "pronto" sem dizer o que o pacote contém (FR-Q07)
-- [ ] T019 [US2] Validar no dispositivo os quatro cenários de aceite da US2 (carregando, pronta, indisponível, salvar sempre); anexar screenshots em `docs/preview/us2/`
+- [X] T019 [US2] Validar no dispositivo os quatro cenários de aceite da US2 (carregando, pronta, indisponível, salvar sempre); anexar screenshots em `docs/preview/us2/`
 
 ---
 

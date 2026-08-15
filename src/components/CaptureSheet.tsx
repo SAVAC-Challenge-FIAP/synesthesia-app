@@ -30,6 +30,14 @@ import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
 import { Media } from '@/types';
 
 /**
+ * Tempo máximo em `carregando` antes de liberar a postagem com confirmação.
+ * A mediana medida é de ~6s (baseline.md T003); 30s é folga de 5x sobre o pior
+ * caso observado, e existe só para que uma requisição pendurada não prenda o
+ * usuário — nunca para encurtar uma curadoria que está progredindo.
+ */
+const LIMITE_CURADORIA_MS = 30_000;
+
+/**
  * Modal de Captura (US3/US4/US5): pacote sensorial em edição — foto + filtro
  * + música + trecho. Salvar/Postar preservam a unidade aprovada (RN-001).
  */
@@ -76,11 +84,24 @@ export function CaptureSheet() {
     }
 
     patch({ curadoria: 'carregando' });
+
+    // Transição "carregando --(tempo limite)--> indisponivel" do data-model.
+    // Sem ela o bloqueio da postagem vira armadilha: `callGemini` não tem
+    // timeout, e uma requisição pendurada deixaria `carregando` para sempre —
+    // observado no device durante a validação da US2. Se a resposta chegar
+    // depois, o `.then` abaixo ainda repõe a trilha e volta para `pronta`.
+    const limite = setTimeout(() => {
+      if (useCaptureStore.getState().session?.curadoria === 'carregando') {
+        patch({ curadoria: 'indisponivel' });
+      }
+    }, LIMITE_CURADORIA_MS);
+
     const analise = deteccaoTempoReal
       ? analyzePhotoAndSuggest(s.photoUri, vibeById(s.vibeId))
       : getSuggestions(vibeById(s.vibeId)).then((sugestoes) => ({ vibeId: null, sugestoes }));
     analise
       .then(({ vibeId: vibeReal, sugestoes }) => {
+        clearTimeout(limite);
         const atual = useCaptureStore.getState().session;
         if (!atual || atual.photoUri !== photoUri) return;
         const primeira =
@@ -101,7 +122,10 @@ export function CaptureSheet() {
           ...(escolheSozinho ? { musica: primeira } : {}),
         });
       })
-      .catch(() => patch({ curadoria: 'indisponivel' }));
+      .catch(() => {
+        clearTimeout(limite);
+        patch({ curadoria: 'indisponivel' });
+      });
   }, [photoUri, sugestaoAutomatica, deteccaoTempoReal, patch]);
 
   if (!session) return null;
