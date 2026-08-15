@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  O .mp4 sai em cache/synesthesia-video/ e a imagem em cache/ (view-shot); os
+  demais caminhos entram porque o pacote pode vir da galeria persistente ou de
+  um diretório externo, e um `IllegalArgumentException` do FileProvider aqui
+  apareceria como "compartilhar não faz nada".
+-->
+<paths>
+  <cache-path name="share_cache" path="." />
+  <files-path name="share_files" path="." />
+  <external-path name="share_external" path="." />
+  <external-files-path name="share_external_files" path="." />
+  <external-cache-path name="share_external_cache" path="." />
+</paths>

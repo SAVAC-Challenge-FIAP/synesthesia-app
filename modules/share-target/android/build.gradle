@@ -1,0 +1,46 @@
+apply plugin: 'com.android.library'
+
+group = 'expo.modules.sharetarget'
+version = ''
+
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useExpoPublishing()
+
+// Mesmo arranjo do video-muxer: as versões do SDK vêm do projeto raiz, não do
+// expo-modules-core, para o módulo não se mexer sozinho num bump de SDK.
+def useManagedAndroidSdkVersions = false
+if (useManagedAndroidSdkVersions) {
+  useDefaultAndroidSdkVersions()
+} else {
+  buildscript {
+    ext.safeExtGet = { prop, fallback ->
+      rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+    }
+  }
+  project.android {
+    compileSdkVersion safeExtGet("compileSdkVersion", 36)
+    defaultConfig {
+      minSdkVersion safeExtGet("minSdkVersion", 24)
+      targetSdkVersion safeExtGet("targetSdkVersion", 36)
+    }
+  }
+}
+
+android {
+  namespace "expo.modules.sharetarget"
+  defaultConfig {
+    versionCode 1
+    versionName ""
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // FileProvider e o desenho de ícones adaptativos em Bitmap.
+  implementation "androidx.core:core-ktx:1.13.1"
+}

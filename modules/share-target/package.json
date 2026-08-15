@@ -1,0 +1,7 @@
+{
+  "name": "share-target",
+  "version": "1.0.0",
+  "description": "Lista os apps do aparelho que recebem o pacote e compartilha direto num deles",
+  "main": "src/ShareTargetModule.ts",
+  "private": true
+}

@@ -653,6 +653,83 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
 
 ---
 
+## Fase 13 — Destinos reais no modal de postagem (2026-08-15)
+
+- [X] T055 [DESIGN] **Trocar a grade fixa de emoji por destinos reais do aparelho, no modal de
+  postagem** — Figma nó
+  [294-163](https://www.figma.com/design/3yJ1nLbHljozr8qqfrQ6yX/JOVI-Challenge---FIAP-2026?node-id=294-163&m=dev).
+
+  **O que o Sávio pediu**: os emoji da barra de compartilhamento estavam "nada a ver"; ele queria
+  ver "as redes nativas do celular das pessoas" e, se desse, "instagram stories, whatsapp status,
+  essas coisas".
+
+  ### O defeito real, que era maior que o visual
+
+  Os seis destinos eram uma constante no código e **os seis chamavam a mesma função** —
+  `Sharing.shareAsync`, a folha genérica do sistema. Tocar em "LinkedIn" e em "Instagram" fazia
+  exatamente a mesma coisa. Seis caminhos desenhados, um caminho real; o emoji era só o sintoma
+  visível. Ver `docs/preview/fase13/01-antes-...png`.
+
+  ### Como ficou
+
+  Módulo nativo novo [`modules/share-target`](../../modules/share-target/): `listarDestinos(mime)`
+  pergunta ao `PackageManager` quem recebe um `ACTION_SEND` daquele tipo e devolve **pacote,
+  activity, rótulo e ícone** — o ícone vai como data URI PNG. `compartilharEm(...)` dispara o
+  Intent já apontado para (pacote, activity), com a URI do FileProvider e a permissão de leitura
+  na própria flag.
+
+  **Os ícones não são assets nossos.** Os logos existem no Figma e foram baixados, mas não
+  entraram no repo: quem desenha a grade é o ícone que **o app declara no aparelho da pessoa**.
+  Isso não desatualiza quando o Instagram muda de marca, não exige biblioteca de logos
+  versionada, e funciona para qualquer app — no device apareceram Bluetooth, Gmail, Quick Share
+  e YouTube junto com Instagram e TikTok. O layout continua o do Figma: tile 52×52 arredondado,
+  três por linha, nome embaixo, e o tile "Mais" abrindo a folha do sistema para o que não coube.
+
+  **"Instagram Stories" saiu de graça.** Não há hard-code de Stories: o Instagram publica quatro
+  activities (Messages, Feed, Stories, Reels) e cada uma vira um tile. Era exatamente o pedido,
+  e veio de perguntar ao sistema em vez de fixar pacotes.
+
+  ### Duas correções que só apareceram medindo no device
+
+  1. **Monopólio.** Ordenando só por preferência, as quatro entradas do Instagram tomavam a grade
+     inteira e um WhatsApp instalado não apareceria.
+  2. **O tiro pela culatra.** Corrigido com "um por app antes de repetir", Stories e Reels
+     perderam a vaga para *"Adicionar ao Maps"* e *"Mensagens"* — ver
+     `03-rodizio-global-jogou-stories-fora.png`. Um segundo destino do Instagram vale mais que um
+     primeiro do Maps. O rodízio passou a ser **por faixa de preferência**, não global.
+  3. **Rótulos repetidos.** O Instagram publica **duas** activities chamadas "Feed": dois tiles
+     idênticos levando ao mesmo lugar — o defeito desta task renascendo em outra forma. Dedup por
+     (pacote, rótulo), ficando a de maior prioridade do sistema.
+
+  ### Evidência em device (Redmi Note 8 Pro, build local)
+
+  Screenshots em [`docs/preview/fase13/`](../../docs/preview/fase13/).
+
+  - Grade final: Messages · TikTok · Feed · Stories · Reels · Mais, sem repetição.
+  - Toque em **Stories** → `com.instagram.android/com.instagram.modal.ModalActivity` no topo
+    (`dumpsys activity`). O compositor não pôde ser inspecionado porque **não há conta logada** no
+    aparelho de teste — o que está provado é a entrega do Intent, não o render dentro do Instagram.
+  - **Entrega do arquivo provada pelo Gmail**, que lê o conteúdo: anexo
+    `pacote-...mp4`, **14,1 MB**, mais a legenda da trilha chegando no `EXTRA_TEXT`
+    (`05-arquivo-chega-14mb-com-legenda.png`). Isso fecha o FileProvider e o
+    `FLAG_GRANT_READ_URI_PERMISSION` — sem eles o anexo apareceria vazio ou o app recusaria.
+  - Não regressão pelo [quickstart.md](./quickstart.md): `trilhas: ['soun', 'vide']`, `avc1`,
+    `mp4a`, `duracao: 30.00s`.
+  - `npm run typecheck` passando; build local (`./scripts/dev-android.sh build`), **sem EAS**.
+
+  ### O que ficou de fora, de propósito
+
+  - **WhatsApp Status direto não existe** como intent pública. Compartilhando para o WhatsApp,
+    "Status" aparece na lista de destinatários do próprio app — a um toque, não a zero.
+  - **Instagram Stories via `com.instagram.share.ADD_TO_STORY`** (que pularia o compositor) exige
+    um Facebook App ID registrado. Não foi feito: dependeria de cadastro externo e falharia de
+    forma instável sem ele. O tile "Stories" atual usa o `ACTION_SEND` normal, que é estável.
+  - **O caminho de lista vazia** (nenhum app compatível → botão "Compartilhar" único) está
+    implementado mas **não foi visto rodando**: o aparelho de teste tem apps demais para produzir
+    esse estado. É o mesmo caminho do Expo Go, onde o módulo nativo não carrega.
+
+---
+
 ## Dúvidas para o Sávio
 
 > Preencher aqui qualquer decisão de produto que aparecer durante a execução autônoma, em vez de inventar. Implementar a alternativa mais conservadora e seguir.

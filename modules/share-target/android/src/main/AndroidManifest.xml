@@ -1,0 +1,33 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!--
+    Android 11+ fecha a visibilidade de pacotes por padrão: sem isto,
+    `queryIntentActivities` volta vazio e a grade some inteira, mesmo com o
+    Instagram instalado. Declaramos a *capacidade* que nos interessa (receber
+    um SEND), não uma lista de pacotes — assim a grade acompanha o que a pessoa
+    tem, em vez de uma lista nossa que envelhece.
+  -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.SEND" />
+      <data android:mimeType="*/*" />
+    </intent>
+  </queries>
+
+  <application>
+    <!--
+      FileProvider próprio em vez de pegar carona no do expo-sharing: a
+      authority dele é detalhe interno da biblioteca e mudaria sem aviso num
+      upgrade, quebrando o compartilhamento em silêncio.
+    -->
+    <provider
+      android:name="androidx.core.content.FileProvider"
+      android:authorities="${applicationId}.ShareTargetFileProvider"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/share_target_paths" />
+    </provider>
+  </application>
+</manifest>
