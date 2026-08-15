@@ -44,6 +44,13 @@ export default function CameraScreen() {
     manualFiltro === 'original' ? null : (manualFiltro ?? (filtroAutomatico ? vibe.filtro : null));
   const filtro = filtroAtivo ? filterById(filtroAtivo) : null;
 
+  // Callback estável: recriado a cada render, ele invalidaria a memoização dos
+  // chips e o carrossel inteiro voltaria a redesenhar a cada troca de filtro.
+  const escolherFiltro = useCallback(
+    (id: FilterId | null) => setManualFiltro(id ?? 'original'),
+    [],
+  );
+
   const flip = () => {
     // flip recalcula a prévia da vibe (FR-001): frontal puxa vibes pessoais
     setFacing((f) => (f === 'back' ? 'front' : 'back'));
@@ -122,11 +129,7 @@ export default function CameraScreen() {
             </Pressable>
           ) : null}
 
-          <FilterCarousel
-            ativo={filtroAtivo}
-            autoAtivo={filtroAuto}
-            onSelect={(id) => setManualFiltro(id ?? 'original')}
-          />
+          <FilterCarousel ativo={filtroAtivo} autoAtivo={filtroAuto} onSelect={escolherFiltro} />
 
           {/* Home bar: galeria / captura / flip */}
           <View style={styles.controls}>

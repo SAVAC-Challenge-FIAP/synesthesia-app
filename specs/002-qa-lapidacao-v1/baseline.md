@@ -207,7 +207,7 @@ Os dois casos de falha ficaram cobertos, e com tratamentos diferentes de propós
 | Rede caiu (`TypeError`) | tenta o Gemini por vibe e só depois cai | falha instantânea, a nova tentativa não custa espera |
 | Tempo limite (`AbortError`) | **pula** o Gemini e vai direto ao Deezer | insistir custaria outros 22 s no serviço que já não respondeu |
 
-### Próxima hipótese, se alguém quiser perseguir a mediana
+### Próxima hipótese, se alguém quiser perseguir a mediana (US3)
 
 Trocar `gemini-3.1-flash-lite` por um modelo mais rápido e medir a qualidade da leitura de
 cena lado a lado, em 20 fotos variadas — não em 5 da mesma cena. É decisão de produto, não
@@ -306,3 +306,31 @@ depois do qual a postagem é liberada com confirmação. Se a resposta chegar at
 
 > A causa raiz (requisição HTTP sem timeout) continua em `music.ts` e está anotada como
 > candidata da Fase 5, junto da instrumentação do T020.
+
+---
+
+## T027 — Atraso na troca de filtro
+
+Medido com `dumpsys gfxinfo`, que conta os frames que o app de fato desenhou. Dois
+controles antes de atribuir qualquer custo à troca de filtro:
+
+| Cenário | Frames | Janky | p50 | p90 | p95 |
+|---|---|---|---|---|---|
+| Visor parado, 10 s sem tocar | **0** | — | — | — | — |
+| 12 toques em área inerte | **0** | — | — | — | — |
+| 12 trocas de filtro (antes) | 299 | 39,1% | 14 ms | **113 ms** | 200 ms |
+| 12 trocas de filtro (depois) | 367 | 38,2% | 15 ms | **77 ms** | 200 ms |
+
+Os dois controles em zero são o achado que orienta o resto: **o preview da câmera é uma
+surface nativa e não passa pelo React Native**, então o app não desenha nada enquanto
+ninguém interage. Todo frame contado veio das trocas de filtro — não há custo de fundo a
+descontar.
+
+**Correção aplicada**: o chip virou componente memoizado e os dois `onSelect`
+(`app/camera.tsx` e `CaptureSheet`) viraram callbacks estáveis. Sem isso, trocar um filtro
+redesenhava os nove chips. O p90 caiu **32%**, de 113 ms para 77 ms.
+
+**O que sobrou, e é honesto registrar**: ainda são ~30 frames por troca, quando o esperado
+seria 1 ou 2, e o p95 continua em 200 ms. A memoização dos chips não explica esse resto —
+ele está no re-render da tela do visor inteira a cada mudança de `manualFiltro`. Investigar
+isso é exatamente o **T038** da Fase 9, e é lá que ele foi atacado.

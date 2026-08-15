@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,7 +27,7 @@ import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
-import { Media } from '@/types';
+import { FilterId, Media } from '@/types';
 
 /**
  * Tempo máximo em `carregando` antes de liberar a postagem com confirmação.
@@ -71,6 +71,12 @@ export function CaptureSheet() {
   const [sharePkg, setSharePkg] = useState<SharePackage | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [etapa, setEtapa] = useState<EtapaCuradoria>('preparando');
+
+  // Estável pelo mesmo motivo do visor: mantém a memoização dos chips de pé
+  const escolherFiltro = useCallback(
+    (id: FilterId | null) => patch({ filtroId: id, filtroAuto: false }),
+    [patch],
+  );
 
   const photoUri = session?.photoUri;
 
@@ -296,10 +302,7 @@ export function CaptureSheet() {
               </Text>
             </View>
             <View style={styles.carouselWrap}>
-              <FilterCarousel
-                ativo={session.filtroId}
-                onSelect={(id) => patch({ filtroId: id, filtroAuto: false })}
-              />
+              <FilterCarousel ativo={session.filtroId} onSelect={escolherFiltro} />
             </View>
 
             {/* Música: a outra metade do pacote sensorial */}
