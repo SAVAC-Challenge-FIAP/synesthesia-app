@@ -200,7 +200,10 @@ class VideoMuxerModule : Module() {
       .setAudioMimeType(MimeTypes.AUDIO_AAC)
       .addListener(object : Transformer.Listener {
         override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-          Log.i(TAG, "mp4 pronto: $outputPath (${exportResult.durationMs}ms, ${exportResult.fileSizeBytes} bytes)")
+          // `approximateDurationMs` é a duração **do vídeo gerado**, não o tempo
+          // gasto exportando — o `t=` do log de progresso é que mede a espera.
+          // (`durationMs` foi deprecado no Media3 em favor deste.)
+          Log.i(TAG, "mp4 pronto: $outputPath (video de ${exportResult.approximateDurationMs}ms, ${exportResult.fileSizeBytes} bytes)")
           emExportacao = false
           // C-03: a última emissão antes de `concluido` chega a 100 — mas só
           // se a barra chegou a existir. Emitir 100 numa exportação que nunca

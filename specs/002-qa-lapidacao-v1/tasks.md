@@ -341,8 +341,14 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   **Feito**: estado `postando` + `postandoRef` (espelho síncrono, porque dois toques chegam
   antes do re-render) envolvendo **toda** a `exportar()`, inclusive o `exportPackage`. Botão
   vira "Postando..." desabilitado, com spinner e o motivo à vista; `exportar()` ganhou
-  `try/catch` — antes uma falha ficava calada. O tempo real medido no logcat foi **29966 ms**,
-  o que confirma o diagnóstico dos 20–30 s.
+  `try/catch` — antes uma falha ficava calada.
+
+  > ⚠️ **Correção de leitura (2026-08-15)**: este registro dizia que "o tempo real medido no
+  > logcat foi 29966 ms, o que confirma o diagnóstico dos 20–30 s". **Estava errado.** Os
+  > 29966 ms vinham de `exportResult.durationMs`, que é a duração **do vídeo gerado** (os 30 s
+  > do trecho), não o tempo gasto exportando. O tempo real só foi medido na Fase 8, pelo `t=`
+  > do log de progresso: **~9,8 s**. O defeito do T045 é o mesmo e a correção também — só a
+  > grandeza da espera era menor do que o registrado.
   **Evidência**: cinco toques em rajada em "Postar agora" → **1 única** linha
   `VideoMuxer: mp4 pronto (29966ms)` no logcat (antes seriam 5 exportações concorrentes), e a
   tela final foi direto "Vídeo gerado!", sem passar pela de "duas partes".
@@ -367,6 +373,64 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
   máquina do DM Mono; o que as mantém "técnicas" agora é a caixa alta com `letterSpacing`.
   Efeito colateral bem-vindo: Lato é mais estreita, e o chip NEON voltou a caber inteiro.
   Screenshots em `docs/preview/t046/`.
+
+---
+
+## Fase 11 — QA de uso real, 2ª rodada (reportado pelo Sávio, 2026-08-15)
+
+> Achados de **uso real**, no mesmo espírito da Fase 10. Todos validados no dispositivo.
+
+- [X] T047 [BUG] **O trecho não se movimenta e não dá para escolher onde termina.**
+  O slider parecia uma barra de progresso mas era um seletor de início: ficava parado enquanto
+  a música tocava, e a reprodução parava sozinha aos 30 s, onde quer que o usuário estivesse.
+  Pior: **não havia como escolher o fim** — `trechoFim` era fixado em `30` no `CaptureSheet`,
+  no `MusicSheet` e no `camera.tsx`, então todo vídeo saía com a prévia inteira.
+  **Diagnóstico**: o modelo **já suportava** recorte arbitrário — `trechoFim` existe em
+  `CaptureSession`, alimenta `durationSeconds` em [`sharePackage.ts`](../../src/services/sharePackage.ts)
+  e entra na legenda. Só a interface é que nunca deixava mexer nele.
+  **Feito** em [`MusicPlayer.tsx`](../../src/components/MusicPlayer.tsx): separou-se o que era
+  uma coisa só em três — uma **barra de progresso** não interativa que anda com a reprodução,
+  **dois sliders** (início e fim) e a **duração do vídeo** em destaque. A reprodução agora
+  respeita o fim escolhido e volta ao início do trecho. Piso de 5 s (`TRECHO_MIN_S`), que já
+  era o implícito no antigo `maximumValue={TRECHO_MAX_S - 5}`.
+  O recorte **sobrevive à troca de faixa** (toda prévia do Deezer tem 30 s, então "quero 10 s
+  de vídeo" continua valendo) — antes o `MusicSheet` resetava para 0–30 e jogava a escolha fora.
+  **Evidência**: recorte 10 s→20 s exibindo "VÍDEO DE 10s"; barra andando 2s/10s → 8s/10s;
+  parada no fim do trecho com retorno a 0s/10s; e o `.mp4` resultante com **10,00 s** e 5,4 MB
+  (contra 15 MB dos de 30 s).
+
+- [X] T048 [PERF] **O vídeo só começava a ser gerado no toque de "Postar".**
+  O usuário já tinha gasto tempo escolhendo música e conferindo a prévia, e só então esperava
+  ~10 s olhando um indicador. Isso contraria a premissa do produto, que é agilizar o post.
+  **Feito**: [`src/services/preExport.ts`](../../src/services/preExport.ts) antecipa a geração
+  em segundo plano assim que o pacote está definido. Detalhes que fazem a coisa se sustentar:
+  - **Chave de identidade** (foto + filtro + faixa + recorte): mudou qualquer um, o vídeo
+    anterior não serve, e só é servido quem pedir pela chave vigente.
+  - **Quietude de 2,5 s** antes de disparar: arrastar o slider muda a chave a cada passo, e sem
+    isso cada passo queimaria uma exportação de ~10 s para jogar fora.
+  - **Uma por vez**: o muxer não sabe cancelar (fora do escopo do contrato), então a que estiver
+    rodando vai até o fim e é descartada; só a última chave pedida entra na fila.
+  - **Não concorre com a postagem**: nada é agendado com a exportação real em curso ou a tela de
+    destinos aberta, porque ali o arquivo está em uso e a limpeza de cache o apagaria.
+  - Ao postar: pronto → abre na hora; em voo para a mesma chave → aproveita em vez de começar
+    outra; nada → gera com o indicador de sempre.
+  **Bug pego na revisão, antes de ir ao device**: iniciar uma geração nova apaga os `.mp4`
+  anteriores (limpeza do T040), então o pacote "pronto" perdia o arquivo. Se o usuário desfizesse
+  a mudança e postasse antes da nova terminar, receberia um caminho inexistente. Corrigido
+  zerando o `pronto` quando uma geração começa.
+  **Evidência**: `.mp4` de 10 s presente no cache **sem nenhum toque em "Postar"**, e a tela
+  "Vídeo gerado!" abrindo em **~2 s**, sem barra de progresso.
+
+- [X] T049 [DIAG] **Os "erros" do `VideoMuxerModule.kt` no editor.**
+  São **falsos positivos do índice Kotlin do VSCode**, que não tem o classpath do Gradle. A
+  prova está na própria mensagem: `Cannot access built-in declaration 'kotlin.String'` — se o
+  stdlib do Kotlin realmente não resolvesse, nada compilaria, nem `String`.
+  Verificado com recompilação do zero (`:video-muxer:compileDebugKotlin --rerun-tasks`):
+  **BUILD SUCCESSFUL, zero erros**. Os únicos warnings vinham de `node_modules`, exceto um
+  nosso, este sim real e já corrigido: `exportResult.durationMs` está deprecado no Media3 →
+  trocado por `approximateDurationMs`.
+  Esse warning rendeu ainda a **correção de leitura registrada no T045**: `durationMs` é a
+  duração do vídeo, não o tempo de exportação.
 
 ---
 

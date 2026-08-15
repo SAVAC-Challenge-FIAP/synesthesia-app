@@ -73,7 +73,10 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
 
   const confirmar = () => {
     player.pause();
-    if (escolhida) patch({ musica: escolhida, curadoria: 'pronta', trechoInicio: 0, trechoFim: 30 });
+    // O recorte escolhido **sobrevive** à troca de faixa: toda prévia do Deezer
+    // tem os mesmos 30s, então "quero 10 segundos de vídeo" continua valendo com
+    // a música nova. Antes isto resetava para 0–30 e jogava a escolha fora.
+    if (escolhida) patch({ musica: escolhida, curadoria: 'pronta' });
     onClose();
   };
 

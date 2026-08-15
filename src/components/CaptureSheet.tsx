@@ -15,13 +15,14 @@ import { captureRef } from 'react-native-view-shot';
 
 import { FilterCarousel } from '@/components/FilterCarousel';
 import { FilteredImage } from '@/components/FilteredImage';
-import { MusicPlayer, TRECHO_MAX_S } from '@/components/MusicPlayer';
+import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicSheet } from '@/components/MusicSheet';
 import { PostSheet } from '@/components/PostSheet';
 import { filterById } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
 import { analyzePhotoAndSuggest, EtapaCuradoria, getSuggestions } from '@/services/music';
 import { persistPhoto } from '@/services/mediaStorage';
+import * as preExport from '@/services/preExport';
 import { exportPackage, SharePackage } from '@/services/sharePackage';
 import { saveToSystemGallery } from '@/services/systemGallery';
 import { useCaptureStore } from '@/stores/useCaptureStore';
@@ -37,6 +38,16 @@ import { FilterId, Media } from '@/types';
  * usuário — nunca para encurtar uma curadoria que está progredindo.
  */
 const LIMITE_CURADORIA_MS = 30_000;
+
+/**
+ * Quietude antes de disparar a pré-geração do vídeo em segundo plano.
+ *
+ * Arrastar o slider do recorte muda a chave do pacote a cada passo; sem esta
+ * espera, cada passo dispararia uma exportação de ~10s que seria descartada no
+ * passo seguinte — gasto de bateria puro. Esperar o usuário assentar a escolha
+ * é o que torna a antecipação barata.
+ */
+const ESPERA_QUIETUDE_MS = 2_500;
 
 /**
  * Texto de cada etapa da curadoria (FR-Q08). Substitui o rótulo único que
@@ -168,23 +179,70 @@ export function CaptureSheet() {
       });
   }, [photoUri, sugestaoAutomatica, deteccaoTempoReal, patch]);
 
-  if (!session) return null;
+  const renderizarComFiltro = useCallback(async (): Promise<string> => {
+    const s = useCaptureStore.getState().session;
+    if (!s) return '';
+    // Sem filtro, a imagem sai exatamente como capturada (T-0B)
+    if (!s.filtroId) return s.photoUri;
+    try {
+      return await captureRef(previewRef, { format: 'jpg', quality: 0.92 });
+    } catch {
+      return s.photoUri;
+    }
+  }, []);
+
+  /**
+   * Identidade do pacote a exportar. Muda quando muda qualquer coisa que o
+   * vídeo carrega — foto, filtro, faixa ou recorte —, e é ela que decide se um
+   * vídeo pré-gerado ainda serve.
+   */
+  const chave = session
+    ? preExport.chavePacote({
+        photoUri: session.photoUri,
+        filtroId: session.filtroId,
+        musicaId: session.musica?.id ?? null,
+        trechoInicio: session.trechoInicio,
+        trechoFim: session.trechoFim,
+      })
+    : null;
+
+  /**
+   * Antecipa a geração do .mp4 enquanto o usuário ainda decide. A premissa do
+   * produto é agilizar o post; o tempo que ele passa ouvindo a prévia e
+   * ajustando o recorte é tempo que o aparelho pode estar trabalhando, em vez
+   * de cobrar ~10s parado depois do toque em "Postar".
+   */
+  const pronta = session?.curadoria === 'pronta';
+  const temMusica = Boolean(session?.musica);
+  useEffect(() => {
+    if (!chave || !pronta || !temMusica) return;
+    // Não competir com a exportação de verdade nem com a tela de destinos já
+    // aberta: ali o arquivo pode estar em uso, e a limpeza de cache o apagaria.
+    if (postando || sharePkg) return;
+    const t = setTimeout(() => {
+      preExport.agendar(chave, async () => {
+        const s = useCaptureStore.getState().session;
+        return {
+          imageUri: await renderizarComFiltro(),
+          musica: s?.musica ?? null,
+          trechoInicio: s?.trechoInicio ?? 0,
+          trechoFim: s?.trechoFim ?? 30,
+        };
+      });
+    }, ESPERA_QUIETUDE_MS);
+    return () => clearTimeout(t);
+  }, [chave, pronta, temMusica, postando, sharePkg, renderizarComFiltro]);
+
+  // Sessão encerrada: o pacote pré-gerado não vale para a próxima foto
+  useEffect(() => () => preExport.limpar(), []);
+
+  if (!session || !chave) return null;
 
   // Enquanto a curadoria corre, ninguém consegue postar um pacote pela metade
   const curando = session.curadoria === 'carregando';
   const filtro = session.filtroId ? filterById(session.filtroId) : null;
   const vibe = vibeById(session.vibeId);
   const editando = session.mediaId !== null;
-
-  const renderizarComFiltro = async (): Promise<string> => {
-    // Sem filtro, a imagem sai exatamente como capturada (T-0B)
-    if (!session.filtroId) return session.photoUri;
-    try {
-      return await captureRef(previewRef, { format: 'jpg', quality: 0.92 });
-    } catch {
-      return session.photoUri;
-    }
-  };
 
   const salvar = async (fechar: boolean): Promise<Media | null> => {
     if (salvando) return null;
@@ -248,21 +306,43 @@ export function CaptureSheet() {
     // Guarda de reentrada: uma exportação por vez. Sem isto, cada toque no
     // botão mudo abria uma geração de vídeo concorrente (T045).
     if (postandoRef.current) return;
+
+    // Caminho rápido: o vídeo deste pacote já foi gerado enquanto o usuário
+    // decidia. Sem barra, sem espera — a tela de destinos abre na hora, que é
+    // a razão de existir da pré-geração.
+    const jaPronto = preExport.obterPronto(chave);
+    if (jaPronto) {
+      postandoRef.current = true;
+      setPostando(true);
+      try {
+        await salvar(false);
+        setSharePkg(jaPronto);
+      } finally {
+        postandoRef.current = false;
+        setPostando(false);
+      }
+      return;
+    }
+
     postandoRef.current = true;
     setPostando(true);
     setProgresso(null);
     try {
-      const renderizada = await renderizarComFiltro();
       await salvar(false);
+      // Já tem uma pré-geração desta mesma chave em voo? Aproveita em vez de
+      // começar outra — duas exportações do mesmo pacote seria desperdício.
+      const emVoo = preExport.obterEmVoo(chave);
       // O pacote leva a unidade aprovada: imagem + trilha + trecho (RN-001).
       // No Expo Go sai como imagem + áudio + legenda; no dev build, .mp4 (T-07).
-      const pacote = await exportPackage({
-        imageUri: renderizada,
-        musica: session.musica,
-        trechoInicio: session.trechoInicio,
-        trechoFim: session.trechoFim,
-        onProgresso: setProgresso,
-      });
+      const pacote =
+        (emVoo ? await emVoo : null) ??
+        (await exportPackage({
+          imageUri: await renderizarComFiltro(),
+          musica: session.musica,
+          trechoInicio: session.trechoInicio,
+          trechoFim: session.trechoFim,
+          onProgresso: setProgresso,
+        }));
       setSharePkg(pacote);
     } catch {
       // Falhar calado é o mesmo defeito de fundo da US2: ação de saída sem o
@@ -378,8 +458,11 @@ export function CaptureSheet() {
                     // ele — este player fica montado por baixo, mas calado (T044)
                     ativo={!showMusic}
                     trechoInicio={session.trechoInicio}
-                    onTrechoInicio={(s) =>
-                      patch({ trechoInicio: s, trechoFim: TRECHO_MAX_S })
+                    trechoFim={session.trechoFim}
+                    // O fim agora vem do usuário. Antes era fixado em 30 aqui,
+                    // e por isso todo vídeo saía com a prévia inteira.
+                    onTrecho={(inicio, fim) =>
+                      patch({ trechoInicio: inicio, trechoFim: fim })
                     }
                   />
                   <View style={styles.musicActions}>
