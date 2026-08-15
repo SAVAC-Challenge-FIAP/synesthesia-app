@@ -177,6 +177,36 @@ A execução 5 é a prova: o Gemini estourou, a degradação assumiu, e o usuár
 trilha em 23,1 s — dentro do limite de 30 s da interface. Antes, esse mesmo caso ficaria
 pendurado por 1 a 2 minutos com a postagem bloqueada.
 
+---
+
+## T024 — Degradação graciosa, testada por injeção de falha
+
+Não dava para testar cortando a rede: o aparelho está ligado por **adb sobre Wi-Fi**, então
+desligar o Wi-Fi derruba a própria ferramenta de verificação. Em vez disso, os dois hosts
+foram apontados para domínios inexistentes (`.invalid`), o pipeline foi exercitado, e o
+arquivo restaurado do backup em seguida.
+
+Log de uma captura com Gemini **e** Deezer indisponíveis:
+
+```
+[music] análise da foto falhou (caiu para pipeline por vibe): [TypeError: Network request failed]
+[music] getSuggestions vibe="energetica" geminiKey=presente
+[music] Gemini falhou (caiu para Deezer puro): [TypeError: Network request failed]
+[music] ORIGEM=local — catálogo offline para vibe="energetica"
+[music][tempo] imagem=409ms gemini=0ms deezer=0ms total=792ms saida=degradado
+```
+
+Os quatro degraus da spec, na ordem, em **792 ms** — e a tela mostrou "Envolver · Anitta",
+a entrada do catálogo local para a vibe `energetica`. Nenhum degrau foi perdido nas
+mudanças da Fase 5.
+
+Os dois casos de falha ficaram cobertos, e com tratamentos diferentes de propósito:
+
+| Falha | Comportamento | Por quê |
+|---|---|---|
+| Rede caiu (`TypeError`) | tenta o Gemini por vibe e só depois cai | falha instantânea, a nova tentativa não custa espera |
+| Tempo limite (`AbortError`) | **pula** o Gemini e vai direto ao Deezer | insistir custaria outros 22 s no serviço que já não respondeu |
+
 ### Próxima hipótese, se alguém quiser perseguir a mediana
 
 Trocar `gemini-3.1-flash-lite` por um modelo mais rápido e medir a qualidade da leitura de
