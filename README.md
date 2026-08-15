@@ -25,6 +25,22 @@ Este repositório é a evolução **mobile (Expo / React Native)** do MVP funcio
 2. **Fusão entre Atmosfera e Som** — imagem e música formam um único pacote sensorial no momento da captura.
 3. **Ciclo de Vida da Mídia** — galeria inteligente que preserva a intenção criativa: revisite, lapide e exporte.
 
+## 📱 Preview
+
+Capturas reais do app rodando em development build (Redmi Note 8 Pro, Android 10):
+
+<div align="center">
+<img src="docs/preview/camera.png" width="260" alt="Visor com filtro ao vivo e carrossel de filtros" />
+<img src="docs/preview/captura.png" width="260" alt="Modal de captura com filtro e trilha sugerida" />
+<img src="docs/preview/trilha.png" width="260" alt="Trilha curada pelo Gemini a partir da cena" />
+</div>
+
+<div align="center">
+<sub><b>Visor ao vivo</b> — filtro aplicado em tempo real · <b>Captura</b> — Gemini lê a cena e define a vibe · <b>Trilha</b> — curadoria musical coerente com a atmosfera</sub>
+</div>
+
+No exemplo acima o Gemini leu *"laptop aberto em ambiente escuro, foco no teclado"*, classificou a vibe como **noturna**, aplicou o filtro **Eclipse 🌒** e sugeriu **Midnight City (M83)** — o pacote sensorial é exportado como um `.mp4` de 30s unindo imagem e trilha.
+
 ## 🚀 Como rodar (Expo Go)
 
 Pré-requisitos: Node 20+, celular com o app **Expo Go** ([Android](https://play.google.com/store/apps/details?id=host.exp.exponent) / [iOS](https://apps.apple.com/app/expo-go/id982107779)) na mesma rede Wi-Fi do computador.
@@ -47,12 +63,25 @@ O Expo Go não carrega módulos nativos fora do SDK. Para validação imediata n
 | `react-native-vision-camera` | `expo-camera` |
 | ML Kit (rotulagem de cena on-device) | Vibe simulada on-device (`src/services/vibeEngine.ts`) — mesmo contrato `detectVibe() → Vibe` |
 | Skia (shaders GPU) | Overlays + style `filter` do RN (GPU) |
-| `ffmpeg-kit` (vídeo .mp4 imagem+áudio) | Compartilha a imagem renderizada com filtro (`react-native-view-shot`) |
+| `ffmpeg-kit` (vídeo .mp4 imagem+áudio) | No Expo Go: imagem renderizada + áudio + legenda. No **development build**: `.mp4` real (ver abaixo) |
 | `expo-av` | `expo-audio` (sucessor oficial) |
+
+## 🎬 Development build (fluxo completo, com `.mp4`)
+
+O `.mp4` único (imagem + trilha) exige código nativo e **só roda em development build** — no Expo Go o pacote degrada para imagem + áudio + legenda, sem nunca bloquear a postagem.
+
+A geração usa o módulo local [`modules/video-muxer`](modules/video-muxer), construído sobre o **[Media3 Transformer](https://developer.android.com/media/media3/transformer)** do Google (H.264 + AAC) em vez do `ffmpeg-kit` previsto originalmente: entrega o mesmo resultado sem o peso do binário do FFmpeg e sem lidar na mão com as diferenças de encoder entre fabricantes.
+
+```bash
+# Requer Android SDK + JDK 17 (não precisa do Android Studio)
+npm run android        # compila nativo e instala no device conectado
+```
+
+Utilitários de desenvolvimento em [`scripts/dev-android.sh`](scripts/dev-android.sh) (`build`, `log`, `shot`, `video`).
 
 ## 🛠️ Stack
 
-`Expo` · `expo-router` · `TypeScript` · `react-native-vision-camera` · `react-native-skia` · `react-native-reanimated` · `react-native-mlkit-image-labeling` · `zustand` · `async-storage` · `@google/generative-ai` (Gemini) · `Deezer` · `Last.fm` · `expo-av` · `@gorhom/bottom-sheet` · `ffmpeg-kit-react-native` · `expo-media-library` · `expo-sharing`
+`Expo` · `expo-router` · `TypeScript` · `react-native-vision-camera` · `react-native-skia` · `react-native-reanimated` · `react-native-mlkit-image-labeling` · `zustand` · `async-storage` · `@google/generative-ai` (Gemini) · `Deezer` · `Last.fm` · `expo-av` · `@gorhom/bottom-sheet` · `androidx.media3-transformer` · `expo-media-library` · `expo-sharing`
 
 ## 🎨 Identidade visual
 
@@ -70,6 +99,8 @@ Tipografia: **Syne** (display) + **DM Mono** (labels técnicas). Filtros: Vivid 
 ```
 .
 ├── app/                          # Rotas (expo-router): permissões, câmera, galeria, ajustes
+├── modules/video-muxer/          # Expo Module nativo: imagem + trilha → .mp4 (Media3 Transformer)
+├── scripts/dev-android.sh        # Build/log/screenshot/pull no device via adb
 ├── src/
 │   ├── components/               # CaptureSheet, MusicSheet, PostSheet, FilterCarousel, player...
 │   ├── constants/                # 8 filtros + vibes

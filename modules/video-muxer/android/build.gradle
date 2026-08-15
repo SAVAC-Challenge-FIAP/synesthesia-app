@@ -41,3 +41,13 @@ android {
     abortOnError false
   }
 }
+
+dependencies {
+  // Media3 Transformer: junta imagem + áudio num .mp4 sem a gente mexer em
+  // MediaCodec/MediaMuxer na mão (as quirks de encoder por fabricante ficam
+  // com a biblioteca do Google, não com a gente).
+  def media3Version = "1.11.0"
+  implementation "androidx.media3:media3-transformer:$media3Version"
+  implementation "androidx.media3:media3-effect:$media3Version"
+  implementation "androidx.media3:media3-common:$media3Version"
+}
