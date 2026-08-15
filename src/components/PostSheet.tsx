@@ -1,6 +1,7 @@
 import * as Sharing from 'expo-sharing';
 import React, { useState } from 'react';
 import { Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SharePackage } from '@/services/sharePackage';
 import { saveToSystemGallery } from '@/services/systemGallery';
@@ -24,6 +25,9 @@ const DESTINOS = [
 ];
 
 export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: () => void }) {
+  // Mesmo motivo do CaptureSheet: modal desenha na própria janela, então o
+  // espaçamento inferior vem do inset real do aparelho (ver baseline.md T004).
+  const insets = useSafeAreaInsets();
   const temVideo = pacote.videoUri !== null;
   const temTrilha = pacote.musica !== null;
   const [baixando, setBaixando] = useState(false);
@@ -79,7 +83,7 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 8, 32) }]}>
           <Text style={styles.emoji}>{temVideo ? '🎬' : '📦'}</Text>
           <Text style={styles.title}>{temVideo ? 'Vídeo gerado!' : 'Pacote pronto!'}</Text>
           <Text style={styles.subtitle}>
