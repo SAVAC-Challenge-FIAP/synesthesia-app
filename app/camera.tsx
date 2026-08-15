@@ -14,7 +14,7 @@ import { detectVibe } from '@/services/vibeEngine';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
-import { colors, fonts, sizes } from '@/theme/tokens';
+import { colors, fonts, hitSlops, sizes } from '@/theme/tokens';
 import { FilterId } from '@/types';
 
 /**
@@ -102,14 +102,22 @@ export default function CameraScreen() {
               <Text style={styles.vibeNome}>{vibe.nome.toUpperCase()}</Text>
             </View>
           </View>
-          <Pressable style={styles.opcoes} onPress={() => router.push('/settings')}>
+          <Pressable
+            style={styles.opcoes}
+            hitSlop={hitSlops.chip}
+            onPress={() => router.push('/settings')}
+          >
             <Text style={styles.opcoesText}>+ OPÇÕES</Text>
           </Pressable>
         </View>
 
         <View style={styles.bottom} pointerEvents="box-none">
           {manualFiltro ? (
-            <Pressable style={styles.autoBtn} onPress={() => setManualFiltro(null)}>
+            <Pressable
+              style={styles.autoBtn}
+              hitSlop={hitSlops.chip}
+              onPress={() => setManualFiltro(null)}
+            >
               <Text style={styles.autoBtnText}>↺ VOLTAR AO AUTOMÁTICO</Text>
             </Pressable>
           ) : null}

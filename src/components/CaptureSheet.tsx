@@ -26,7 +26,7 @@ import { saveToSystemGallery } from '@/services/systemGallery';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
-import { colors, fonts, radii, sizes } from '@/theme/tokens';
+import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
 import { Media } from '@/types';
 
 /**
@@ -260,11 +260,12 @@ export function CaptureSheet() {
                     }
                   />
                   <View style={styles.musicActions}>
-                    <Pressable style={styles.musicBtn} onPress={() => setShowMusic(true)}>
+                    <Pressable style={styles.musicBtn} hitSlop={hitSlops.chip} onPress={() => setShowMusic(true)}>
                       <Text style={styles.musicBtnText}>TROCAR MÚSICA</Text>
                     </Pressable>
                     <Pressable
                       style={styles.musicBtn}
+                      hitSlop={hitSlops.chip}
                       onPress={() => patch({ musica: null })}
                     >
                       <Text style={[styles.musicBtnText, { color: colors.parchment50 }]}>
@@ -280,7 +281,7 @@ export function CaptureSheet() {
                       ? 'Sem áudio — o pacote será salvo só com a imagem.'
                       : 'Sem sugestões no momento — você pode salvar só a imagem.'}
                   </Text>
-                  <Pressable style={styles.musicBtn} onPress={() => setShowMusic(true)}>
+                  <Pressable style={styles.musicBtn} hitSlop={hitSlops.chip} onPress={() => setShowMusic(true)}>
                     <Text style={styles.musicBtnText}>
                       {session.sugestoes.length > 0 ? 'ESCOLHER MÚSICA' : 'BUSCAR MÚSICA'}
                     </Text>

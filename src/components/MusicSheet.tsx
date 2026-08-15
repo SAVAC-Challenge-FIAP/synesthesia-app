@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { vibeById } from '@/constants/vibes';
 import { getSuggestions } from '@/services/music';
 import { useCaptureStore } from '@/stores/useCaptureStore';
-import { colors, fonts, radii } from '@/theme/tokens';
+import { colors, fonts, hitSlops, radii } from '@/theme/tokens';
 import { MusicSuggestion } from '@/types';
 
 /**
@@ -124,11 +124,12 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
           </ScrollView>
 
           <View style={styles.actions}>
-            <Pressable style={styles.cancel} onPress={cancelar}>
+            <Pressable style={styles.cancel} hitSlop={hitSlops.botao} onPress={cancelar}>
               <Text style={styles.cancelText}>Cancelar</Text>
             </Pressable>
             <Pressable
               style={[styles.confirm, !escolhida && { opacity: 0.4 }]}
+              hitSlop={hitSlops.botao}
               disabled={!escolhida}
               onPress={confirmar}
             >

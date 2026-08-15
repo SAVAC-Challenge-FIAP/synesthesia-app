@@ -8,7 +8,7 @@ import { FilteredImage } from '@/components/FilteredImage';
 import { vibeById } from '@/constants/vibes';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
-import { colors, fonts, radii, sizes } from '@/theme/tokens';
+import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
 import { Media } from '@/types';
 
 /**
@@ -89,7 +89,7 @@ export default function GalleryScreen() {
                     {item.musica ? `🎵 ${item.musica.titulo}` : 'SEM ÁUDIO'}
                   </Text>
                 </View>
-                <Pressable style={styles.trash} hitSlop={8} onPress={() => excluir(item)}>
+                <Pressable style={styles.trash} hitSlop={hitSlops.icone} onPress={() => excluir(item)}>
                   <Text style={styles.trashIcon}>🗑️</Text>
                 </Pressable>
               </Pressable>

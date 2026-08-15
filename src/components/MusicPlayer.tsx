@@ -3,7 +3,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, fonts } from '@/theme/tokens';
+import { colors, fonts, hitSlops } from '@/theme/tokens';
 import { MusicSuggestion } from '@/types';
 
 export const TRECHO_MAX_S = 30;
@@ -55,7 +55,7 @@ export function MusicPlayer({ musica, trechoInicio, onTrechoInicio }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        <Pressable onPress={toggle} style={styles.playBtn}>
+        <Pressable onPress={toggle} hitSlop={hitSlops.botao} style={styles.playBtn}>
           <Text style={styles.playIcon}>{status.playing ? '❚❚' : '▶'}</Text>
         </Pressable>
         <View style={styles.sliderWrap}>

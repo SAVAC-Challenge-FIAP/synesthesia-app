@@ -32,4 +32,20 @@ export const sizes = {
   captureButton: 70,
   /** Aspecto do frame de foto no Figma (~735/913) */
   photoAspect: 735 / 913,
+  /** Mínimo de área tocável (FR-Q02) */
+  alvoMinimo: 48,
+} as const;
+
+/**
+ * `hitSlop` para controles cujo desenho do Figma é menor que 48dp (FR-Q02).
+ * Cresce a área tocável **sem** mexer no tamanho visual — que é justamente o
+ * que a US1 exige.
+ */
+export const hitSlops = {
+  /** chips de ~24dp (TROCAR MÚSICA, ENVIAR ÁUDIO, filtros) → ~52dp */
+  chip: { top: 14, bottom: 14 },
+  /** botões de ~36–42dp (Cancelar, Confirmar, Baixar vídeo) → ~48–54dp */
+  botao: { top: 6, bottom: 6 },
+  /** ícones pequenos sobre mídia (lixeira da galeria, ~18dp) → ~50dp */
+  icone: { top: 16, bottom: 16, left: 16, right: 16 },
 } as const;

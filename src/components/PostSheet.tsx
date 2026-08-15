@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SharePackage } from '@/services/sharePackage';
 import { saveToSystemGallery } from '@/services/systemGallery';
-import { colors, fonts, radii } from '@/theme/tokens';
+import { colors, fonts, hitSlops, radii } from '@/theme/tokens';
 
 /**
  * Confirmação de postagem (US8/FR-014): compartilha o pacote sensorial.
@@ -106,6 +106,7 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
           {temVideo ? (
             <Pressable
               style={[styles.baixarBtn, baixado && styles.baixarBtnFeito]}
+              hitSlop={hitSlops.botao}
               disabled={baixando}
               onPress={baixarVideo}
             >
@@ -122,12 +123,12 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
               </Text>
               <View style={styles.trilhaActions}>
                 {pacote.audioUri ? (
-                  <Pressable style={styles.trilhaBtn} onPress={compartilharAudio}>
+                  <Pressable style={styles.trilhaBtn} hitSlop={hitSlops.chip} onPress={compartilharAudio}>
                     <Text style={styles.trilhaBtnText}>🎵 ENVIAR ÁUDIO (30S)</Text>
                   </Pressable>
                 ) : null}
                 {pacote.caption ? (
-                  <Pressable style={styles.trilhaBtn} onPress={compartilharLegenda}>
+                  <Pressable style={styles.trilhaBtn} hitSlop={hitSlops.chip} onPress={compartilharLegenda}>
                     <Text style={styles.trilhaBtnText}>✍️ ENVIAR LEGENDA</Text>
                   </Pressable>
                 ) : null}

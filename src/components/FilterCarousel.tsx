@@ -2,7 +2,7 @@ import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text } from 'react-native';
 
 import { FILTERS } from '@/constants/filters';
-import { colors, fonts, radii } from '@/theme/tokens';
+import { colors, fonts, hitSlops, radii } from '@/theme/tokens';
 import { FilterId } from '@/types';
 
 interface Props {
@@ -36,6 +36,7 @@ export function FilterCarousel({ ativo, onSelect, autoAtivo }: Props) {
         return (
           <Pressable
             onPress={() => onSelect(item.id)}
+            hitSlop={hitSlops.chip}
             style={[styles.chip, selected && styles.chipAtivo]}
           >
             <Text style={styles.emoji}>{item.emoji}</Text>
