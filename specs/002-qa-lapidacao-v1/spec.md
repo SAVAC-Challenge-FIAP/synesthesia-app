@@ -53,9 +53,14 @@ O usuário captura uma foto, a curadoria musical ainda está rodando, e ele toca
 
 ### User Story 3 - Esperar menos pela trilha (Priority: P2)
 
-Entre disparar a foto e ver a música sugerida se passam entre 30 e 45 segundos. Nesse intervalo o usuário olha para um texto estático, sem saber se o app está trabalhando ou travado.
+Entre disparar a foto e ver a música sugerida passam-se alguns segundos. Nesse intervalo o usuário olha para um texto estático, sem saber se o app está trabalhando ou travado.
 
-**Why this priority**: O **Princípio III** afirma que "a percepção de latência é um bug", e o **Princípio II** promete reduzir o atrito de decisão. Uma espera de 40 segundos no caminho principal contradiz a promessa central do produto. É P2 e não P1 porque o fluxo *conclui* corretamente — o dano é à experiência, não à integridade do resultado.
+> **Revisado em 2026-08-15** (D1): esta história nasceu descrevendo uma espera de **30–45s** que
+> não se reproduziu na medição (mediana real: **6,02s** — ver [baseline.md](./baseline.md) T003).
+> Com a espera uma ordem de grandeza menor, **o peso da US3 se desloca**: o dano real não é a
+> duração, é o *feedback estático* durante ela — o cenário de aceite 2, não o 1. Ver **SC-Q03**.
+
+**Why this priority**: O **Princípio III** afirma que "a percepção de latência é um bug", e o **Princípio II** promete reduzir o atrito de decisão. Uma espera muda no caminho principal contradiz a promessa central do produto. É P2 e não P1 porque o fluxo *conclui* corretamente — o dano é à experiência, não à integridade do resultado.
 
 **Independent Test**: Medir o tempo entre o disparo e a exibição da trilha em 5 capturas, antes e depois, e comparar.
 
@@ -165,7 +170,17 @@ A geração do `.mp4` leva entre 40 e 70 segundos. Durante todo esse tempo o usu
 
 - **SC-Q01**: 100% dos toques dentro da área visível de qualquer botão primário acionam a ação, em aparelhos com navegação por botões e por gestos.
 - **SC-Q02**: Zero casos de pacote exportado sem trilha sem que o usuário tenha confirmado explicitamente.
-- **SC-Q03**: O tempo entre disparar a foto e ver a trilha sugerida cai pelo menos 40% em relação à medição inicial (30–45s).
+- **SC-Q03**: O tempo entre disparar a foto e ver a trilha sugerida tem **mediana ≤ 6s** em 5 capturas consecutivas com rede estável, e **nenhuma** captura passa de 10s.
+
+  > **Recalibrado em 2026-08-15** (D1, decisão do Sávio). O critério original pedia queda de 40%
+  > sobre uma linha de base de 30–45s que **não se reproduz**: medida no mesmo aparelho e na
+  > mesma rede, sem nenhuma linha de código alterada, a mediana foi de **6,02s** (ver
+  > [baseline.md](./baseline.md) T003). Os 30–45s eram condição de ambiente, não do produto.
+  > Perseguir −40% sobre 6,02s exigiria chegar a 3,6s, o que só se alcança trocando o modelo do
+  > Gemini — alternativa que o [research.md](./research.md) R3 adiou por degradar a leitura de
+  > cena, que é o diferencial do produto, e que o Sávio manteve descartada.
+  > O critério agora fixa a **faixa real desejada** em vez de uma redução sobre número instável.
+  > **Situação**: atingido — mediana de **5,47s** após a redução de payload do T021 (71 KB → 35 KB).
 - **SC-Q04**: Em qualquer momento das esperas longas, o usuário consegue dizer se o app está progredindo ou parado.
 - **SC-Q05**: Uma pessoa que nunca usou o app identifica corretamente que existem mais de quatro filtros, apenas olhando a tela.
 - **SC-Q06**: Capturas de tela do app em dois fabricantes diferentes mostram ícones de controle idênticos.

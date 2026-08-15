@@ -35,7 +35,7 @@ qualquer ──(descartar)──> ocioso
 - **RV-01**: A ação de postar só é acionável no estado `pronta`, ou em `indisponivel` **após confirmação explícita** do usuário.
 - **RV-02**: A ação de salvar é acionável em **todos** os estados — a foto nunca pode ser perdida nem bloqueada (Princípio V).
 - **RV-03**: Nenhuma mensagem de conclusão pode afirmar que o pacote está pronto sem declarar o que ele contém.
-- **RV-04**: O estado `carregando` MUST comunicar progresso — não pode ser um texto estático por 30–45s.
+- **RV-04**: O estado `carregando` MUST comunicar progresso — não pode ser um texto estático pela duração da espera (medida: ~6s de mediana; ver D1).
 
 ---
 

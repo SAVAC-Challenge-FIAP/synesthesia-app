@@ -82,14 +82,15 @@ adb exec-out screencap -p > estado.png
 
 ## US3 — Latência da curadoria
 
-**Meça antes de mexer.** A linha de base é 30–45s.
+**Meça antes de mexer.** A linha de base medida é de **~6s de mediana** (baseline.md T003) —
+os 30–45s da spec original eram condição de ambiente e não se reproduzem (D1).
 
 ```bash
 # Os tempos de cada etapa aparecem no Metro; capture 5 execuções antes e 5 depois
 npx expo start --dev-client --host lan
 ```
 
-✅ **Aceite**: redução ≥40% na mediana de 5 capturas (SC-Q03), **com os números registrados**. Durante a espera, a interface comunica progresso real em vez de texto estático.
+✅ **Aceite**: mediana ≤6s em 5 capturas e nenhuma acima de 10s (SC-Q03), **com os números registrados**. Durante a espera, a interface comunica progresso real em vez de texto estático.
 
 > Lembrete do research: `resolveWithDeezer` **já é paralelo**. Não "otimize" ali — meça as três etapas e ataque a dominante.
 

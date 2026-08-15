@@ -30,7 +30,8 @@ Rodada de lapidação sobre um fluxo já funcional. Seis frentes, priorizadas po
 **Project Type**: Aplicativo mobile (Expo + React Native), com um módulo nativo local.
 
 **Performance Goals**:
-- Tempo até a trilha: redução ≥ 40% sobre a linha de base de 30–45s (SC-Q03)
+- Tempo até a trilha: mediana ≤ 6s em 5 capturas, nenhuma acima de 10s (SC-Q03, recalibrado em
+  2026-08-15 — a linha de base de 30–45s não se reproduziu; a medição real deu 6,02s)
 - Preview da câmera: sem queda perceptível de fluidez com filtro ativo
 - Troca de filtro: sem atraso perceptível
 

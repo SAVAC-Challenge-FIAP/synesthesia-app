@@ -106,7 +106,8 @@ aparece no `adb logcat`. O logcat só serve para o nativo (`VideoMuxer`, `Androi
 
 ## Fase 5 — US3: Esperar menos pela trilha (P2) 🟡
 
-**Objetivo**: reduzir em ≥40% a mediana do tempo até a trilha (linha de base 30–45s).
+**Objetivo**: mediana do tempo até a trilha ≤ 6s em 5 capturas, nenhuma acima de 10s
+(SC-Q03 recalibrado em 2026-08-15 pela D1 — a linha de base de 30–45s não se reproduziu).
 **Princípio**: II e III · **FR**: Q08, Q10, Q11
 **Teste independente**: medir 5 capturas antes e depois e comparar medianas.
 
@@ -296,10 +297,16 @@ do produto.
 modelo. Feito no T021 — 71 KB → 35 KB, sem perda de leitura de cena. Resultado medido no
 T023: mediana 6,02 s → 5,47 s, **9%**, não os 40%.
 
-**Ainda em aberto**: o SC-Q03 continua escrito no [spec.md](./spec.md) com a linha de base de
-30–45 s, que não se reproduz. Alguém precisa decidir se recalibra o critério para a faixa
-real (~5,5 s) ou se mantém o alvo e autoriza a troca de modelo. Enquanto isso, o critério
-está **não atingido** de propósito, e não marcado como cumprido.
+**Resolvido pelo Sávio em 2026-08-15**: recalibrar o critério para a faixa real, **sem** trocar
+o modelo do Gemini. O SC-Q03 passou a ser **mediana ≤ 6 s em 5 capturas, nenhuma acima de 10 s**
+— um alvo absoluto, em vez de uma redução percentual sobre um número que não se reproduz.
+Com a mediana medida de **5,47 s**, o critério está **atingido**.
+
+Atualizados junto, para os artefatos não se contradizerem: `spec.md` (SC-Q03 e o texto da US3,
+cujo peso se desloca da *duração* para o *feedback estático* durante ela), `plan.md`
+(Performance Goals), `quickstart.md` (roteiro de aceite), `data-model.md` (RV-04) e o objetivo
+da Fase 5 aqui. O `baseline.md` e o `research.md` **não** foram mexidos: são o registro do que
+foi medido na época e devem continuar dizendo o que diziam. **D1 encerrada.**
 
 ### D2 — A troca de tipografia contraria a identidade documentada (T046)
 
