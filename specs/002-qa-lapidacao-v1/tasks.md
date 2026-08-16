@@ -1005,6 +1005,62 @@ Isto é a lista pedida — o que falta subir em `assets/`:
 
 ---
 
+## Fase 18 — QA do Sávio sobre as Fases 14–17 (2026-08-16)
+
+Relatado depois de usar o que as fases anteriores entregaram. Duas frentes: a
+curadoria ainda erra, e o enquadramento ficou feio.
+
+### Curadoria
+
+- [X] **T072** [P1] **Nunca entregar faixa sem prévia.** "as músicas frequentemente
+  estão vindo desabilitadas isso não pode acontecer... tem que vir sempre 4 músicas
+  certinhas". É a **D8 decidida pelo Sávio**: vale a alternativa 3 (exigir preview).
+  Pedir ao Gemini mais candidatas do que os 4 slots, resolver todas em paralelo e
+  montar o conjunto só com as que têm `previewUrl`.
+
+- [X] **T073** [P1] **Redistribuir os papéis: 2 `certeira` + 1 `curinga` + 1
+  `descoberta`.** "vai ser 2 certeiras as mais famosas uma vai ser coringa e outra
+  descoberta". Reverte a escolha de duas descobertas do T058 — que era minha, não
+  dele. E as certeiras devem ser **as mais famosas**, não só "sem risco".
+
+- [X] **T074** [P1] **Aprender o gosto por gênero, não só por artista.** "eu gosto de
+  rock então provavelmente tínhamos que ir entendendo que ele vai ter preferências
+  por rock, metal e por uma banda tipo um Skillet". O `useTasteStore` do T057 guarda
+  artista; falta o **gênero**. Pegar o gênero sem chamada extra: pedir o campo ao
+  Gemini junto de cada sugestão e guardar quando a faixa for escolhida.
+
+  Isto **resolve a D7 pela decisão do Sávio**: ele quer que a curadoria aprenda, o
+  que exige o gosto entrar no prompt. Registrar a mudança na nota de privacidade.
+
+- [ ] **T075** [P2] **"as músicas estão nada a ver"** — medir depois de T072–T074 se
+  a pertinência melhorou, com o mesmo roteiro do T056.
+
+### Visor e movimento
+
+- [ ] **T076** [P1] **Acabar com a borda cinza do enquadramento.** "não gostei de
+  quando eu vou mudar a proporção ele fica uma borda cinza pra simbolizar isso não é
+  legal, ele tem que ficar com o fundo daquela cor gradiente, é sempre esse o fundo".
+  O véu `rgba(9,5,6,0.55)` do T066 sai; o que aparece fora do enquadramento é o
+  `FundoBase` do T068.
+
+- [ ] **T077** [P1] **A `CameraView` passa a ter o tamanho do enquadramento, com
+  animação.** "o visor da câmera se adapta de forma fluida e animada, eu não quero a
+  câmera full na tela o tempo todo". Contraria a decisão do T066 (que manteve a
+  prévia cheia por instrução da própria task) — **vale o que o Sávio pediu agora**.
+
+- [ ] **T078** [P2] **A prévia da captura usa a proporção real da foto.** "a proporção
+  da captura tem que ser a mesma da foto tirada, não precisa ser fixa." O T066 já
+  gravou `Media.aspecto`; conferir que a prévia usa a dimensão real do arquivo.
+
+- [ ] **T079** [P2] **Animar a abertura do painel "+ Opções".**
+
+- [ ] **T080** [P2] **Levar o movimento do loader para a entrada do app.** "gostei do
+  loader de quando está esperando a requisição do Gemini... você não consegue colocar
+  esse movimento na entrada do app?" O splash nativo do T071 é estático — a animação
+  precisa de uma tela de abertura em JS logo depois dele.
+
+---
+
 ## Dúvidas para o Sávio
 
 > Preencher aqui qualquer decisão de produto que aparecer durante a execução autônoma, em vez de inventar. Implementar a alternativa mais conservadora e seguir.

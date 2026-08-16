@@ -171,22 +171,74 @@ interface GeminiTrackIdea {
   artista: string;
   justificativa: string;
   papel?: string;
+  genero?: string;
 }
 
 /**
- * Distribuição fixa de papéis nos quatro slots (T058).
+ * Composição do conjunto final (T073, pedido do Sávio): **2 `certeira`,
+ * 1 `curinga`, 1 `descoberta`**.
  *
- * `afinidade` **não** está aqui de propósito: ela dependeria de mandar ao Gemini
- * os artistas que a pessoa escolhe, e isso é divulgação de gosto pessoal que o
- * opt-in da leitura de cena não cobre (D7). O rótulo é aplicado depois,
- * localmente, por `rotularAfinidade` — o histórico não sai do aparelho.
- *
- * Duas `descoberta` em quatro, e não uma: com uma só, a medição do T056 mostra
- * que os outros três slots bastam para o conjunto inteiro parecer o de sempre.
+ * O T058 tinha posto duas `descoberta`, decisão minha para atacar a repetição.
+ * Funcionou demais na diversidade e de menos na pertinência — "as músicas estão
+ * nada a ver". Duas certeiras seguram o conjunto no lugar; a descoberta continua
+ * lá, mas como tempero, não como metade do prato.
  */
-const PAPEIS_PEDIDOS = ['certeira', 'descoberta', 'descoberta', 'curinga'] as const;
+const SLOTS: Record<PapelFaixa, number> = {
+  certeira: 2,
+  curinga: 1,
+  descoberta: 1,
+  afinidade: 0, // derivado localmente, nunca pedido ao modelo
+};
+
+/**
+ * Quantas candidatas pedir por papel — mais do que os slots, de propósito (T072).
+ *
+ * "as músicas frequentemente estão vindo desabilitadas isso não pode acontecer".
+ * Faixa sem `previewUrl` chega muda: aparece na lista com o play apagado e não dá
+ * para ouvir antes de escolher. Pedindo folga, as que não resolvem no Deezer são
+ * simplesmente descartadas e o slot é preenchido pela próxima do mesmo papel —
+ * sem uma segunda ida ao Gemini, que custaria latência no caminho crítico.
+ *
+ * A folga é maior na `descoberta` porque é justamente ela que mais falha: quanto
+ * mais obscuro o artista, menor a chance de o Deezer o ter.
+ */
+const CANDIDATAS: Record<string, number> = { certeira: 3, curinga: 2, descoberta: 4 };
+
+const TOTAL_CANDIDATAS = Object.values(CANDIDATAS).reduce((a, b) => a + b, 0);
 
 const PAPEIS_VALIDOS: readonly string[] = ['certeira', 'descoberta', 'curinga'];
+
+/** Ordem em que os papéis são pedidos, repetindo conforme `CANDIDATAS`. */
+const PAPEIS_PEDIDOS: PapelFaixa[] = [
+  ...Array<PapelFaixa>(CANDIDATAS.certeira).fill('certeira'),
+  ...Array<PapelFaixa>(CANDIDATAS.curinga).fill('curinga'),
+  ...Array<PapelFaixa>(CANDIDATAS.descoberta).fill('descoberta'),
+];
+
+/**
+ * Preferências aprendidas, para o prompt (T074).
+ *
+ * O Sávio pediu explicitamente que a curadoria aprenda — "eu gosto de rock então
+ * provavelmente tínhamos que ir entendendo que ele vai ter preferências por rock,
+ * metal e por uma banda tipo um Skillet". Isso **resolve a D7 por decisão dele**:
+ * o gosto passa a entrar no pedido ao Gemini.
+ *
+ * O gênero vem primeiro por ser o que generaliza: o artista não se repete, o
+ * gênero sim.
+ */
+function preferenciasAprendidas(): string {
+  const estado = useTasteStore.getState();
+  const generos = estado.generosFrequentes(3);
+  const artistas = estado.artistasFrequentes(4);
+  if (generos.length === 0 && artistas.length === 0) return '';
+  const partes: string[] = [];
+  if (generos.length) partes.push(`gosta de ${generos.join(', ')}`);
+  if (artistas.length) partes.push(`já escolheu ${artistas.join(', ')}`);
+  return (
+    `Esta pessoa ${partes.join(' e ')}. Leve isso em conta nas "certeira", ` +
+    `sem repetir os mesmos artistas. `
+  );
+}
 
 /**
  * Instrução comum aos dois prompts. Concentrada aqui porque a lição do T056 foi
@@ -195,18 +247,22 @@ const PAPEIS_VALIDOS: readonly string[] = ['certeira', 'descoberta', 'curinga'];
  */
 function instrucaoDeCuradoria(bloqueio: string[]): string {
   const papeis =
-    `Devolva 4 faixas com estes papéis, nesta ordem, no campo "papel": ` +
-    `"certeira" (combina com a cena, sem risco), ` +
-    `"descoberta" (artista POUCO CONHECIDO, fora do mainstream, com uma faixa realmente boa), ` +
-    `"descoberta" (outro artista pouco conhecido, diferente do anterior), ` +
-    `"curinga" (livre, pode surpreender). `;
+    `Devolva ${TOTAL_CANDIDATAS} faixas, nesta ordem de papéis no campo "papel": ` +
+    `${CANDIDATAS.certeira}x "certeira" (faixas CONHECIDAS e queridas que combinam com a cena), ` +
+    `${CANDIDATAS.curinga}x "curinga" (livre, pode surpreender), ` +
+    `${CANDIDATAS.descoberta}x "descoberta" (artista pouco conhecido, fora do mainstream). `;
+  const genero =
+    `Informe também o campo "genero" de cada faixa, em uma ou duas palavras ` +
+    `(ex.: "rock", "metal", "mpb", "synthwave"). `;
+  const existir =
+    `Só sugira faixas que existam de verdade e sejam encontráveis em serviços de ` +
+    `streaming, com o nome exato do artista principal. `;
   const variacao =
-    `Varie deliberadamente época, idioma e país de origem entre as quatro — ` +
-    `não devolva quatro faixas da mesma década nem todas em inglês. `;
+    `Varie época, idioma e país de origem entre elas. `;
   const naoRepita = bloqueio.length
     ? `NÃO sugira nenhuma destas, já usadas recentemente: ${bloqueio.join('; ')}. `
     : '';
-  return papeis + variacao + naoRepita;
+  return papeis + genero + existir + variacao + preferenciasAprendidas() + naoRepita;
 }
 
 /** Aceita só os papéis que o modelo tinha permissão de usar. */
@@ -249,10 +305,10 @@ async function askGemini(vibe: Vibe): Promise<GeminiTrackIdea[]> {
   const bloqueio = useTasteStore.getState().faixasSugeridasRecentes(vibe.id, 20);
   const prompt =
     `Você é o curador musical do app Synesthesia. A foto tem a vibe "${vibe.nome}" (${vibe.descricao}). ` +
-    `Sugira 4 músicas reais que combinem. ` +
+    `Sugira músicas reais que combinem. ` +
     instrucaoDeCuradoria(bloqueio) +
     `Responda SOMENTE JSON: ` +
-    `[{"titulo":"...","artista":"...","papel":"...","justificativa":"até 12 palavras, em pt-BR"}]`;
+    `[{"titulo":"...","artista":"...","papel":"...","genero":"...","justificativa":"até 12 palavras, em pt-BR"}]`;
   const text = await callGemini([{ type: 'text', text: prompt }]);
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) return [];
@@ -296,10 +352,10 @@ async function askGeminiWithPhoto(photoBase64: string): Promise<GeminiSceneResul
   const prompt =
     `Você é o motor sensorial do app Synesthesia. Analise a foto anexada e: ` +
     `1) classifique a atmosfera da cena em EXATAMENTE UMA destas vibes: ${vibesDisponiveis}; ` +
-    `2) sugira 4 músicas reais que combinem com o que aparece na foto. ` +
+    `2) sugira músicas reais que combinem com o que aparece na foto. ` +
     instrucaoDeCuradoria(bloqueio) +
     `Responda SOMENTE JSON: {"vibe":"<id da vibe>","cena":"o que há na foto, até 10 palavras", ` +
-    `"musicas":[{"titulo":"...","artista":"...","papel":"...","justificativa":"até 12 palavras, em pt-BR, ligada à cena"}]}`;
+    `"musicas":[{"titulo":"...","artista":"...","papel":"...","genero":"...","justificativa":"até 12 palavras, em pt-BR, ligada à cena"}]}`;
   const text = await callGemini([
     { type: 'text', text: prompt },
     { type: 'image', data: photoBase64, mime_type: 'image/jpeg' },
@@ -411,7 +467,7 @@ function registrarFaixas(origem: string, sugestoes: MusicSuggestion[]) {
  */
 async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<MusicSuggestion[]> {
   const resolved = await Promise.all(
-    ideas.slice(0, 4).map(async (idea, i): Promise<MusicSuggestion | null> => {
+    ideas.slice(0, TOTAL_CANDIDATAS).map(async (idea, i): Promise<MusicSuggestion | null> => {
       try {
         const candidatas = await searchDeezer(`${idea.titulo} ${idea.artista}`, 5);
         const track =
@@ -434,6 +490,7 @@ async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<
           origem: 'gemini',
           papel: papelDe(idea, i),
           artistaId: track?.artist.id,
+          genero: idea.genero?.trim() || undefined,
         };
       } catch (e) {
         console.log(`[music] Deezer falhou ao resolver preview de "${idea.titulo}"`, e);
@@ -442,6 +499,47 @@ async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<
     }),
   );
   return resolved.filter((s): s is MusicSuggestion => s !== null);
+}
+
+/**
+ * Monta os quatro slots a partir das candidatas resolvidas (T072/T073).
+ *
+ * Só entram faixas **com prévia**. Era a reclamação direta do Sávio: "as músicas
+ * frequentemente estão vindo desabilitadas isso não pode acontecer... tem que vir
+ * sempre 4 músicas certinhas". Uma faixa muda ocupa um slot e não pode ser
+ * ouvida antes de escolher — pior que não estar lá.
+ *
+ * Se um papel não tiver candidatas suficientes com prévia, o slot é preenchido
+ * por sobra de outro papel, mantendo o total em 4. Preferir completar com um
+ * papel "errado" a devolver três faixas: quem usa quer quatro opções, e o rótulo
+ * é auxiliar — a faixa é o produto.
+ */
+function montarConjunto(resolvidas: MusicSuggestion[]): MusicSuggestion[] {
+  const comAudio = resolvidas.filter((s) => s.previewUrl);
+  const escolhidas: MusicSuggestion[] = [];
+  const usadas = new Set<string>();
+
+  for (const papel of ['certeira', 'curinga', 'descoberta'] as PapelFaixa[]) {
+    const querem = SLOTS[papel];
+    const doPapel = comAudio.filter((s) => s.papel === papel && !usadas.has(s.id));
+    for (const faixa of doPapel.slice(0, querem)) {
+      escolhidas.push(faixa);
+      usadas.add(faixa.id);
+    }
+  }
+  // Completa o que faltou com qualquer sobra que tenha áudio.
+  for (const faixa of comAudio) {
+    if (escolhidas.length >= 4) break;
+    if (!usadas.has(faixa.id)) {
+      escolhidas.push(faixa);
+      usadas.add(faixa.id);
+    }
+  }
+  const mudas = resolvidas.length - comAudio.length;
+  if (mudas > 0) {
+    console.log(`[music] ${mudas} candidata(s) sem prévia descartada(s); ficaram ${escolhidas.length}`);
+  }
+  return escolhidas.slice(0, 4);
 }
 
 /**
@@ -566,7 +664,7 @@ export async function analyzePhotoAndSuggest(
       const resolvidas = await resolveWithDeezer(scene.musicas ?? [], vibe);
       const tDeezer = Date.now() - marcoDeezer;
       if (resolvidas.length > 0) {
-        const sugestoes = rotularAfinidade(await verificarDescobertas(resolvidas));
+        const sugestoes = rotularAfinidade(montarConjunto(await verificarDescobertas(resolvidas)));
         // A lista de bloqueio da próxima curadoria é esta: o que acabou de ser
         // oferecido. Guardar aqui, e não em quem consome, garante que vale para
         // todo caminho que devolve faixas do Gemini.
@@ -617,7 +715,7 @@ export async function getSuggestions(
       onEtapa?.('buscando');
       const resolvidas = await resolveWithDeezer(ideas, vibe);
       if (resolvidas.length > 0) {
-        const ok = rotularAfinidade(await verificarDescobertas(resolvidas));
+        const ok = rotularAfinidade(montarConjunto(await verificarDescobertas(resolvidas)));
         useTasteStore.getState().registrarSugeridas(vibe.id, ok);
         console.log(`[music] ORIGEM=gemini — ${ok.length} sugestão(ões) usadas`);
         registrarFaixas('gemini', ok);

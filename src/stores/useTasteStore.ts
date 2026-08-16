@@ -38,6 +38,12 @@ export interface EscolhaMusical {
   faixaId: string;
   titulo: string;
   artista: string;
+  /**
+   * Gênero da faixa (T074). É o que permite generalizar: saber que ela escolheu
+   * Skillet vale menos do que saber que ela escolhe **rock** — o artista não se
+   * repete, o gênero sim. Vem do Gemini junto da sugestão, sem chamada extra.
+   */
+  genero?: string;
   vibeId: VibeId;
   /** `manual` = trocou no MusicSheet; `auto` = aceitou o que o sistema pôs. */
   origem: 'auto' | 'manual';
@@ -62,6 +68,8 @@ interface TasteState {
 
   /** Artistas mais escolhidos, do mais forte para o mais fraco. */
   artistasFrequentes: (n?: number) => string[];
+  /** Gêneros mais escolhidos — a generalização que o T074 pede. */
+  generosFrequentes: (n?: number) => string[];
   /** Chaves `titulo — artista` já sugeridas para a vibe, das mais recentes. */
   faixasSugeridasRecentes: (vibeId: VibeId, n?: number) => string[];
   /**
@@ -106,6 +114,7 @@ export const useTasteStore = create<TasteState>()(
             faixaId: musica.id,
             titulo: musica.titulo,
             artista: musica.artista,
+            genero: musica.genero ?? anterior?.genero,
             vibeId,
             // `manual` nunca é rebaixado para `auto`. Sem isto, trocar a música e
             // então salvar o pacote — que é o caminho normal — apagaria o sinal
@@ -140,6 +149,20 @@ export const useTasteStore = create<TasteState>()(
             },
           };
         }),
+
+      generosFrequentes: (n = 4) => {
+        const agora = Date.now();
+        const peso = new Map<string, number>();
+        for (const e of get().escolhas) {
+          const g = e.genero?.trim().toLowerCase();
+          if (!g) continue;
+          peso.set(g, (peso.get(g) ?? 0) + pesoDe(e, agora));
+        }
+        return [...peso.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, n)
+          .map(([g]) => g);
+      },
 
       artistasFrequentes: (n = 8) => {
         const agora = Date.now();

@@ -75,6 +75,8 @@ export interface MusicSuggestion {
    * conferir `nb_fan` sem cair em homônimo — ver `verificarDescobertas`.
    */
   artistaId?: number;
+  /** Gênero informado pelo Gemini (T074) — alimenta o histórico de gosto. */
+  genero?: string;
 }
 
 /**
