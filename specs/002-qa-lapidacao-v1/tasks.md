@@ -1140,3 +1140,37 @@ Três saídas, da mais conservadora para a mais capaz:
 
 **Implementada a alternativa 1** por ora (regra 5). A 2 é barata e provavelmente vale;
 a 3 troca latência por completude, e essa é escolha do Sávio, não do loop.
+
+### Estado da Fase 17 em 2026-08-16 (para quem retomar)
+
+- **T069 ✅** — os ícones **não** dependiam mais de entrega do Sávio. Como esta
+  máquina não tem nenhum rasterizador de SVG (`rsvg-convert`, Inkscape,
+  ImageMagick, `cairosvg`, `sharp` — todos ausentes), `scripts/gerar-icones.py`
+  desenha os PNGs direto a partir da geometria do símbolo. Verificado no launcher.
+
+- **T070 — implementado, sem evidência.** `src/components/LoaderMarca.tsx` existe,
+  o typecheck passa e o app roda com ele no lugar dos `ActivityIndicator` do
+  `CaptureSheet` e do `MusicSheet`. **Não marcado como concluído** porque não foi
+  visto rodando (regra 2).
+
+  O que atrapalhou, para não repetir a tentativa: a curadoria fechou em ~4 s em
+  todas as tentativas (várias caíram no catálogo curado, que é instantâneo), e a
+  seção "TRILHA SONORA" fica **abaixo da dobra** — quando o swipe chega, a faixa
+  já carregou. Os `input tap` na galeria também rolaram a lista em vez de abrir o
+  card.
+
+  **Caminho que deve funcionar**: reabrir uma mídia da galeria (a sessão nasce com
+  `sugestoes: []`) e abrir "Trocar música" — o `MusicSheet` dispara
+  `getSuggestions` e o loader fica no topo da lista, **acima da dobra**. Alternativa
+  mais determinística: pôr o aparelho offline para a busca demorar, ou subir
+  temporariamente `ESPERA_QUIETUDE_MS`/o limite da curadoria só para a captura.
+
+- **T071 — não iniciado.** Precisa de `expo-splash-screen` (dependência nativa,
+  logo `./scripts/dev-android.sh build`) e do `backgroundColor: '#090506'` que já
+  está no `app.json`. O `assets/splash-icon.png` já foi gerado pelo T069:
+  1024×1024, transparente, só a marca.
+
+- **Ainda pendente do Sávio** (único item que restou da lista da fase): os SVGs
+  `assets/favicon.svg` e `assets/logo-full-name.svg` continuam com
+  `<rect ... fill="black"/>` embutido. O `assets/icon.svg` já veio limpo e foi a
+  base de tudo; os outros dois só travam usar a marca sobre ruby ou parchment.
