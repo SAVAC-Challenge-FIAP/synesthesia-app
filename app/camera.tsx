@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated,
   Easing,
+  InteractionManager,
   Pressable,
   StyleSheet,
   Text,
@@ -67,6 +68,30 @@ export default function CameraScreen() {
    * que existiria para isso, é `@platform ios`.
    */
   const focada = useIsFocused();
+
+  /**
+   * A câmera só monta **depois** que a navegação assenta (T097).
+   *
+   * O bug: voltar dos Ajustes para o visor deixava a prévia esticada, e só
+   * trocar o enquadramento consertava. A causa é que a `CameraView` remontava
+   * no mesmo instante em que a tela recebia o foco — ou seja, no meio da
+   * transição do `expo-router`, quando o container ainda não está no tamanho
+   * final. A surface nativa se configura pelo primeiro layout que enxerga e
+   * **não** se recalibra sozinha; trocar o enquadramento só funcionava porque
+   * mudar o tamanho do container a obrigava a refazer a conta.
+   *
+   * `runAfterInteractions` espera a transição terminar. Aí o primeiro layout
+   * que a surface vê já é o definitivo.
+   */
+  const [camPronta, setCamPronta] = useState(false);
+  useEffect(() => {
+    if (!focada) {
+      setCamPronta(false);
+      return;
+    }
+    const tarefa = InteractionManager.runAfterInteractions(() => setCamPronta(true));
+    return () => tarefa.cancel();
+  }, [focada]);
 
   const [facing, setFacing] = useState<CameraType>('back');
   // Painel "+ Opções" (T065): o chip deixou de empurrar para os Ajustes e passou
@@ -347,7 +372,7 @@ export default function CameraScreen() {
               { width: larguraTela, top: visorAnimado?.top ?? 0, height: visorAnimado?.height ?? 0 },
             ]}
           >
-            {focada ? (
+            {focada && camPronta && geometrias ? (
               <CameraView
                 ref={cameraRef}
                 style={StyleSheet.absoluteFill}

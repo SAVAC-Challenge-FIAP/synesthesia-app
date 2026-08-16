@@ -1466,3 +1466,19 @@ Terceira rodada do mesmo dia, sobre o que a Fase 19 entregou.
 - [X] **T096** [P3] **Modo FULL removido**, por decisão do Sávio no uso — durou
   uma rodada. A âncora `tela` fica no código porque o cálculo já a trata e
   reintroduzir custa uma linha.
+
+- [X] **T097** [P1] [BUG] **Prévia esticada ao voltar de outra tela.** *"se eu
+  estiver na câmera e entrar nas configurações ou em outra página e voltar para
+  câmera, ela deixa a imagem distorcida... só volta ao normal se eu definir
+  alguma escala"*. Reproduzido no aparelho.
+
+  A `CameraView` remontava no instante em que a tela recebia o foco — ou seja,
+  **no meio da transição** do `expo-router`, com o container ainda fora do
+  tamanho final. A surface nativa se configura pelo primeiro layout que enxerga
+  e não se recalibra sozinha; trocar o enquadramento "consertava" porque mudar o
+  tamanho do container obrigava a refazer a conta. A pista estava na própria
+  descrição do Sávio.
+
+  Agora a montagem espera `InteractionManager.runAfterInteractions`: o primeiro
+  layout que a surface vê já é o definitivo. Verificado nos dois caminhos
+  (Ajustes e galeria) e nos três enquadramentos.
