@@ -937,7 +937,7 @@ o flash também".
   novo em `Media`. Migração de galeria: as mídias já salvas não têm esse campo e não podem
   quebrar.
 
-- [ ] **T067** [P2] **Flash.**
+- [X] **T067** [P2] **Flash.**
   `CameraView` do `expo-camera` aceita `flash` (`'off' | 'on' | 'auto'`) e `enableTorch`. Ligar o
   controle ao ícone do painel do T065, com os três estados visíveis (não um toggle cego). Câmera
   frontal geralmente não tem flash — o controle precisa refletir isso em vez de mentir.

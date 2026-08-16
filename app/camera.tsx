@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
-import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraType, CameraView, FlashMode, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Redirect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -64,6 +64,7 @@ export default function CameraScreen() {
   const [opcoesAbertas, setOpcoesAbertas] = useState(false);
   const [resolucao, setResolucao] = useState<string | null>(null);
   const [enquadramentoId, setEnquadramentoId] = useState<EnquadramentoId>(ENQUADRAMENTO_PADRAO);
+  const [flash, setFlash] = useState<FlashMode>('off');
   // 'original' = usuário escolheu explicitamente sem filtro; null = automático
   const [manualFiltro, setManualFiltro] = useState<FilterId | 'original' | null>(null);
   const [capturando, setCapturando] = useState(false);
@@ -100,9 +101,27 @@ export default function CameraScreen() {
     };
   }, [opcoesAbertas, resolucao]);
 
+  /**
+   * Flash (T067) — três estados **visíveis**, não um toggle cego: a pessoa
+   * precisa saber se está em automático ou forçado antes de disparar.
+   */
+  const proximoFlash = () =>
+    setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'));
+
+  /**
+   * Câmera frontal deste tipo de aparelho não tem flash. Em vez de mostrar um
+   * controle que não faz nada — e portanto mente —, ele fica esmaecido e
+   * inerte, e o modo volta para `off` para o ícone não prometer luz que não vem.
+   */
+  const flashDisponivel = facing === 'back';
+
   const flip = () => {
     // flip recalcula a prévia da vibe (FR-001): frontal puxa vibes pessoais
-    setFacing((f) => (f === 'back' ? 'front' : 'back'));
+    setFacing((f) => {
+      const novo = f === 'back' ? 'front' : 'back';
+      if (novo === 'front') setFlash('off');
+      return novo;
+    });
   };
 
   const capturar = useCallback(async () => {
@@ -153,7 +172,12 @@ export default function CameraScreen() {
   return (
     <View style={styles.root}>
       {focada ? (
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} />
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing={facing}
+          flash={flash}
+        />
       ) : null}
       {filtro ? <FilterLayer filter={filtro} /> : null}
 
@@ -164,18 +188,41 @@ export default function CameraScreen() {
       <SafeAreaView style={styles.ui} pointerEvents="box-none">
         {/* Barra de status: vibe detectada + Ajustes */}
         <View style={styles.topBar}>
-          <View style={styles.vibeBadge}>
-            <Text style={styles.vibeEmoji}>{vibe.emoji}</Text>
-            <View>
-              <Text style={styles.vibeLabel}>VIBE · PRÉVIA</Text>
-              <Text style={styles.vibeNome}>{vibe.nome.toUpperCase()}</Text>
+          {/* O painel aberto toma a linha inteira. O Figma desenhou 4 slots numa
+              barra de 382; com flash, três enquadramentos, resolução e ajustes
+              são seis, e dividir a linha com o badge fazia "16:9" e "64M" se
+              encostarem. A vibe volta assim que o painel fecha. */}
+          {opcoesAbertas ? null : (
+            <View style={styles.vibeBadge}>
+              <Text style={styles.vibeEmoji}>{vibe.emoji}</Text>
+              <View>
+                <Text style={styles.vibeLabel}>VIBE · PRÉVIA</Text>
+                <Text style={styles.vibeNome}>{vibe.nome.toUpperCase()}</Text>
+              </View>
             </View>
-          </View>
+          )}
           {opcoesAbertas ? (
             <CameraOptionsBar
               resolucao={resolucao}
               onFechar={() => setOpcoesAbertas(false)}
               onAjustes={() => router.push('/settings')}
+              slotFlash={
+                <Pressable
+                  hitSlop={hitSlops.chip}
+                  disabled={!flashDisponivel}
+                  onPress={proximoFlash}
+                  style={!flashDisponivel && { opacity: 0.3 }}
+                >
+                  <View style={styles.flashSlot}>
+                    <Ionicons
+                      name={flash === 'off' ? 'flash-off-outline' : 'flash'}
+                      size={20}
+                      color={flash === 'off' ? colors.parchment : colors.amber}
+                    />
+                    {flash === 'auto' ? <Text style={styles.flashAuto}>A</Text> : null}
+                  </View>
+                </Pressable>
+              }
               slotEnquadramento={
                 <View style={styles.enquadramentos}>
                   {ENQUADRAMENTOS.map((e) => (
@@ -296,6 +343,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: colors.parchment25,
+  },
+  flashSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  flashAuto: {
+    color: colors.amber,
+    fontFamily: fonts.labelForte,
+    fontSize: 10,
+    letterSpacing: 0.5,
   },
   enquadramentos: {
     flexDirection: 'row',
