@@ -62,7 +62,16 @@ export interface CaptureSession {
 
 interface CaptureState {
   session: CaptureSession | null;
-  start: (s: Omit<CaptureSession, 'sugestoes' | 'curadoria' | 'trilhaArquivada'>) => void;
+  /**
+   * `sugestoes` é opcional porque a captura nova não tem nenhuma — elas chegam
+   * da curadoria. Quem passa são as mídias reabertas da galeria, que já as
+   * carregam salvas (T083).
+   */
+  start: (
+    s: Omit<CaptureSession, 'sugestoes' | 'curadoria' | 'trilhaArquivada'> & {
+      sugestoes?: MusicSuggestion[];
+    },
+  ) => void;
   patch: (p: Partial<CaptureSession>) => void;
   clear: () => void;
 }
@@ -73,7 +82,7 @@ export const useCaptureStore = create<CaptureState>()((set) => ({
     set({
       session: {
         ...s,
-        sugestoes: [],
+        sugestoes: s.sugestoes ?? [],
         trilhaArquivada: false,
         // Abre em `carregando`, nunca em `indisponivel`: enquanto não se sabe
         // se há trilha, a postagem fica bloqueada em vez de sair sem áudio.

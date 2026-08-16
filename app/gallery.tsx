@@ -30,6 +30,9 @@ export default function GalleryScreen() {
       filtroAuto: false, // edição preserva o filtro salvo; só o usuário troca
       vibeId: m.vibeId,
       musica: m.musica,
+      // O leque de opções volta com o pacote (T083): reabrir não dispara
+      // curadoria nenhuma, e "Trocar música" já abre com as quatro faixas.
+      sugestoes: m.sugestoes ?? [],
       trechoInicio: m.trechoInicio,
       trechoFim: m.trechoFim,
       // Mídias salvas antes do T066 não têm `aspecto`; o padrão é exatamente a
@@ -86,7 +89,7 @@ export default function GalleryScreen() {
             const vibe = vibeById(item.vibeId);
             return (
               <Pressable
-                style={[styles.card, { aspectRatio: item.aspecto ?? sizes.photoAspect }]}
+                style={styles.card}
                 onPress={() => lapidar(item)}
                 onLongPress={() => excluir(item)}
               >
@@ -153,8 +156,17 @@ const styles = StyleSheet.create({
   row: {
     gap: 12,
   },
+  /**
+   * Vitrine uniforme (T082): todo card é quadrado, independentemente do
+   * enquadramento com que a foto foi tirada. A grade antes usava a proporção de
+   * cada mídia, e uma 16:9 ao lado de uma 1:1 deixava a coluna serrilhada.
+   *
+   * A proporção real não se perde: ela continua em `Media.aspecto` e é ela que
+   * manda na tela de captura. Aqui é só miniatura.
+   */
   card: {
     flex: 1,
+    aspectRatio: 1,
     marginBottom: 12,
     borderRadius: radii.card,
     borderWidth: 1,
@@ -162,12 +174,27 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'rgba(141,21,20,0.12)',
   },
+  /**
+   * A `FilteredImage` desenha a foto em `absoluteFill` — ela precisa de um
+   * container com altura própria. Este estilo declarava só `width: '100%'`, sem
+   * altura: cada card ficava com 0px de foto, e foi por isso que as prévias
+   * sumiram da galeria (T081).
+   */
   photo: {
-    width: '100%',
+    ...StyleSheet.absoluteFillObject,
   },
+  /**
+   * Com o card quadrado, os metadados passam a flutuar sobre o rodapé da foto —
+   * antes eles ocupavam altura própria e disputavam espaço com a imagem.
+   */
   meta: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     padding: 10,
     gap: 4,
+    backgroundColor: 'rgba(9,5,6,0.62)',
   },
   metaVibe: {
     color: colors.parchment,

@@ -103,6 +103,18 @@ export interface Media {
    * exatamente o valor com que elas foram criadas.
    */
   aspecto?: number;
+  /**
+   * As quatro sugestões que a curadoria produziu para esta foto (T083).
+   *
+   * Guardar só a faixa escolhida fazia a decisão inteira se perder: reabrir a
+   * mídia trazia `sugestoes: []`, e o app saía chamando o Gemini de novo para
+   * um pacote que já estava fechado — cobrando rede, tempo e uma vibe
+   * recalculada por cima da que estava salva.
+   *
+   * Opcional pelo mesmo motivo de `aspecto`: as mídias gravadas antes disto não
+   * têm o campo, e a ausência significa "não sei", nunca "não há".
+   */
+  sugestoes?: MusicSuggestion[];
   criadaEm: number;
   atualizadaEm: number;
 }

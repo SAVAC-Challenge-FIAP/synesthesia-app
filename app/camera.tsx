@@ -14,7 +14,7 @@ import { FilterLayer } from '@/components/FilterLayer';
 import { FilteredImage } from '@/components/FilteredImage';
 import { filterById } from '@/constants/filters';
 import { ENQUADRAMENTO_PADRAO, ENQUADRAMENTOS, enquadramentoPor } from '@/constants/enquadramentos';
-import { recortarNoAspecto } from '@/services/enquadrar';
+import { escolherTamanhoNativo, prepararFoto } from '@/services/enquadrar';
 import { detectVibe } from '@/services/vibeEngine';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
@@ -63,32 +63,65 @@ export default function CameraScreen() {
   // Painel "+ Opções" (T065): o chip deixou de empurrar para os Ajustes e passou
   // a abrir a barra do Figma; quem leva aos Ajustes agora é a engrenagem dela.
   const [opcoesAbertas, setOpcoesAbertas] = useState(false);
-  const [resolucao, setResolucao] = useState<string | null>(null);
+  const [tamanhos, setTamanhos] = useState<string[]>([]);
   const [enquadramentoId, setEnquadramentoId] = useState<EnquadramentoId>(ENQUADRAMENTO_PADRAO);
   const [flash, setFlash] = useState<FlashMode>('off');
+  /** Área entre a barra superior e os controles — o palco real do visor (T087). */
+  const [palco, setPalco] = useState({ largura: 0, altura: 0 });
+
+  const razaoAlvo = enquadramentoPor(enquadramentoId).razao;
 
   /**
-   * Aspecto do visor, animado (T077). O Sávio: "o visor da câmera se adapta de
-   * forma fluida e animada, eu não quero a câmera full na tela o tempo todo".
+   * Resolução do sensor que já nasce no enquadramento escolhido (T086).
    *
-   * O T066 mantinha a `CameraView` cheia e escurecia o que seria cortado — e era
-   * justamente esse véu cinza que ele não quis. Agora a prévia **é** do tamanho
-   * do enquadramento, e o que aparece em volta é o gradiente da identidade.
-   *
-   * `useNativeDriver` fica de fora porque `aspectRatio` é propriedade de layout;
-   * a animação roda no JS, e a 300ms de duração isso não aparece.
+   * Quando existe, a `CameraView` recebe essa `pictureSize` e a foto sai pronta:
+   * nada é recortado depois, e o que o visor mostrou é o que o arquivo tem. O
+   * 1:1 não existe em sensor nenhum — ali `null` significa "vai ter de cortar".
    */
-  const aspectoAnimado = useRef(
-    new Animated.Value(enquadramentoPor(ENQUADRAMENTO_PADRAO).razao),
-  ).current;
+  const tamanhoNativo = useMemo(
+    () => escolherTamanhoNativo(tamanhos, razaoAlvo),
+    [tamanhos, razaoAlvo],
+  );
+
+  /**
+   * Tamanho do visor, animado (T077/T087).
+   *
+   * Antes isto era um `aspectRatio` num `Animated.View` de largura cheia, dentro
+   * de um palco `absoluteFill` — a prévia se centralizava na **tela inteira**,
+   * com os controles por cima dela, e no 16:9 a altura pedida (largura ÷ 0,5625)
+   * passava do que sobra entre as barras. Daí a impressão de desproporção e de
+   * visor fora do lugar.
+   *
+   * Agora largura e altura são calculadas a partir do palco medido: o lado que
+   * limita é respeitado, o outro segue a razão. A `interpolate` sobre as três
+   * razões conhecidas faz a transição entre elas continuar fluida — o que anima
+   * é a mesma escala, só que agora dentro de um espaço que existe de verdade.
+   */
+  const razoes = useMemo(
+    () => [...ENQUADRAMENTOS.map((e) => e.razao)].sort((a, b) => a - b),
+    [],
+  );
+  const anim = useRef(new Animated.Value(enquadramentoPor(ENQUADRAMENTO_PADRAO).razao)).current;
   useEffect(() => {
-    Animated.timing(aspectoAnimado, {
-      toValue: enquadramentoPor(enquadramentoId).razao,
+    Animated.timing(anim, {
+      toValue: razaoAlvo,
       duration: 300,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [enquadramentoId, aspectoAnimado]);
+  }, [razaoAlvo, anim]);
+
+  const medidas = useMemo(() => {
+    if (!palco.largura || !palco.altura) return null;
+    const larguras = razoes.map((r) => Math.min(palco.largura, palco.altura * r));
+    return {
+      largura: anim.interpolate({ inputRange: razoes, outputRange: larguras }),
+      altura: anim.interpolate({
+        inputRange: razoes,
+        outputRange: larguras.map((l, i) => l / razoes[i]),
+      }),
+    };
+  }, [palco, razoes, anim]);
   // 'original' = usuário escolheu explicitamente sem filtro; null = automático
   const [manualFiltro, setManualFiltro] = useState<FilterId | 'original' | null>(null);
   const [capturando, setCapturando] = useState(false);
@@ -107,23 +140,23 @@ export default function CameraScreen() {
   );
 
   /**
-   * Lê a resolução real do sensor para o rótulo do painel. O Figma traz "12M"
-   * cravado; repetir isso seria inventar um número sobre o aparelho de quem usa.
-   * Só roda quando o painel abre — antes disso não há o que mostrar.
+   * Lê as resoluções reais do sensor. Serve a duas coisas: o rótulo de
+   * megapixels do painel (o Figma traz "12M" cravado, e repetir isso seria
+   * inventar um número sobre o aparelho de quem usa) e, desde o T086, a escolha
+   * da `pictureSize` que já sai no enquadramento certo.
+   *
+   * Passou a rodar assim que a câmera fica pronta, e não mais só quando o painel
+   * abre: agora a lista decide como a **foto** é tirada, então precisa estar em
+   * mãos antes do primeiro disparo, não depois de alguém abrir "+ Opções".
    */
-  useEffect(() => {
-    if (!opcoesAbertas || resolucao || !cameraRef.current) return;
-    let vivo = true;
+  const lerTamanhos = useCallback(() => {
+    if (!cameraRef.current) return;
     cameraRef.current
       .getAvailablePictureSizesAsync()
-      .then((tamanhos) => {
-        if (vivo) setResolucao(rotuloDeResolucao(tamanhos));
-      })
+      .then(setTamanhos)
       .catch(() => {});
-    return () => {
-      vivo = false;
-    };
-  }, [opcoesAbertas, resolucao]);
+  }, []);
+  const resolucao = tamanhos.length > 0 ? rotuloDeResolucao(tamanhos) : null;
 
   /**
    * Flash (T067) — três estados **visíveis**, não um toggle cego: a pessoa
@@ -155,20 +188,27 @@ export default function CameraScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       const foto = await cameraRef.current.takePictureAsync({ quality: 0.85 });
       if (foto?.uri) {
-        // O recorte é REAL, no arquivo: a máscara do visor sem isto mostraria
-        // um 1:1 e o pacote sairia 4:3.
-        const enquadramento = enquadramentoPor(enquadramentoId);
-        const uriRecortada = await recortarNoAspecto(
-          foto.uri,
-          foto.width,
-          foto.height,
-          enquadramento.razao,
-        );
+        /**
+         * O que barateia o disparo (T085/T086) é a `pictureSize`: pedindo ao
+         * sensor um modo que já tem a proporção escolhida, o preparo vira só o
+         * giro, sem recorte — e sem os 64MP que este aparelho entregava por
+         * padrão, que eram o grosso do tempo de recodificação.
+         *
+         * O giro em si não tem como ser pulado: o arquivo vem deitado do
+         * sensor, e é ele que precisa ir para o pacote em pé.
+         */
+        const { uri: photoUri, aspecto } = await prepararFoto({
+          uri: foto.uri,
+          largura: foto.width,
+          altura: foto.height,
+          razaoAlvo,
+          frontal: facing === 'front',
+        });
         router.push('/capture');
         startSession({
           mediaId: null,
-          photoUri: uriRecortada,
-          aspecto: enquadramento.razao,
+          photoUri,
+          aspecto,
           filtroId: filtroAtivo,
           filtroAuto,
           vibeId: vibe.id,
@@ -180,7 +220,7 @@ export default function CameraScreen() {
     } finally {
       setCapturando(false);
     }
-  }, [capturando, enquadramentoId, filtroAtivo, filtroAuto, router, startSession, vibe.id]);
+  }, [capturando, facing, razaoAlvo, filtroAtivo, filtroAuto, router, startSession, vibe.id]);
 
   // Guards DEPOIS de todos os hooks (Rules of Hooks): um return antecipado
   // entre hooks muda a ordem entre renders e derruba a tela
@@ -196,21 +236,6 @@ export default function CameraScreen() {
   return (
     <View style={styles.root}>
       <FundoBase />
-      <View style={styles.palco} pointerEvents="none">
-        <Animated.View style={[styles.visor, { aspectRatio: aspectoAnimado }]}>
-          {focada ? (
-            <CameraView
-              ref={cameraRef}
-              style={StyleSheet.absoluteFill}
-              facing={facing}
-              flash={flash}
-            />
-          ) : null}
-        </Animated.View>
-      </View>
-      {filtro ? <FilterLayer filter={filtro} /> : null}
-
-      {gradeComposicao ? <GridOverlay /> : null}
 
       <SafeAreaView style={styles.ui} pointerEvents="box-none">
         {/* Barra de status: vibe detectada + Ajustes */}
@@ -282,6 +307,43 @@ export default function CameraScreen() {
           )}
         </View>
 
+        {/* Palco do visor (T087): a faixa entre a barra superior e os controles.
+            Era `absoluteFill`, e por isso a prévia se centralizava na tela toda
+            — com meia foto atrás do carrossel e dos botões. O filtro e a grade
+            vêm para dentro dele pelo mesmo motivo: são camadas *da imagem*, e
+            estavam pintando a tela inteira, fundo da identidade incluído. */}
+        <View
+          style={styles.palco}
+          pointerEvents="none"
+          onLayout={(e) =>
+            setPalco({
+              largura: e.nativeEvent.layout.width,
+              altura: e.nativeEvent.layout.height,
+            })
+          }
+        >
+          {medidas ? (
+            <Animated.View
+              style={[styles.visor, { width: medidas.largura, height: medidas.altura }]}
+            >
+              {focada ? (
+                <CameraView
+                  ref={cameraRef}
+                  style={StyleSheet.absoluteFill}
+                  facing={facing}
+                  flash={flash}
+                  // Pede ao sensor o modo que já tem a proporção escolhida; sem
+                  // um que sirva (1:1), fica no padrão e o recorte resolve.
+                  {...(tamanhoNativo ? { pictureSize: tamanhoNativo } : {})}
+                  onCameraReady={lerTamanhos}
+                />
+              ) : null}
+              {filtro ? <FilterLayer filter={filtro} /> : null}
+              {gradeComposicao ? <GridOverlay /> : null}
+            </Animated.View>
+          ) : null}
+        </View>
+
         <View style={styles.bottom} pointerEvents="box-none">
           {manualFiltro ? (
             <Pressable
@@ -341,13 +403,11 @@ function GridOverlay() {
 
 const styles = StyleSheet.create({
   palco: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   visor: {
-    width: '100%',
-    maxHeight: '100%',
     overflow: 'hidden',
     borderRadius: radii.card,
   },

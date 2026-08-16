@@ -1230,3 +1230,120 @@ a 3 troca latência por completude, e essa é escolha do Sávio, não do loop.
   `assets/favicon.svg` e `assets/logo-full-name.svg` continuam com
   `<rect ... fill="black"/>` embutido. O `assets/icon.svg` já veio limpo e foi a
   base de tudo; os outros dois só travam usar a marca sobre ruby ou parchment.
+
+---
+
+## Fase 19 — QA do Sávio sobre a captura, a galeria e a postagem (2026-08-16)
+
+Segunda rodada de uso real depois da Fase 18. O tema comum de quase tudo aqui é
+**a imagem não é a imagem**: o que o visor mostra, o que o arquivo tem e o que a
+prévia desenha são três coisas diferentes hoje. As causas foram lidas no código
+antes de escrever estas tasks e estão anotadas em cada uma.
+
+### Decisões do Sávio tomadas junto com este relato
+
+- **D6 encerrada — não se corrige.** Sobre o truncamento com fonte do sistema
+  ampliada: *"isso aqui foda-se, é um app de escola, nunca vai ser preciso fazer
+  nada em relação a isso, esquece"*. A dúvida fica registrada como **descartada
+  por decisão de produto**, não como dívida.
+- **Assets liberados.** *"os assets você dá conta, pode tirar, pode fazer o que
+  você quiser, editar essas coisas"* — o item "pendente do Sávio" da Fase 17
+  (os SVGs com `<rect fill="black">`) deixa de esperar por ele e vira trabalho
+  meu. Ver **T086**.
+- **O loader aprovado é o da espera do Gemini** (`LoaderMarca`, T070): *"o loader
+  ficou bom, se for aquele da aba de música antes dela chegar"*. Isso **valida o
+  T070** pela via do uso real e confirma o escopo do **T080**.
+- **A grade de destinos morre.** *"esses ícones de compartilhar não prestam, pq
+  se eu clicar eles vão abrir o compartilhar nativo do celular de qualquer forma,
+  então foda-se, pode tirar"*. Reverte a intenção do T055 — a grade nativa
+  resolveu o problema errado.
+
+### Galeria
+
+- [ ] **T081** [P1] [BUG] **As prévias sumiram da galeria.** Causa lida no
+  código, não é hipótese: `FilteredImage` desenha a foto com
+  `StyleSheet.absoluteFill`, o que exige que o container tenha altura própria;
+  o `styles.photo` de [gallery.tsx](../../app/gallery.tsx) só declara
+  `width: '100%'`, sem altura nenhuma. Altura 0 = card vazio. O card por fora
+  tem `aspectRatio`, mas ele não desce para a foto.
+
+- [ ] **T082** [P1] [DESIGN] **Cards todos do mesmo tamanho.** Hoje cada card usa
+  `aspectRatio: item.aspecto`, então a grade fica serrilhada — 1:1 ao lado de
+  16:9. Grade uniforme (quadrada), miniatura em `cover`. A proporção real da
+  foto continua guardada em `Media.aspecto` e continua valendo na captura; o que
+  padroniza é só a vitrine.
+
+- [ ] **T083** [P1] [BUG] **Reabrir uma foto da galeria dispara a curadoria de
+  novo.** *"se eu clicar em uma imagem ele aparece falando que tá buscando a
+  música de novo, não estamos com essa decisão guardada já no armazenamento?"* —
+  está sim, e o bug é a guarda do efeito: em
+  [CaptureSheet.tsx](../../src/components/CaptureSheet.tsx) a condição de saída é
+  `s.sugestoes.length > 0`, e uma mídia reaberta da galeria nasce com
+  `sugestoes: []` porque **as sugestões nunca foram persistidas** — só a faixa
+  escolhida. Resultado: chamada nova ao Gemini, vibe recalculada por cima da
+  salva e o estado voltando para `carregando` num pacote que já estava pronto.
+
+  Duas metades: (a) mídia reaberta com `musica` não redisparar curadoria
+  nenhuma; (b) persistir `sugestoes` na `Media`, para "Trocar música" numa foto
+  antiga abrir com as quatro opções já conhecidas, sem rede.
+
+### Captura e proporção
+
+- [ ] **T084** [P1] [BUG] **A foto capturada não é a foto que aparece na
+  captura.** *"parece que deu um zoom"*. São dois cortes empilhados: o visor
+  mostra a prévia em `cover` (corta o que não cabe no aspecto escolhido), o
+  arquivo é recortado **de novo** por `recortarNoAspecto`, e a prévia desenha
+  esse arquivo em `cover` dentro de um `aspectRatio: session.aspecto` que é a
+  razão *pedida*, não a razão *real* do arquivo. Onde as três discordam, aparece
+  zoom.
+
+  Regra que o Sávio deu, e que resolve por construção: **a tela de captura monta
+  a imagem com largura 100% e altura automática pela proporção real do arquivo**
+  — assim nunca distorce e nunca corta. Absorve o **T078**.
+
+- [ ] **T085** [P1] [PERF] **Demora entre disparar e ver a foto na captura.**
+  `capturar()` em [camera.tsx](../../app/camera.tsx) espera `takePictureAsync` e
+  **depois** reescreve o arquivo inteiro em `recortarNoAspecto` (com
+  `compress: 1`, ou seja, recodifica o JPEG grande todo) antes de navegar. É
+  trabalho síncrono no caminho crítico do toque. Com o T084, o recorte só
+  precisa existir quando o enquadramento não for o nativo do sensor.
+
+- [ ] **T086** [P1] [DESIGN] **Enquadramento pelo sensor, não por corte.** *"essa
+  aspect ratio que você tá fazendo é o quê, um corte na imagem? tem alguma forma
+  de fazer isso nativo? olha a câmera nativa pra ver como ela faz de uma forma
+  tão natural"*. Resposta honesta: 4:3 e 16:9 **existem no sensor** e podem ser
+  pedidos via `pictureSize` (`getAvailablePictureSizesAsync` já é chamado hoje,
+  só para rotular a resolução); 1:1 **não existe** em sensor nenhum — a câmera
+  nativa também corta. Pedir ao sensor o que ele tem, e cortar só o que ele não
+  tem.
+
+- [ ] **T087** [P1] [DESIGN] **O visor centralizado na área útil.** *"fica
+  desproporcional e descentralizada da área útil da tela; a área útil seria a
+  área entre os controles da câmera e as opções"*. Hoje o palco é
+  `StyleSheet.absoluteFill` — a prévia se centraliza na **tela inteira** e os
+  controles ficam por cima dela. O palco passa a ser a faixa entre a barra
+  superior e a barra de controles.
+
+### Postagem
+
+- [ ] **T088** [P1] [DESIGN] **Um botão "Postar", e ele abre a folha nativa.**
+  Tira a grade de destinos do T055 e o módulo `share-target` do caminho da UI.
+  Resolve junto o **erro do Instagram** relatado (*"só consigo mandar por
+  mensagem o vídeo gerado"*): a folha do sistema concede a permissão de URI ao
+  app escolhido, o que o Intent direto por activity não garante.
+
+- [ ] **T089** [P1] [BUG] **"Baixar vídeo" não funciona.**
+  `saveToSystemGallery` pede a permissão granular **`['photo']`** e depois manda
+  um `.mp4` para a biblioteca — no Android 13+ salvar vídeo exige a permissão de
+  vídeo, então a chamada falha e a função devolve `false` em silêncio (o `catch`
+  vazio). O botão fica "BAIXAR VÍDEO" para sempre, sem erro nenhum à vista.
+
+### Movimento
+
+- [ ] **T080** [P2] **Loader na entrada do app** — confirmado pelo Sávio como o
+  movimento que ele quer na abertura. Continua na fila, agora com o
+  `LoaderMarca` validado no uso real.
+
+- [ ] **T090** [P3] **Assets: limpar os SVGs e gerar o que faltar.** Liberado
+  pelo Sávio. Tirar o `<rect fill="black">` de `assets/favicon.svg` e
+  `assets/logo-full-name.svg` e gerar a variante monocromática em `parchment`.

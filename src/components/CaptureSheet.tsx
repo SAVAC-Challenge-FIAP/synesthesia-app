@@ -5,6 +5,7 @@ import {
   Alert,
   Animated,
   BackHandler,
+  Image,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -173,6 +174,37 @@ export function CaptureSheet() {
 
   const photoUri = session?.photoUri;
 
+  /**
+   * Proporção **do arquivo**, medida nele (T084).
+   *
+   * A prévia usava `session.aspecto`, que é a razão *pedida* no visor. Quando as
+   * duas discordavam — recorte que não rodou, sensor que entregou outra coisa —,
+   * a foto era desenhada em `cover` dentro de um quadro da razão errada, e o que
+   * sobrava era cortado: exatamente o "zoom" que aparecia entre o disparo e a
+   * tela de captura.
+   *
+   * Medindo o arquivo, largura 100% e altura pela razão real, não há corte nem
+   * distorção possível — é a regra que o Sávio deu, e ela se cumpre sozinha.
+   */
+  const [aspectoReal, setAspectoReal] = useState<number | null>(null);
+  useEffect(() => {
+    if (!photoUri) return;
+    let vivo = true;
+    setAspectoReal(null);
+    Image.getSize(
+      photoUri,
+      (largura, altura) => {
+        if (vivo && largura > 0 && altura > 0) setAspectoReal(largura / altura);
+      },
+      // Não deu para medir: fica com o aspecto da sessão, que é o que havia
+      // antes — pior que a medida, melhor que nada.
+      () => {},
+    );
+    return () => {
+      vivo = false;
+    };
+  }, [photoUri]);
+
   // Análise sensorial fora do caminho crítico do frame (constituição III):
   // com "Detecção em tempo real" ativa, a PRÓPRIA FOTO vai ao Gemini, que
   // infere a vibe real da cena e cura as faixas numa só chamada (T-0A/T-0B);
@@ -185,6 +217,23 @@ export function CaptureSheet() {
     if (!photoUri || analisada.current === photoUri) return;
     const { session: s } = useCaptureStore.getState();
     if (!s || s.sugestoes.length > 0) return;
+
+    /**
+     * Mídia reaberta da galeria não se cura de novo (T083).
+     *
+     * A guarda acima olhava só para `sugestoes`, e um pacote salvo volta com a
+     * lista vazia — as sugestões nunca tinham sido persistidas. Reabrir uma foto
+     * antiga saía chamando o Gemini, jogava a tela de volta em `carregando` e
+     * ainda sobrescrevia a vibe salva pela vibe recalculada. O pacote já está
+     * decidido; quem quiser mexer na trilha abre o "Trocar música", e aí sim a
+     * busca acontece — por pedido, não sozinha.
+     */
+    if (s.mediaId !== null) {
+      analisada.current = photoUri;
+      patch({ curadoria: s.musica ? 'pronta' : 'indisponivel' });
+      return;
+    }
+
     analisada.current = photoUri;
 
     // Curadoria desligada nos ajustes: não há o que esperar. Sai de
@@ -365,6 +414,7 @@ export function CaptureSheet() {
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
           aspecto: session.aspecto,
+          sugestoes: session.sugestoes,
           criadaEm: 0,
           atualizadaEm: Date.now(),
         };
@@ -374,6 +424,9 @@ export function CaptureSheet() {
           musica: musicaDoPacote,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
+          // Reabrir e trocar de música atualiza o leque salvo junto com a
+          // escolha — senão a mídia guardaria a faixa nova e as opções velhas.
+          sugestoes: session.sugestoes,
         });
       } else {
         const id = `${Date.now()}`;
@@ -394,6 +447,9 @@ export function CaptureSheet() {
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
           aspecto: session.aspecto,
+          // As quatro opções vão junto: reabrir esta foto não precisa mais
+          // consultar o Gemini para mostrar de onde a escolha saiu (T083).
+          sugestoes: session.sugestoes,
           criadaEm: Date.now(),
           atualizadaEm: Date.now(),
         };
@@ -524,7 +580,7 @@ export function CaptureSheet() {
               <FilteredImage
                 uri={session.photoUri}
                 filtroId={session.filtroId}
-                style={[styles.preview, { aspectRatio: session.aspecto }]}
+                style={[styles.preview, { aspectRatio: aspectoReal ?? session.aspecto }]}
               />
             </View>
 
