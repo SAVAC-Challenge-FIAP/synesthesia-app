@@ -959,7 +959,7 @@ o flash também".
 **Objetivo**: o app tem cara de produto, não de protótipo.
 **Só começa** quando a Fase 14 estiver fechada e não houver pendência de QA nas 15–16.
 
-- [ ] **T069** [P3] **Trocar os ícones do app pelos assets do Sávio.**
+- [X] **T069** [P3] **Trocar os ícones do app pelos assets do Sávio.**
   Já estão no repo: `assets/favicon.svg` (40×40), `assets/favicom.png` (160×160),
   `assets/logo-full-name.svg` (170×40), `assets/logo-full-name.png` (680×160). A marca é um
   conjunto de círculos concêntricos em `amber` sobre preto — uma íris/diafragma.
