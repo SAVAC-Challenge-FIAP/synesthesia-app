@@ -1406,3 +1406,31 @@ Terceira rodada do mesmo dia, sobre o que a Fase 19 entregou.
   *"em vez de pacotes vamos chamar de momentos"*. Trocado só no que a pessoa lê
   — galeria, captura, postagem e alertas. O código segue com `SharePackage`,
   `chavePacote` e afins, que são nomes de estrutura, não de produto.
+
+- [X] **T093** [P1] [DESIGN] **Cada enquadramento com a sua âncora, e o FULL de
+  volta.** Três correções sobre o T091, todas ditadas pelo Sávio:
+
+  1. *"parece que deu uma mudada no eixo de centralização do 1:1 e 4:3... ficou
+     ruim esses dois que estavam bons"* — estavam mesmo. O T091 passou a
+     centralizar todo mundo na tela, e os dois que **cabem** na área útil devem
+     se centralizar **nela**, entre a barra de opções e os filtros.
+  2. *"a de 16:9 ela deve começar nos controladores"* — ancorada embaixo, ela
+     cresce para cima e nunca deixa aquela faixa de imagem órfã entre os filtros
+     e os botões (que era o "ainda passa por baixo dos controladores" que ele
+     viu, e que eu não peguei na validação anterior).
+  3. *"deixa a opção full, tá faltando"* — enquadramento novo, com a razão da
+     própria tela. A prévia toma tudo e a foto sai recortada nessa razão.
+
+  As âncoras (`util` / `controles` / `tela`) agora são declaradas em
+  `ENQUADRAMENTOS`, ao lado da razão: onde o visor vive é decisão de produto,
+  não consequência da proporção.
+
+  ⚠️ **Duas armadilhas pagas neste ciclo**, ambas vistas no aparelho:
+  - `onLayout` com atualização funcional — `setFaixas((f) => ({ ...f, ui:
+    e.nativeEvent.layout.height }))` **quebra**: o updater roda depois, e aí o
+    evento já foi reciclado (`Cannot read property 'layout' of null`). Ler a
+    medida numa constante antes resolve.
+  - `StyleSheet.absoluteFill` dentro de uma `SafeAreaView` **ignora o padding
+    dela**. Ancorar "no topo dos controles" sem descontar `insets.bottom` põe o
+    visor a uma barra de navegação inteira de distância — foi exatamente por
+    isso que a primeira tentativa do 16:9 continuou invadindo os botões.

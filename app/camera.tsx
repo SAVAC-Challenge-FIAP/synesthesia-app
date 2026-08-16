@@ -14,7 +14,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CameraOptionsBar, rotuloDeResolucao } from '@/components/CameraOptionsBar';
 import { FilterCarousel } from '@/components/FilterCarousel';
@@ -76,14 +76,25 @@ export default function CameraScreen() {
   const [enquadramentoId, setEnquadramentoId] = useState<EnquadramentoId>(ENQUADRAMENTO_PADRAO);
   const [flash, setFlash] = useState<FlashMode>('off');
   /**
-   * Altura da barra de captura/galeria/flip, medida (T091). É o único limite do
-   * visor: ele pode crescer sob o carrossel de filtros, mas nunca sob os
-   * controles — tocar num botão que está por cima da imagem é outro problema.
+   * As faixas da tela, medidas no layout (T093). São quatro, de cima para
+   * baixo: barra de opções, área útil, filtros e controles. O visor se posiciona
+   * em relação a elas, e cada enquadramento escolhe a sua âncora.
    */
-  const [alturaControles, setAlturaControles] = useState(0);
+  const [faixas, setFaixas] = useState({ ui: 0, topo: 0, baixo: 0, controles: 0 });
   const { width: larguraTela } = useWindowDimensions();
+  /**
+   * Os insets entram na conta porque a camada do visor é `absoluteFill` dentro
+   * da `SafeAreaView`, e `absoluteFill` **ignora o padding** dela: a camada vai
+   * até a borda física, enquanto a barra de controles para na borda segura.
+   * Sem descontar isso, o 16:9 ancorado "no topo dos controles" descia a altura
+   * da barra de navegação inteira — e voltava a aparecer atrás dos botões.
+   */
+  const insets = useSafeAreaInsets();
 
-  const razaoAlvo = enquadramentoPor(enquadramentoId).razao;
+  const enquadramento = enquadramentoPor(enquadramentoId);
+  /** FULL não tem razão própria: a razão dele é a da tela. */
+  const razaoAlvo =
+    enquadramento.razao ?? (faixas.ui > 0 ? larguraTela / faixas.ui : 9 / 16);
 
   /**
    * Resolução do sensor que já nasce no enquadramento escolhido (T086).
@@ -98,43 +109,68 @@ export default function CameraScreen() {
   );
 
   /**
-   * Altura do visor, animada (T077/T091). **A largura é sempre a da tela.**
+   * Posição e altura do visor, animadas (T077/T091/T093). **A largura é sempre
+   * a da tela**, nos quatro enquadramentos.
    *
-   * Esta é a regra que o Sávio deu para o 16:9 e que vale para os três: largura
-   * cheia, sempre. A versão anterior limitava o visor à faixa entre as barras, e
-   * o 16:9 — que precisa de largura ÷ 0,5625 de altura — encolhia de lado para
-   * caber, o que é exatamente o que ele não quer ver.
+   * O que muda entre eles é a âncora, e ela não segue da razão — é escolha,
+   * declarada em `ENQUADRAMENTOS`:
    *
-   * Crescer, então, significa avançar sobre o carrossel de filtros. E aí a outra
-   * metade da regra: ou não avança, ou avança **inteiro**. Meia lista de filtros
-   * sobre a imagem é a pior das três opções, porque parece defeito. O carrossel
-   * passa a flutuar por cima da prévia, com um degradê que o sustenta.
+   * - 4:3 e 1:1 cabem na área útil e ficam centralizados **nela**, entre a barra
+   *   de opções e os filtros. Centralizá-los na tela inteira, como a versão
+   *   anterior fazia, subia os dois e desalinhava o que já estava bom.
+   * - 16:9 não cabe: encosta no topo dos controles e cresce para cima. Ancorado
+   *   assim, ele não deixa faixa de imagem sobrando entre os filtros e os
+   *   botões — que era o "passa por baixo dos controladores" que o Sávio viu — e
+   *   passa por baixo dos filtros e das opções inteiro, nunca pela metade.
+   * - FULL é a tela toda, atrás de tudo.
    *
-   * A `interpolate` sobre as três razões conhecidas mantém a transição contínua:
-   * o que anima é a altura, e a largura nunca muda.
+   * A animação corre sobre o **índice** do enquadramento, não sobre a razão:
+   * `top` e `height` de cada um são pontos conhecidos, e interpolar entre eles
+   * mantém a transição contínua mesmo com âncoras diferentes.
    */
-  const razoes = useMemo(
-    () => [...ENQUADRAMENTOS.map((e) => e.razao)].sort((a, b) => a - b),
-    [],
+  const indices = useMemo(() => ENQUADRAMENTOS.map((_, i) => i), []);
+  const geometrias = useMemo(() => {
+    const { ui, topo, baixo, controles } = faixas;
+    if (!ui || !larguraTela) return null;
+    // Bordas do conteúdo, já descontados os paddings da área segura.
+    const topoConteudo = insets.top;
+    const fundoConteudo = ui - insets.bottom;
+    const alturaUtil = fundoConteudo - topoConteudo - topo - baixo;
+    return ENQUADRAMENTOS.map((e) => {
+      if (e.ancora === 'tela') return { top: 0, height: ui };
+      const height = larguraTela / (e.razao ?? larguraTela / ui);
+      const top =
+        e.ancora === 'controles'
+          ? fundoConteudo - controles - height
+          : topoConteudo + topo + (alturaUtil - height) / 2;
+      return { top, height };
+    });
+  }, [faixas, larguraTela, insets]);
+
+  const indiceAtual = Math.max(
+    0,
+    ENQUADRAMENTOS.findIndex((e) => e.id === enquadramentoId),
   );
-  const anim = useRef(new Animated.Value(enquadramentoPor(ENQUADRAMENTO_PADRAO).razao)).current;
+  const anim = useRef(new Animated.Value(indiceAtual)).current;
   useEffect(() => {
     Animated.timing(anim, {
-      toValue: razaoAlvo,
+      toValue: indiceAtual,
       duration: 300,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [razaoAlvo, anim]);
+  }, [indiceAtual, anim]);
 
-  const alturaVisor = useMemo(
-    () =>
-      anim.interpolate({
-        inputRange: razoes,
-        outputRange: razoes.map((r) => larguraTela / r),
+  const visorAnimado = useMemo(() => {
+    if (!geometrias) return null;
+    return {
+      top: anim.interpolate({ inputRange: indices, outputRange: geometrias.map((g) => g.top) }),
+      height: anim.interpolate({
+        inputRange: indices,
+        outputRange: geometrias.map((g) => g.height),
       }),
-    [razoes, anim, larguraTela],
-  );
+    };
+  }, [geometrias, indices, anim]);
   // 'original' = usuário escolheu explicitamente sem filtro; null = automático
   const [manualFiltro, setManualFiltro] = useState<FilterId | 'original' | null>(null);
   const [capturando, setCapturando] = useState(false);
@@ -289,35 +325,54 @@ export default function CameraScreen() {
     <View style={styles.root}>
       <FundoBase />
 
-      {/* Camada do visor (T091): largura da tela inteira, altura pela razão, e
-          o único piso é o topo dos controles — daí `bottom: alturaControles`.
-          Vem antes da interface no JSX, então tudo desenha por cima dela. */}
-      <View
-        style={[styles.camadaVisor, { bottom: alturaControles }]}
-        pointerEvents="none"
+      <SafeAreaView
+        style={styles.ui}
+        pointerEvents="box-none"
+        onLayout={(e) => {
+          // O valor é lido **antes** do updater: dentro dele o evento já foi
+          // reciclado pelo React e `nativeEvent` vem nulo (visto no aparelho).
+          const h = e.nativeEvent.layout.height;
+          setFaixas((f) => ({ ...f, ui: h }));
+        }}
       >
-        <Animated.View style={[styles.visor, { width: larguraTela, height: alturaVisor }]}>
-          {focada ? (
-            <CameraView
-              ref={cameraRef}
-              style={StyleSheet.absoluteFill}
-              facing={facing}
-              flash={flash}
-              // Pede ao sensor o modo que já tem a proporção escolhida; sem
-              // um que sirva (1:1), fica no padrão e o recorte resolve.
-              {...(tamanhoNativo ? { pictureSize: tamanhoNativo } : {})}
-              onCameraReady={lerTamanhos}
-            />
-          ) : null}
-          {/* Camadas *da imagem*: dentro do visor, não sobre a tela inteira. */}
-          {filtro ? <FilterLayer filter={filtro} /> : null}
-          {gradeComposicao ? <GridOverlay /> : null}
-        </Animated.View>
-      </View>
+        {/* Camada do visor (T091/T093): posiciona a prévia pela âncora do
+            enquadramento. Mora **dentro** da área segura de propósito — as
+            faixas são medidas neste mesmo referencial, e montá-la na raiz
+            deslocaria tudo pela altura da barra de status. Vem antes da
+            interface no JSX, então tudo desenha por cima dela. */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.visor,
+              { width: larguraTela, top: visorAnimado?.top ?? 0, height: visorAnimado?.height ?? 0 },
+            ]}
+          >
+            {focada ? (
+              <CameraView
+                ref={cameraRef}
+                style={StyleSheet.absoluteFill}
+                facing={facing}
+                flash={flash}
+                // Pede ao sensor o modo que já tem a proporção escolhida; sem
+                // um que sirva (1:1), fica no padrão e o recorte resolve.
+                {...(tamanhoNativo ? { pictureSize: tamanhoNativo } : {})}
+                onCameraReady={lerTamanhos}
+              />
+            ) : null}
+            {/* Camadas *da imagem*: dentro do visor, não sobre a tela inteira. */}
+            {filtro ? <FilterLayer filter={filtro} /> : null}
+            {gradeComposicao ? <GridOverlay /> : null}
+          </Animated.View>
+        </View>
 
-      <SafeAreaView style={styles.ui} pointerEvents="box-none">
         {/* Barra de status: vibe detectada + Ajustes */}
-        <View style={styles.topBar}>
+        <View
+          style={styles.topBar}
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            setFaixas((f) => ({ ...f, topo: h }));
+          }}
+        >
           {/* O painel aberto toma a linha inteira. O Figma desenhou 4 slots numa
               barra de 382; com flash, três enquadramentos, resolução e ajustes
               são seis, e dividir a linha com o badge fazia "16:9" e "64M" se
@@ -418,7 +473,14 @@ export default function CameraScreen() {
             barra de baixo para o rodapé. */}
         <View style={styles.espaco} pointerEvents="none" />
 
-        <View style={styles.bottom} pointerEvents="box-none">
+        <View
+          style={styles.bottom}
+          pointerEvents="box-none"
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            setFaixas((f) => ({ ...f, baixo: h }));
+          }}
+        >
           {/* A "sombrinha" que o Sávio pediu: no 16:9 o carrossel fica sobre a
               imagem, e sem este degradê os chips disputariam contraste com
               qualquer cena clara. Ele morre antes dos controles, que já têm o
@@ -445,7 +507,10 @@ export default function CameraScreen() {
               visor — por isso ela é lida no layout (T091). */}
           <View
             style={styles.controls}
-            onLayout={(e) => setAlturaControles(e.nativeEvent.layout.height + 18)}
+            onLayout={(e) => {
+              const h = e.nativeEvent.layout.height + 18;
+              setFaixas((f) => ({ ...f, controles: h }));
+            }}
           >
             <Pressable style={styles.sideBtn} onPress={() => router.push('/gallery')}>
               {ultimaMedia ? (
@@ -497,15 +562,9 @@ const styles = StyleSheet.create({
    * Ele se centraliza aqui dentro — no 4:3 e no 1:1 sobra folga dos dois lados;
    * no 16:9 a altura toma quase tudo e o carrossel passa a flutuar por cima.
    */
-  camadaVisor: {
+  visor: {
     position: 'absolute',
     left: 0,
-    right: 0,
-    top: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  visor: {
     overflow: 'hidden',
     borderRadius: radii.card,
   },
