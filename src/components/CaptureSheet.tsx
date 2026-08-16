@@ -20,6 +20,7 @@ import { captureRef } from 'react-native-view-shot';
 
 import { FilteredImage } from '@/components/FilteredImage';
 import { FundoBase } from '@/components/FundoBase';
+import { LoaderMarca } from '@/components/LoaderMarca';
 import { FilterThumbs } from '@/components/FilterThumbs';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicSheet } from '@/components/MusicSheet';
@@ -551,7 +552,7 @@ export function CaptureSheet() {
             <View style={styles.musicBox}>
               {session.curadoria === 'carregando' ? (
                 <View style={styles.loadingRow}>
-                  <ActivityIndicator color={colors.amber} />
+                  <LoaderMarca tamanho={34} />
                   <Text style={styles.loadingText}>{TEXTO_ETAPA[etapa]}</Text>
                 </View>
               ) : session.musica ? (

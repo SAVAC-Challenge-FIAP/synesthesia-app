@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { vibeById } from '@/constants/vibes';
+import { LoaderMarca } from '@/components/LoaderMarca';
 import { getSuggestions } from '@/services/music';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useTasteStore } from '@/stores/useTasteStore';
@@ -134,7 +134,7 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
             {session.curadoria === 'carregando' ? (
               <View style={styles.loading}>
-                <ActivityIndicator color={colors.ruby} />
+                <LoaderMarca tamanho={30} />
                 <Text style={styles.loadingText}>BUSCANDO SUGESTÕES...</Text>
               </View>
             ) : session.sugestoes.length === 0 ? (
