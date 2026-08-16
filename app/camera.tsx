@@ -2,9 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { CameraType, CameraView, FlashMode, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CameraOptionsBar, rotuloDeResolucao } from '@/components/CameraOptionsBar';
@@ -66,8 +75,13 @@ export default function CameraScreen() {
   const [tamanhos, setTamanhos] = useState<string[]>([]);
   const [enquadramentoId, setEnquadramentoId] = useState<EnquadramentoId>(ENQUADRAMENTO_PADRAO);
   const [flash, setFlash] = useState<FlashMode>('off');
-  /** Área entre a barra superior e os controles — o palco real do visor (T087). */
-  const [palco, setPalco] = useState({ largura: 0, altura: 0 });
+  /**
+   * Altura da barra de captura/galeria/flip, medida (T091). É o único limite do
+   * visor: ele pode crescer sob o carrossel de filtros, mas nunca sob os
+   * controles — tocar num botão que está por cima da imagem é outro problema.
+   */
+  const [alturaControles, setAlturaControles] = useState(0);
+  const { width: larguraTela } = useWindowDimensions();
 
   const razaoAlvo = enquadramentoPor(enquadramentoId).razao;
 
@@ -84,18 +98,20 @@ export default function CameraScreen() {
   );
 
   /**
-   * Tamanho do visor, animado (T077/T087).
+   * Altura do visor, animada (T077/T091). **A largura é sempre a da tela.**
    *
-   * Antes isto era um `aspectRatio` num `Animated.View` de largura cheia, dentro
-   * de um palco `absoluteFill` — a prévia se centralizava na **tela inteira**,
-   * com os controles por cima dela, e no 16:9 a altura pedida (largura ÷ 0,5625)
-   * passava do que sobra entre as barras. Daí a impressão de desproporção e de
-   * visor fora do lugar.
+   * Esta é a regra que o Sávio deu para o 16:9 e que vale para os três: largura
+   * cheia, sempre. A versão anterior limitava o visor à faixa entre as barras, e
+   * o 16:9 — que precisa de largura ÷ 0,5625 de altura — encolhia de lado para
+   * caber, o que é exatamente o que ele não quer ver.
    *
-   * Agora largura e altura são calculadas a partir do palco medido: o lado que
-   * limita é respeitado, o outro segue a razão. A `interpolate` sobre as três
-   * razões conhecidas faz a transição entre elas continuar fluida — o que anima
-   * é a mesma escala, só que agora dentro de um espaço que existe de verdade.
+   * Crescer, então, significa avançar sobre o carrossel de filtros. E aí a outra
+   * metade da regra: ou não avança, ou avança **inteiro**. Meia lista de filtros
+   * sobre a imagem é a pior das três opções, porque parece defeito. O carrossel
+   * passa a flutuar por cima da prévia, com um degradê que o sustenta.
+   *
+   * A `interpolate` sobre as três razões conhecidas mantém a transição contínua:
+   * o que anima é a altura, e a largura nunca muda.
    */
   const razoes = useMemo(
     () => [...ENQUADRAMENTOS.map((e) => e.razao)].sort((a, b) => a - b),
@@ -111,17 +127,14 @@ export default function CameraScreen() {
     }).start();
   }, [razaoAlvo, anim]);
 
-  const medidas = useMemo(() => {
-    if (!palco.largura || !palco.altura) return null;
-    const larguras = razoes.map((r) => Math.min(palco.largura, palco.altura * r));
-    return {
-      largura: anim.interpolate({ inputRange: razoes, outputRange: larguras }),
-      altura: anim.interpolate({
+  const alturaVisor = useMemo(
+    () =>
+      anim.interpolate({
         inputRange: razoes,
-        outputRange: larguras.map((l, i) => l / razoes[i]),
+        outputRange: razoes.map((r) => larguraTela / r),
       }),
-    };
-  }, [palco, razoes, anim]);
+    [razoes, anim, larguraTela],
+  );
   // 'original' = usuário escolheu explicitamente sem filtro; null = automático
   const [manualFiltro, setManualFiltro] = useState<FilterId | 'original' | null>(null);
   const [capturando, setCapturando] = useState(false);
@@ -164,6 +177,45 @@ export default function CameraScreen() {
    */
   const proximoFlash = () =>
     setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'));
+
+  /**
+   * Abertura do painel "+ Opções" (T079). Ele trocava de conteúdo num frame —
+   * o chip sumia e a barra aparecia no lugar, seca. Agora o badge de vibe e o
+   * chip saem esmaecendo enquanto a barra entra deslizando de cima, e o inverso
+   * ao fechar. É a mesma troca, com o tempo que ela precisava para ser lida.
+   *
+   * `useNativeDriver` liga porque só opacidade e `translateY` estão em jogo.
+   */
+  const abertura = useRef(new Animated.Value(0)).current;
+
+  /**
+   * A entrada roda num efeito, **depois** da montagem — e não junto com o
+   * comando. Com `useNativeDriver`, uma animação disparada antes de o nó nativo
+   * existir termina no vazio: o driver não tem o que atualizar e a barra
+   * aparecia com opacidade 0, invisível. Visto no aparelho.
+   */
+  useEffect(() => {
+    if (!opcoesAbertas) return;
+    abertura.setValue(0);
+    Animated.timing(abertura, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [opcoesAbertas, abertura]);
+
+  const fecharOpcoes = useCallback(() => {
+    Animated.timing(abertura, {
+      toValue: 0,
+      duration: 180,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      // Só desmonta no fim: desmontar junto com o toque cortaria a saída.
+      if (finished) setOpcoesAbertas(false);
+    });
+  }, [abertura]);
 
   /**
    * Câmera frontal deste tipo de aparelho não tem flash. Em vez de mostrar um
@@ -237,14 +289,51 @@ export default function CameraScreen() {
     <View style={styles.root}>
       <FundoBase />
 
+      {/* Camada do visor (T091): largura da tela inteira, altura pela razão, e
+          o único piso é o topo dos controles — daí `bottom: alturaControles`.
+          Vem antes da interface no JSX, então tudo desenha por cima dela. */}
+      <View
+        style={[styles.camadaVisor, { bottom: alturaControles }]}
+        pointerEvents="none"
+      >
+        <Animated.View style={[styles.visor, { width: larguraTela, height: alturaVisor }]}>
+          {focada ? (
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              flash={flash}
+              // Pede ao sensor o modo que já tem a proporção escolhida; sem
+              // um que sirva (1:1), fica no padrão e o recorte resolve.
+              {...(tamanhoNativo ? { pictureSize: tamanhoNativo } : {})}
+              onCameraReady={lerTamanhos}
+            />
+          ) : null}
+          {/* Camadas *da imagem*: dentro do visor, não sobre a tela inteira. */}
+          {filtro ? <FilterLayer filter={filtro} /> : null}
+          {gradeComposicao ? <GridOverlay /> : null}
+        </Animated.View>
+      </View>
+
       <SafeAreaView style={styles.ui} pointerEvents="box-none">
         {/* Barra de status: vibe detectada + Ajustes */}
         <View style={styles.topBar}>
           {/* O painel aberto toma a linha inteira. O Figma desenhou 4 slots numa
               barra de 382; com flash, três enquadramentos, resolução e ajustes
               são seis, e dividir a linha com o badge fazia "16:9" e "64M" se
-              encostarem. A vibe volta assim que o painel fecha. */}
-          {opcoesAbertas ? null : (
+              encostarem. A vibe volta assim que o painel fecha.
+
+              Os dois estados ficam **sobrepostos** e trocam por opacidade: era a
+              troca instantânea de um pelo outro que fazia o painel "abrir seco"
+              (T079). Desmontar um para montar o outro não deixa nada para
+              animar. */}
+          <Animated.View
+            style={[
+              styles.linhaPadrao,
+              { opacity: abertura.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) },
+            ]}
+            pointerEvents={opcoesAbertas ? 'none' : 'box-none'}
+          >
             <View style={styles.vibeBadge}>
               <Text style={styles.vibeEmoji}>{vibe.emoji}</Text>
               <View>
@@ -252,11 +341,36 @@ export default function CameraScreen() {
                 <Text style={styles.vibeNome}>{vibe.nome.toUpperCase()}</Text>
               </View>
             </View>
-          )}
+            <Pressable
+              style={styles.opcoes}
+              hitSlop={hitSlops.chip}
+              onPress={() => setOpcoesAbertas(true)}
+            >
+              <Text style={styles.opcoesText}>+ OPÇÕES</Text>
+            </Pressable>
+          </Animated.View>
+
           {opcoesAbertas ? (
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  justifyContent: 'center',
+                  opacity: abertura,
+                  transform: [
+                    {
+                      translateY: abertura.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-14, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
             <CameraOptionsBar
               resolucao={resolucao}
-              onFechar={() => setOpcoesAbertas(false)}
+              onFechar={fecharOpcoes}
               onAjustes={() => router.push('/settings')}
               slotFlash={
                 <Pressable
@@ -296,55 +410,24 @@ export default function CameraScreen() {
                 </View>
               }
             />
-          ) : (
-            <Pressable
-              style={styles.opcoes}
-              hitSlop={hitSlops.chip}
-              onPress={() => setOpcoesAbertas(true)}
-            >
-              <Text style={styles.opcoesText}>+ OPÇÕES</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {/* Palco do visor (T087): a faixa entre a barra superior e os controles.
-            Era `absoluteFill`, e por isso a prévia se centralizava na tela toda
-            — com meia foto atrás do carrossel e dos botões. O filtro e a grade
-            vêm para dentro dele pelo mesmo motivo: são camadas *da imagem*, e
-            estavam pintando a tela inteira, fundo da identidade incluído. */}
-        <View
-          style={styles.palco}
-          pointerEvents="none"
-          onLayout={(e) =>
-            setPalco({
-              largura: e.nativeEvent.layout.width,
-              altura: e.nativeEvent.layout.height,
-            })
-          }
-        >
-          {medidas ? (
-            <Animated.View
-              style={[styles.visor, { width: medidas.largura, height: medidas.altura }]}
-            >
-              {focada ? (
-                <CameraView
-                  ref={cameraRef}
-                  style={StyleSheet.absoluteFill}
-                  facing={facing}
-                  flash={flash}
-                  // Pede ao sensor o modo que já tem a proporção escolhida; sem
-                  // um que sirva (1:1), fica no padrão e o recorte resolve.
-                  {...(tamanhoNativo ? { pictureSize: tamanhoNativo } : {})}
-                  onCameraReady={lerTamanhos}
-                />
-              ) : null}
-              {filtro ? <FilterLayer filter={filtro} /> : null}
-              {gradeComposicao ? <GridOverlay /> : null}
             </Animated.View>
           ) : null}
         </View>
 
+        {/* O visor mora fora da interface; aqui só sobra o espaço que empurra a
+            barra de baixo para o rodapé. */}
+        <View style={styles.espaco} pointerEvents="none" />
+
         <View style={styles.bottom} pointerEvents="box-none">
+          {/* A "sombrinha" que o Sávio pediu: no 16:9 o carrossel fica sobre a
+              imagem, e sem este degradê os chips disputariam contraste com
+              qualquer cena clara. Ele morre antes dos controles, que já têm o
+              fundo da identidade atrás. */}
+          <LinearGradient
+            colors={['rgba(9,5,6,0)', 'rgba(9,5,6,0.55)', 'rgba(9,5,6,0.9)']}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
           {manualFiltro ? (
             <Pressable
               style={styles.autoBtn}
@@ -358,8 +441,12 @@ export default function CameraScreen() {
 
           <FilterCarousel ativo={filtroAtivo} autoAtivo={filtroAuto} onSelect={escolherFiltro} />
 
-          {/* Home bar: galeria / captura / flip */}
-          <View style={styles.controls}>
+          {/* Home bar: galeria / captura / flip. A medida daqui é o piso do
+              visor — por isso ela é lida no layout (T091). */}
+          <View
+            style={styles.controls}
+            onLayout={(e) => setAlturaControles(e.nativeEvent.layout.height + 18)}
+          >
             <Pressable style={styles.sideBtn} onPress={() => router.push('/gallery')}>
               {ultimaMedia ? (
                 <FilteredImage
@@ -402,8 +489,19 @@ function GridOverlay() {
 }
 
 const styles = StyleSheet.create({
-  palco: {
+  espaco: {
     flex: 1,
+  },
+  /**
+   * Faixa em que o visor pode viver: do topo da tela até o topo dos controles.
+   * Ele se centraliza aqui dentro — no 4:3 e no 1:1 sobra folga dos dois lados;
+   * no 16:9 a altura toma quase tudo e o carrossel passa a flutuar por cima.
+   */
+  camadaVisor: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -446,11 +544,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   topBar: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    // Altura fixa para os dois estados ocuparem exatamente o mesmo espaço — sem
+    // isso a linha saltaria de tamanho no meio do crossfade.
+    height: 60,
+    justifyContent: 'center',
+  },
+  linhaPadrao: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
   },
   vibeBadge: {
     flexDirection: 'row',

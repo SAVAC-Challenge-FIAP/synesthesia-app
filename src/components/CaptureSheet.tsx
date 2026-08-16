@@ -512,7 +512,7 @@ export function CaptureSheet() {
       // Falhar calado é o mesmo defeito de fundo da US2: ação de saída sem o
       // usuário saber em que pé está. A foto já foi salva por `salvar(false)`.
       Alert.alert(
-        'Não deu para montar o pacote',
+        'Não deu para montar o momento',
         'A imagem está salva na galeria. Tente postar de novo em instantes.',
       );
     } finally {
@@ -538,7 +538,7 @@ export function CaptureSheet() {
     if (session.curadoria === 'indisponivel' && !arquivada) {
       Alert.alert(
         'Postar sem trilha?',
-        'Este pacote vai só com a imagem — sem a metade sonora. Você pode esperar a curadoria, escolher uma faixa ou seguir assim mesmo.',
+        'Este momento vai só com a imagem — sem a metade sonora. Você pode esperar a curadoria, escolher uma faixa ou seguir assim mesmo.',
         [
           { text: 'Escolher música', onPress: () => setShowMusic(true) },
           { text: 'Cancelar', style: 'cancel' },
@@ -555,7 +555,7 @@ export function CaptureSheet() {
       clear();
       return;
     }
-    Alert.alert('Descartar captura?', 'A foto e o pacote sensorial serão perdidos.', [
+    Alert.alert('Descartar captura?', 'A foto e o momento serão perdidos.', [
       { text: 'Continuar editando', style: 'cancel' },
       { text: 'Descartar', style: 'destructive', onPress: clear },
     ]);
@@ -694,7 +694,7 @@ export function CaptureSheet() {
                 <View style={styles.semAudio}>
                   <Text style={styles.semAudioText}>
                     {session.sugestoes.length > 0
-                      ? 'Sem áudio — o pacote será salvo só com a imagem.'
+                      ? 'Sem áudio — o momento será salvo só com a imagem.'
                       : 'Sem sugestões no momento — você pode salvar só a imagem.'}
                   </Text>
                   <Pressable style={styles.musicBtn} hitSlop={hitSlops.chip} onPress={() => setShowMusic(true)}>
@@ -732,7 +732,7 @@ export function CaptureSheet() {
                   )}
                   <Text style={styles.motivoBloqueio}>
                     {progresso === null
-                      ? 'MONTANDO O PACOTE — GERANDO O VÍDEO. ISSO LEVA ALGUNS SEGUNDOS.'
+                      ? 'MONTANDO O MOMENTO — GERANDO O VÍDEO. ISSO LEVA ALGUNS SEGUNDOS.'
                       : `GERANDO O VÍDEO — ${progresso}%`}
                   </Text>
                 </View>

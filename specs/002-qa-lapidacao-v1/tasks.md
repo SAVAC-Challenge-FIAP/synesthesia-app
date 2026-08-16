@@ -1370,3 +1370,39 @@ todas as capturas até aqui) e em pé quando ela é. O `prepararFoto` não depen
 disso — ele olha as dimensões que chegaram e gira só se precisar —, mas quem for
 mexer em `takePictureAsync` precisa saber que a orientação **não** é garantida
 nem vem por EXIF.
+
+---
+
+## Fase 20 — Visor de largura cheia, movimento e vocabulário (2026-08-16)
+
+Terceira rodada do mesmo dia, sobre o que a Fase 19 entregou.
+
+- [X] **T091** [P1] [DESIGN] **Largura cheia sempre, inclusive no 16:9.** *"em
+  16:9 ele não tá ocupando 100% da largura, e esse é requisito também; então aí
+  temos que crescer, e para crescer tem que passar por baixo, e aí tem que
+  passar tudo — mas só da lista de filtros"*.
+
+  A Fase 19 tinha limitado o visor à faixa entre as barras, o que resolvia o
+  4:3 e o 1:1 e **estragava** o 16:9: sem altura para 1920px, ele encolhia de
+  lado. Agora a largura é a da tela nos três, a altura vem da razão, e o piso é
+  o topo dos controles — medido, não chutado. No 16:9 o carrossel de filtros
+  passa a flutuar **inteiro** sobre a prévia, com um degradê que o sustenta; nos
+  outros dois o visor nem chega perto dele.
+
+  A regra em uma linha: *o visor pode invadir os filtros, nunca os controles.*
+
+- [X] **T079** [P2] **Animar a abertura do painel "+ Opções".** *"e seu
+  desgraçado não tem animação para abrir as opções, ela abre seco"*. Estava na
+  fila desde a Fase 18. O badge de vibe e a barra agora ficam **sobrepostos** e
+  trocam por opacidade, com a barra deslizando de cima; antes um desmontava para
+  o outro montar, e troca instantânea não tem o que animar.
+
+  ⚠️ Para quem repetir o padrão: a primeira versão disparava a animação no mesmo
+  toque que montava a barra, e com `useNativeDriver` ela **terminava no vazio** —
+  o driver nativo não tinha nó para atualizar e a barra aparecia invisível
+  (visto no aparelho). A entrada tem de rodar num efeito, depois da montagem.
+
+- [X] **T092** [P3] **"Pacote" vira "momento" na interface.** Decisão do Sávio:
+  *"em vez de pacotes vamos chamar de momentos"*. Trocado só no que a pessoa lê
+  — galeria, captura, postagem e alertas. O código segue com `SharePackage`,
+  `chavePacote` e afins, que são nomes de estrutura, não de produto.

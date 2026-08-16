@@ -50,7 +50,7 @@ export default function GalleryScreen() {
   const excluir = (m: Media) => {
     Alert.alert(
       'Excluir mídia?',
-      'A exclusão é permanente: foto, filtro e música deste pacote serão removidos.',
+      'A exclusão é permanente: foto, filtro e música deste momento serão removidos.',
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Excluir', style: 'destructive', onPress: () => remove(m.id) },
@@ -67,7 +67,7 @@ export default function GalleryScreen() {
         </Pressable>
         <Text style={styles.title}>Galeria.</Text>
         <Text style={styles.count}>
-          {medias.length} {medias.length === 1 ? 'PACOTE' : 'PACOTES'}
+          {medias.length} {medias.length === 1 ? 'MOMENTO' : 'MOMENTOS'}
         </Text>
       </View>
 
@@ -75,7 +75,7 @@ export default function GalleryScreen() {
         <View style={styles.empty}>
           <Text style={styles.emptyEmoji}>🏞️</Text>
           <Text style={styles.emptyText}>
-            Nada por aqui ainda.{'\n'}Capture uma cena e o pacote sensorial aparece nesta galeria.
+            Nada por aqui ainda.{'\n'}Capture uma cena e o momento aparece nesta galeria.
           </Text>
         </View>
       ) : (

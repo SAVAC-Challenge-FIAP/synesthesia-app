@@ -57,7 +57,7 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
       ? {
           icone: 'layers-outline' as const,
           corIlustracao: colors.ruby,
-          titulo: 'Pacote pronto, em duas partes.',
+          titulo: 'Momento pronto, em duas partes.',
           conteudo: 'IMAGEM + ÁUDIO DE 30S + LEGENDA, SEPARADOS',
           detalhe:
             'A imagem vai pelo destino escolhido; a trilha segue nas ações abaixo. O vídeo único imagem+trilha chega na versão final do app.',
@@ -65,10 +65,10 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
       : {
           icone: 'image-outline' as const,
           corIlustracao: colors.ruby,
-          titulo: 'Pacote só com a imagem.',
+          titulo: 'Momento só com a imagem.',
           conteudo: 'SEM TRILHA — A METADE SONORA NÃO ENTROU',
           detalhe:
-            'Você pode fechar, escolher uma música e postar de novo para levar o pacote completo.',
+            'Você pode fechar, escolher uma música e postar de novo para levar o momento completo.',
         };
   const [baixando, setBaixando] = useState(false);
   const [baixado, setBaixado] = useState(false);
@@ -97,7 +97,7 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
         // sem ele, vai a imagem — e a trilha segue pelas ações abaixo.
         await Sharing.shareAsync(arquivo, {
           mimeType,
-          dialogTitle: 'Compartilhar pacote sensorial',
+          dialogTitle: 'Compartilhar momento',
         });
       }
     } catch {
