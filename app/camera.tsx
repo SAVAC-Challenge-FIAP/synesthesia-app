@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Redirect, useRouter } from 'expo-router';
@@ -6,7 +7,6 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CaptureSheet } from '@/components/CaptureSheet';
 import { FilterCarousel } from '@/components/FilterCarousel';
 import { FilterLayer } from '@/components/FilterLayer';
 import { FilteredImage } from '@/components/FilteredImage';
@@ -41,7 +41,19 @@ export default function CameraScreen() {
   const gradeComposicao = useSettingsStore((s) => s.gradeComposicao);
   const ultimaMedia = useGalleryStore((s) => s.medias[0]);
   const startSession = useCaptureStore((s) => s.start);
-  const temSessao = useCaptureStore((s) => s.session !== null);
+
+  /**
+   * A câmera só existe enquanto esta tela está em foco (T063).
+   *
+   * É esta linha que cumpre o objetivo da Fase 15, não a mudança de modal para
+   * rota. O T062 mediu que `/settings`, empilhada por cima daqui, deixava o
+   * cliente de câmera ativo: o `expo-router` mantém a tela de baixo montada, e
+   * a `CameraView` continuava produzindo frames para ninguém.
+   *
+   * Desmontar é a única alavanca no Android — a prop `active` da `CameraView`,
+   * que existiria para isso, é `@platform ios`.
+   */
+  const focada = useIsFocused();
 
   const [facing, setFacing] = useState<CameraType>('back');
   // 'original' = usuário escolheu explicitamente sem filtro; null = automático
@@ -73,6 +85,7 @@ export default function CameraScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       const foto = await cameraRef.current.takePictureAsync({ quality: 0.85 });
       if (foto?.uri) {
+        router.push('/capture');
         startSession({
           mediaId: null,
           photoUri: foto.uri,
@@ -87,7 +100,7 @@ export default function CameraScreen() {
     } finally {
       setCapturando(false);
     }
-  }, [capturando, filtroAtivo, filtroAuto, startSession, vibe.id]);
+  }, [capturando, filtroAtivo, filtroAuto, router, startSession, vibe.id]);
 
   // Guards DEPOIS de todos os hooks (Rules of Hooks): um return antecipado
   // entre hooks muda a ordem entre renders e derruba a tela
@@ -102,7 +115,9 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.root}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} />
+      {focada ? (
+        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} />
+      ) : null}
       {filtro ? <FilterLayer filter={filtro} /> : null}
 
       {gradeComposicao ? <GridOverlay /> : null}
@@ -168,7 +183,6 @@ export default function CameraScreen() {
         </View>
       </SafeAreaView>
 
-      {temSessao ? <CaptureSheet /> : null}
     </View>
   );
 }

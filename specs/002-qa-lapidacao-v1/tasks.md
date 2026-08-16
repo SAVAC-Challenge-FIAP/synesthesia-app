@@ -878,7 +878,7 @@ câmera ligada em segundo plano".
   bateria. Registre em `baseline.md`. Se a diferença for irrelevante, **diga isso** — a mudança
   ainda vale por arquitetura, mas o motivo declarado muda.
 
-- [ ] **T063** [P2] **Mover a captura para a rota `/capture`.**
+- [X] **T063** [P2] **Mover a captura para a rota `/capture`.**
 
   - Nova tela `app/capture.tsx`; `CaptureSheet` deixa de ser `<Modal>` e vira o corpo dela.
   - `capturar()` em `camera.tsx` passa a `router.push('/capture')` depois do `startSession`.
@@ -896,7 +896,7 @@ câmera ligada em segundo plano".
   4. `PostSheet` e `MusicSheet` continuam sendo modais **sobre** a tela de captura — não
      transforme os três de uma vez.
 
-- [ ] **T064** [P2] **Confirmar no device que a câmera realmente parou** e repetir a medição do
+- [X] **T064** [P2] **Confirmar no device que a câmera realmente parou** e repetir a medição do
   T062, lado a lado. `dumpsys media.camera` mostra clientes ativos.
 
 ---

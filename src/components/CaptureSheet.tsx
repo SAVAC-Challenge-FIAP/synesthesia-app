@@ -4,8 +4,8 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  BackHandler,
   LayoutAnimation,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -297,8 +297,36 @@ export function CaptureSheet() {
     return () => clearTimeout(t);
   }, [chave, pronta, temMusica, postando, sharePkg, renderizarComFiltro]);
 
-  // Sessão encerrada: o pacote pré-gerado não vale para a próxima foto
-  useEffect(() => () => preExport.limpar(), []);
+  // Sessão encerrada: o pacote pré-gerado não vale para a próxima foto.
+  // Continua valendo agora que a captura é uma tela: o unmount acontece ao sair
+  // da rota, e sem isto o cache de vídeo voltaria a crescer (foi o T040).
+  useEffect(
+    () => () => {
+      console.log('[capture] tela desmontada — pré-geração descartada');
+      preExport.limpar();
+    },
+    [],
+  );
+
+  /**
+   * Botão/gesto de voltar do Android.
+   *
+   * Enquanto a captura era `<Modal>`, quem fazia este papel era o
+   * `onRequestClose`. Na tela ele some, e sem substituto a pessoa perde a
+   * captura sem confirmação nenhuma — regressão direta da US2, que existe para
+   * que a foto nunca se perca em silêncio.
+   *
+   * A ref é necessária porque `descartar` só pode ser definido depois do
+   * `if (!session)`, e hooks não podem ficar atrás de um return antecipado.
+   */
+  const descartarRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      descartarRef.current();
+      return true; // consumimos o evento: quem fecha a tela é o descartar()
+    });
+    return () => sub.remove();
+  }, []);
 
   if (!session || !chave) return null;
 
@@ -472,11 +500,12 @@ export function CaptureSheet() {
       { text: 'Descartar', style: 'destructive', onPress: clear },
     ]);
   };
+  // O handler do botão de voltar aponta sempre para a versão corrente.
+  descartarRef.current = descartar;
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={descartar}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+    <View style={styles.backdrop}>
+      <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>{editando ? 'Lapidar.' : 'Captura.'}</Text>
             <Pressable onPress={descartar} hitSlop={12}>
@@ -685,7 +714,6 @@ export function CaptureSheet() {
             </View>
           </View>
         </View>
-      </View>
 
       {showMusic ? <MusicSheet onClose={() => setShowMusic(false)} /> : null}
       {sharePkg ? (
@@ -697,14 +725,16 @@ export function CaptureSheet() {
           }}
         />
       ) : null}
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop: {
+    // Era o vidro do modal sobre a câmera. Agora é a própria tela, e atrás dela
+    // não há mais visor nenhum — cor sólida, em vez de translucidez sobre preto.
     flex: 1,
-    backgroundColor: 'rgba(9,5,6,0.5)',
+    backgroundColor: colors.ink,
     justifyContent: 'flex-end',
   },
   sheet: {

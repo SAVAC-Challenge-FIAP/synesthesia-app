@@ -650,3 +650,45 @@ miniaturas de filtro** que o modal monta (T054), não da câmera: o estado C, se
 nenhum, gasta ainda mais que B. Memória não é o argumento. O argumento é o sensor e o
 pipeline de frames seguirem vivos enquanto ninguém olha para eles — que é energia, não
 RAM, e é o que o contador de clientes mostra.
+
+---
+
+## T064 — A câmera realmente parou (Fase 15)
+
+Mesma medição do T062, depois do T063.
+
+| Estado | Cliente de câmera (T062) | Cliente de câmera (T064) |
+|---|---|---|
+| Visor da câmera | 1 | 1 |
+| Editando o pacote | **1** (modal) | **0** (tela `/capture`) |
+| App em segundo plano | 0 | 0 |
+
+**O objetivo da Fase 15 foi atingido: durante a edição do pacote, a câmera não está
+mais ligada.** PSS na tela de captura: 547.645 kB (era 572.501 kB com o modal).
+
+### O que de fato resolveu
+
+Não foi a mudança de modal para rota. Foi `useIsFocused()` no `camera.tsx`, que deixa
+de renderizar a `<CameraView>` quando a tela perde o foco. O T062 já tinha mostrado que
+uma rota empilhada por cima não desmonta a de baixo; sem essa linha, `/capture` teria
+ficado exatamente como o modal — só que com outro nome.
+
+As duas metades se precisam: a rota é o que faz a câmera perder o foco, e o
+`useIsFocused` é o que transforma isso em desligamento.
+
+### As quatro armadilhas do T063, verificadas uma a uma
+
+1. **Botão de voltar do Android** — `onRequestClose` do Modal não existe mais. Substituído
+   por `BackHandler`, que consome o evento e chama `descartar()`. Testado: o alerta
+   "Descartar captura?" aparece, e é preciso confirmar. Sem isto seria regressão da US2.
+2. **Exportação com filtro** — `previewRef` + `captureRef` seguem funcionando fora do
+   Modal. O `.mp4` gerado pela tela nova: `vide` + `soun` + `avc1` + `mp4a`, 30,00 s,
+   5.700.510 bytes.
+3. **`preExport.limpar()` no unmount** — confirmado com log no cleanup: sair da tela
+   dispara `[capture] tela desmontada`. O cache de vídeo fica em 1 arquivo (o último
+   exportado) e não cresce.
+4. **`PostSheet` e `MusicSheet`** continuam modais **sobre** a tela de captura, não
+   foram convertidos junto.
+
+Também verificado o ciclo de volta: ao descartar ou fechar o pacote, a rota sai, a
+`CameraView` remonta e o cliente de câmera volta a 1.
