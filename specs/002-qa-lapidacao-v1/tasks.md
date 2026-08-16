@@ -1048,7 +1048,7 @@ curadoria ainda erra, e o enquadramento ficou feio.
   câmera full na tela o tempo todo". Contraria a decisão do T066 (que manteve a
   prévia cheia por instrução da própria task) — **vale o que o Sávio pediu agora**.
 
-- [ ] **T078** [P2] **A prévia da captura usa a proporção real da foto.** "a proporção
+- [X] **T078** [P2] **A prévia da captura usa a proporção real da foto.** — feito no **T084**. "a proporção
   da captura tem que ser a mesma da foto tirada, não precisa ser fixa." O T066 já
   gravou `Media.aspecto`; conferir que a prévia usa a dimensão real do arquivo.
 
@@ -1260,20 +1260,20 @@ antes de escrever estas tasks e estão anotadas em cada uma.
 
 ### Galeria
 
-- [ ] **T081** [P1] [BUG] **As prévias sumiram da galeria.** Causa lida no
+- [X] **T081** [P1] [BUG] **As prévias sumiram da galeria.** Causa lida no
   código, não é hipótese: `FilteredImage` desenha a foto com
   `StyleSheet.absoluteFill`, o que exige que o container tenha altura própria;
   o `styles.photo` de [gallery.tsx](../../app/gallery.tsx) só declara
   `width: '100%'`, sem altura nenhuma. Altura 0 = card vazio. O card por fora
   tem `aspectRatio`, mas ele não desce para a foto.
 
-- [ ] **T082** [P1] [DESIGN] **Cards todos do mesmo tamanho.** Hoje cada card usa
+- [X] **T082** [P1] [DESIGN] **Cards todos do mesmo tamanho.** Hoje cada card usa
   `aspectRatio: item.aspecto`, então a grade fica serrilhada — 1:1 ao lado de
   16:9. Grade uniforme (quadrada), miniatura em `cover`. A proporção real da
   foto continua guardada em `Media.aspecto` e continua valendo na captura; o que
   padroniza é só a vitrine.
 
-- [ ] **T083** [P1] [BUG] **Reabrir uma foto da galeria dispara a curadoria de
+- [X] **T083** [P1] [BUG] **Reabrir uma foto da galeria dispara a curadoria de
   novo.** *"se eu clicar em uma imagem ele aparece falando que tá buscando a
   música de novo, não estamos com essa decisão guardada já no armazenamento?"* —
   está sim, e o bug é a guarda do efeito: em
@@ -1289,7 +1289,7 @@ antes de escrever estas tasks e estão anotadas em cada uma.
 
 ### Captura e proporção
 
-- [ ] **T084** [P1] [BUG] **A foto capturada não é a foto que aparece na
+- [X] **T084** [P1] [BUG] **A foto capturada não é a foto que aparece na
   captura.** *"parece que deu um zoom"*. São dois cortes empilhados: o visor
   mostra a prévia em `cover` (corta o que não cabe no aspecto escolhido), o
   arquivo é recortado **de novo** por `recortarNoAspecto`, e a prévia desenha
@@ -1301,14 +1301,14 @@ antes de escrever estas tasks e estão anotadas em cada uma.
   a imagem com largura 100% e altura automática pela proporção real do arquivo**
   — assim nunca distorce e nunca corta. Absorve o **T078**.
 
-- [ ] **T085** [P1] [PERF] **Demora entre disparar e ver a foto na captura.**
+- [X] **T085** [P1] [PERF] **Demora entre disparar e ver a foto na captura.**
   `capturar()` em [camera.tsx](../../app/camera.tsx) espera `takePictureAsync` e
   **depois** reescreve o arquivo inteiro em `recortarNoAspecto` (com
   `compress: 1`, ou seja, recodifica o JPEG grande todo) antes de navegar. É
   trabalho síncrono no caminho crítico do toque. Com o T084, o recorte só
   precisa existir quando o enquadramento não for o nativo do sensor.
 
-- [ ] **T086** [P1] [DESIGN] **Enquadramento pelo sensor, não por corte.** *"essa
+- [X] **T086** [P1] [DESIGN] **Enquadramento pelo sensor, não por corte.** *"essa
   aspect ratio que você tá fazendo é o quê, um corte na imagem? tem alguma forma
   de fazer isso nativo? olha a câmera nativa pra ver como ela faz de uma forma
   tão natural"*. Resposta honesta: 4:3 e 16:9 **existem no sensor** e podem ser
@@ -1317,7 +1317,7 @@ antes de escrever estas tasks e estão anotadas em cada uma.
   nativa também corta. Pedir ao sensor o que ele tem, e cortar só o que ele não
   tem.
 
-- [ ] **T087** [P1] [DESIGN] **O visor centralizado na área útil.** *"fica
+- [X] **T087** [P1] [DESIGN] **O visor centralizado na área útil.** *"fica
   desproporcional e descentralizada da área útil da tela; a área útil seria a
   área entre os controles da câmera e as opções"*. Hoje o palco é
   `StyleSheet.absoluteFill` — a prévia se centraliza na **tela inteira** e os
@@ -1326,13 +1326,13 @@ antes de escrever estas tasks e estão anotadas em cada uma.
 
 ### Postagem
 
-- [ ] **T088** [P1] [DESIGN] **Um botão "Postar", e ele abre a folha nativa.**
+- [X] **T088** [P1] [DESIGN] **Um botão "Postar", e ele abre a folha nativa.**
   Tira a grade de destinos do T055 e o módulo `share-target` do caminho da UI.
   Resolve junto o **erro do Instagram** relatado (*"só consigo mandar por
   mensagem o vídeo gerado"*): a folha do sistema concede a permissão de URI ao
   app escolhido, o que o Intent direto por activity não garante.
 
-- [ ] **T089** [P1] [BUG] **"Baixar vídeo" não funciona.**
+- [X] **T089** [P1] [BUG] **"Baixar vídeo" não funciona.**
   `saveToSystemGallery` pede a permissão granular **`['photo']`** e depois manda
   um `.mp4` para a biblioteca — no Android 13+ salvar vídeo exige a permissão de
   vídeo, então a chamada falha e a função devolve `false` em silêncio (o `catch`
@@ -1347,3 +1347,26 @@ antes de escrever estas tasks e estão anotadas em cada uma.
 - [ ] **T090** [P3] **Assets: limpar os SVGs e gerar o que faltar.** Liberado
   pelo Sávio. Tirar o `<rect fill="black">` de `assets/favicon.svg` e
   `assets/logo-full-name.svg` e gerar a variante monocromática em `parchment`.
+
+### Validado no aparelho em 2026-08-16 (Fase 19, T081–T089)
+
+Tudo abaixo foi visto rodando, não só compilado:
+
+- **A foto agora sai em pé.** Antes: `cache/Camera/*.jpg` em 2560×1920 e
+  9248×6936 — todas deitadas, todas as capturas do histórico. Depois: 1920×2560,
+  e o preparo nem recodifica quando o sensor já entrega no formato certo.
+- **A prévia bate com o arquivo.** Enquadramento 16:9 → arquivo 1440×2560 →
+  prévia desenhada em 0,5625. Nenhum corte entre o disparo e a tela.
+- **Galeria**: miniaturas de volta e grade uniforme.
+- **Reabrir da galeria** entra direto com "Postar agora" **habilitado** — sem
+  "LENDO A CENA", sem chamada nova ao Gemini.
+- **Postagem**: "Vídeo gerado!" com um botão "Postar" só.
+- **Baixar vídeo**: "SALVO NA GALERIA", e o arquivo confirmado fora do app em
+  `/sdcard/DCIM/pacote-1786912304053.mp4`.
+
+Descoberta que vale registrar para quem mexer na câmera: **este aparelho
+devolve a foto deitada quando nenhuma `pictureSize` é pedida** (era o caso de
+todas as capturas até aqui) e em pé quando ela é. O `prepararFoto` não depende
+disso — ele olha as dimensões que chegaram e gira só se precisar —, mas quem for
+mexer em `takePictureAsync` precisa saber que a orientação **não** é garantida
+nem vem por EXIF.
