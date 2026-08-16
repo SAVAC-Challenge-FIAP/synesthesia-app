@@ -692,3 +692,33 @@ As duas metades se precisam: a rota é o que faz a câmera perder o foco, e o
 
 Também verificado o ciclo de volta: ao descartar ou fechar o pacote, a rota sai, a
 `CameraView` remonta e o cliente de câmera volta a 1.
+
+---
+
+## Fase 16 — enquadramento, flash e fundo base
+
+**T066 — o recorte é real.** Capturada em 1:1, a foto salva saiu **6936×6936**,
+razão 1,0000. Sem isso a máscara do visor seria decoração: mostraria quadrado e o
+pacote sairia 4:3. `Media.aspecto` é opcional de propósito — as 36 mídias já
+salvas não o têm, e o fallback é a proporção com que foram criadas; conferido na
+galeria com aspectos misturados e nenhum layout quebrado.
+
+**T065 — o Figma mentiria sobre este aparelho.** O nó traz "12M" cravado;
+`getAvailablePictureSizesAsync()` reporta **64M** aqui. O rótulo passou a vir do
+sensor.
+
+**T067 — layout que só apareceu rodando.** O Figma desenhou 4 slots numa barra de
+382. Com flash, três enquadramentos, resolução e ajustes são seis, e "16:9" e "64M"
+se encostavam. O painel aberto passou a tomar a linha inteira, e o badge de vibe
+volta ao fechar.
+
+**T068 — nunca tinha sido implementado**, como a task suspeitava: os tokens
+existiam em `tokens.ts` e nenhum componente os usava.
+
+### Não-regressão do pacote exportado (regra 6)
+
+Depois de toda a Fase 16, incluindo o APK reconstruído com `expo-linear-gradient`:
+
+```
+vide presente · soun presente · avc1 presente · mp4a presente · duração 30,00 s
+```
