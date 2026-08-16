@@ -27,19 +27,31 @@ Este repositório é a evolução **mobile (Expo / React Native)** do MVP funcio
 
 ## 📱 Preview
 
-Capturas reais do app rodando em development build (Redmi Note 8 Pro, Android 10):
+Capturas reais do app rodando em release build (Redmi Note 8 Pro, Android 10):
 
 <div align="center">
-<img src="docs/preview/camera.png" width="260" alt="Visor com filtro ao vivo e carrossel de filtros" />
-<img src="docs/preview/captura.png" width="260" alt="Modal de captura com filtro e trilha sugerida" />
-<img src="docs/preview/trilha.png" width="260" alt="Trilha curada pelo Gemini a partir da cena" />
+<img src="docs/preview/fase19-20/abertura.png" width="220" alt="Abertura animada com a marca" />
+<img src="docs/preview/fase19-20/camera-43.png" width="220" alt="Visor no enquadramento 4:3, centralizado na área útil" />
+<img src="docs/preview/fase19-20/camera-169.png" width="220" alt="Visor no enquadramento 16:9, ancorado nos controles" />
+<img src="docs/preview/fase19-20/galeria.png" width="220" alt="Galeria com cards uniformes" />
+<img src="docs/preview/fase19-20/postar.png" width="220" alt="Modal de postagem com o vídeo pronto" />
 </div>
 
 <div align="center">
-<sub><b>Visor ao vivo</b> — filtro aplicado em tempo real · <b>Captura</b> — Gemini lê a cena e define a vibe · <b>Trilha</b> — curadoria musical coerente com a atmosfera</sub>
+<sub><b>Abertura</b> — a marca em movimento, sem piscada entre splash e app · <b>Visor</b> — largura cheia em qualquer enquadramento, cada um com sua âncora na tela · <b>Galeria</b> — miniaturas uniformes, reabrir não refaz a curadoria · <b>Postar</b> — um botão só, pela folha de compartilhamento do sistema</sub>
 </div>
 
-No exemplo acima o Gemini leu *"laptop aberto em ambiente escuro, foco no teclado"*, classificou a vibe como **noturna**, aplicou o filtro **Eclipse 🌒** e sugeriu **Midnight City (M83)** — o pacote sensorial é exportado como um `.mp4` de 30s unindo imagem e trilha.
+Mais capturas (por fase de trabalho) em [`docs/preview/`](docs/preview/).
+
+## 📦 Baixar o APK
+
+Não precisa compilar nada para testar no Android: o [release mais recente](https://github.com/SAVAC-Challenge-FIAP/synesthesia-app/releases/latest) traz um APK assinado, pronto para instalar.
+
+1. Baixe o `.apk` do [release](https://github.com/SAVAC-Challenge-FIAP/synesthesia-app/releases/latest) pelo próprio celular.
+2. Abra o arquivo — o Android vai pedir para permitir instalação de fonte desconhecida, o que é normal para app fora da loja.
+3. Na primeira abertura, conceda câmera e galeria.
+
+Android 7+, qualquer aparelho ARM.
 
 ## 🚀 Como rodar (Expo Go)
 
@@ -79,9 +91,27 @@ npm run android        # compila nativo e instala no device conectado
 
 Utilitários de desenvolvimento em [`scripts/dev-android.sh`](scripts/dev-android.sh) (`build`, `log`, `shot`, `video`).
 
+### Publicar um APK release
+
+Para gerar o APK assinado que vira um [release](https://github.com/SAVAC-Challenge-FIAP/synesthesia-app/releases) do GitHub (o mesmo processo usado na seção "Baixar o APK" acima):
+
+```bash
+npx expo prebuild --platform android      # gera android/, não versionado
+python3 scripts/preparar-release.py       # keystore + assinatura + splash
+
+cd android && ./gradlew assembleRelease \
+  -PreactNativeArchitectures=armeabi-v7a,arm64-v8a   # ~60MB; sem isso, ~100MB (inclui ABIs de emulador)
+```
+
+O APK sai em `android/app/build/outputs/apk/release/app-release.apk`. A keystore e as senhas são geradas na primeira execução do script e ficam **fora do git** (`android/keystore.properties`, `android/app/*.keystore`) — guarde uma cópia em lugar seguro, porque perdê-la impede atualizar um app já publicado sob a mesma identidade.
+
 ## 🛠️ Stack
 
-`Expo` · `expo-router` · `TypeScript` · `react-native-vision-camera` · `react-native-skia` · `react-native-reanimated` · `react-native-mlkit-image-labeling` · `zustand` · `async-storage` · `@google/generative-ai` (Gemini) · `Deezer` · `Last.fm` · `expo-av` · `@gorhom/bottom-sheet` · `androidx.media3-transformer` · `expo-media-library` · `expo-sharing`
+O que está de fato no `package.json`, não a arquitetura originalmente planejada — a tabela de adaptações acima documenta onde as duas divergem.
+
+`Expo 54` · `expo-router` · `TypeScript` · `expo-camera` (visor + captura) · `expo-image-manipulator` (giro/recorte da foto) · `expo-audio` · `expo-linear-gradient` · `zustand` (estado) · `@react-native-async-storage/async-storage` (persistência) · `react-native-view-shot` (renderizar foto + filtro) · `@react-native-community/slider` · `@expo-google-fonts/nunito` + `@expo-google-fonts/lato` · `androidx.media3-transformer` (módulo nativo, ver abaixo) · `expo-media-library` · `expo-sharing`
+
+A curadoria musical chama a **Interactions API do Gemini** direto por `fetch` (sem SDK) e o **Deezer** (API pública, sem chave) para os previews de 30s — ver [`src/services/music.ts`](src/services/music.ts).
 
 ## 🎨 Identidade visual
 
@@ -98,18 +128,32 @@ Tipografia: **Nunito** (display) + **Lato** (labels técnicas). Filtros: Vivid �
 
 ```
 .
-├── app/                          # Rotas (expo-router): permissões, câmera, galeria, ajustes
-├── modules/video-muxer/          # Expo Module nativo: imagem + trilha → .mp4 (Media3 Transformer)
-├── scripts/dev-android.sh        # Build/log/screenshot/pull no device via adb
+├── app/                          # Rotas (expo-router)
+│   ├── index.tsx                 # Onboarding de permissões
+│   ├── camera.tsx                # Visor: enquadramento, filtro ao vivo, flash, opções
+│   ├── capture.tsx               # Tela de captura (edição do pacote sensorial)
+│   ├── gallery.tsx                # Galeria: grade uniforme, reabrir/excluir
+│   ├── settings.tsx               # Ajustes de câmera e música
+│   └── _layout.tsx               # Fontes, splash → AberturaMarca, providers
+├── modules/
+│   ├── video-muxer/              # Expo Module nativo: imagem + trilha → .mp4 (Media3 Transformer)
+│   └── share-target/             # Expo Module nativo: destinos de compartilhamento do PackageManager
+├── scripts/
+│   ├── dev-android.sh            # Build/log/screenshot/pull no device via adb
+│   └── preparar-release.py       # Keystore + assinatura do APK release (ver "Publicar um APK")
 ├── src/
-│   ├── components/               # CaptureSheet, MusicSheet, PostSheet, FilterCarousel, player...
-│   ├── constants/                # 8 filtros + vibes
-│   ├── services/                 # vibeEngine (contexto), music (Gemini/Deezer), mediaStorage
-│   ├── stores/                   # zustand: ajustes, galeria, sessão de captura
+│   ├── components/               # CaptureSheet, MusicSheet, PostSheet, FilterCarousel,
+│   │                              # AberturaMarca/LoaderMarca (marca animada), player...
+│   ├── constants/                # 8 filtros, 8 vibes, 3 enquadramentos (cada um com sua âncora)
+│   ├── services/                 # vibeEngine, music (Gemini/Deezer), enquadrar (giro/recorte),
+│   │                              # sharePackage, videoMuxer, systemGallery, mediaStorage
+│   ├── stores/                   # zustand: ajustes, galeria, sessão de captura, gosto musical
 │   └── theme/                    # Design tokens (ruby/amber/ink/parchment, Nunito + Lato)
 ├── CLAUDE.md                     # Guia para agentes de código
-├── docs/                         # Documentos-fonte (requisitos + arquitetura)
-├── specs/001-synesthesia-mvp/    # Especificação (Spec Kit)
+├── docs/                         # Documentos-fonte (requisitos + arquitetura) + previews
+├── specs/
+│   ├── 001-synesthesia-mvp/      # Especificação original (Spec Kit)
+│   └── 002-qa-lapidacao-v1/      # QA e lapidação pós-MVP — histórico de bugs e decisões
 └── .specify/                     # Constituição, templates e workflow do Spec Kit
 ```
 
