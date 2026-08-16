@@ -730,6 +730,281 @@ Fase 1 (linha de base) ──> Fase 2 (fundação) ──> Fase 3 (US1) ──> 
 
 ---
 
+# Reta final — Fases 14 a 17 (especificadas em 2026-08-16)
+
+> **Estas quatro fases saem do escopo original do 002.** O cabeçalho deste arquivo diz "não
+> adiciona funcionalidades", e a Fase 14 adiciona: histórico de gosto e curadoria personalizada
+> não existiam. Ficam aqui mesmo assim, por continuidade com as Fases 12–13 e porque o loop lê
+> este arquivo — mas quem for reescrever a spec um dia precisa saber que o 002 cresceu.
+>
+> **Ordem definida pelo Sávio**: 14 → 15 → 16 → 17. A identidade visual (17) é a última, e só
+> começa quando a inteligência musical estiver fechada e o app estiver sem pendência de QA.
+>
+> **As regras de execução autônoma no topo deste arquivo valem inteiras**: nunca EAS, evidência
+> em device real, `npm run typecheck` passando, uma task por commit em pt-BR no imperativo, e
+> decisão de produto que aparecer vai para "Dúvidas para o Sávio" em vez de ser inventada.
+
+---
+
+## Fase 14 — Curadoria que não se repete (P1) 🔴
+
+**Objetivo**: capturar cinco vezes na mesma vibe e receber conjuntos de faixas majoritariamente
+diferentes, com pelo menos uma sugestão fora do óbvio em cada rodada.
+**Princípio**: I (Multimodalidade Primeiro) e II (Redução do Atrito de Decisão).
+**Teste independente**: cinco curadorias seguidas na mesma vibe; contar faixas distintas.
+
+**O que o Sávio relatou**, nas palavras dele: o Gemini "indica sempre as mesmas músicas para as
+mesmas vibes"; ele quer que o sistema aprenda "de um cantor que aquela pessoa gosta ou já
+escolheu", guardando "o histórico das músicas escolhidas, dos artistas", mas que o Gemini seja
+"instruído a sair da bolha às vezes" — "uma previsão certa de acordo com o histórico ou uma
+aleatoriedade, um chute bom, sabe? um cantor menos conhecido que tem uma música boa".
+
+### A causa está escrita no prompt
+
+Antes de arquitetar qualquer coisa, leia [`src/services/music.ts`](../../src/services/music.ts).
+Os dois prompts pedem, literalmente, músicas **"reais e populares"** — `askGemini` na linha do
+`Sugira 4 músicas reais e populares` e `askGeminiWithPhoto` no mesmo formato. "Populares" é uma
+instrução para convergir nos mesmos hits: o modelo está obedecendo. Some-se a isso que **não há
+nenhum estado entre uma curadoria e a seguinte** — nada diz ao Gemini o que ele já sugeriu — e
+que o fallback do Deezer busca `searchDeezer(kw, 3)` sempre a partir do índice 0, devolvendo o
+mesmo topo. O catálogo local tem duas faixas fixas por vibe.
+
+Ou seja: são quatro fontes de repetição empilhadas, e a mais barata de corrigir é uma palavra.
+**Não comece pelo store.** Meça primeiro (T056), senão não há como saber quanto cada camada
+contribuiu.
+
+- [ ] **T056** [P1] **Medir a repetição antes de mexer em qualquer código.**
+
+  Roteiro: cinco capturas da **mesma cena** (apoie o aparelho, não mude o enquadramento), com a
+  leitura de cena ligada. Registre em [`baseline.md`](./baseline.md) as 4 faixas de cada rodada,
+  quantas são distintas no total (de 20 possíveis) e quantos artistas distintos aparecem.
+  Repita para uma segunda vibe, mudando de cena. Sem esse número, o "melhorou" da Fase 14 é
+  impressão.
+
+  Os logs já existentes ajudam: `[music] ORIGEM=...` diz de qual camada as faixas vieram, e
+  `[music][tempo]` dá a latência. Leia com `adb logcat ReactNativeJS:V '*:S'`.
+
+- [ ] **T057** [P1] **Histórico de gosto no aparelho** — store novo `src/stores/useTasteStore.ts`.
+
+  Guarda o que a pessoa **escolheu**, não o que apareceu para ela:
+
+  ```
+  escolhas: { faixaId, titulo, artista, vibeId, origem: 'auto' | 'manual', em: number }[]
+  ```
+
+  - `manual` = trocou a música no `MusicSheet`. É o sinal forte: ela rejeitou a sugestão e
+    buscou outra coisa.
+  - `auto` = aceitou passivamente a faixa que o sistema escolheu e salvou/postou o pacote.
+    Vale, mas muito menos — não confunda os dois pesos.
+  - Registrar em `MusicSheet` (confirmação da troca) e em `CaptureSheet.salvar()` (a faixa que
+    de fato foi no pacote). Se a trilha foi arquivada, **não** registre: arquivar é rejeição.
+  - Persistir com `zustand/persist` + AsyncStorage, igual aos outros stores. Teto de ~200
+    entradas, descartando as mais antigas — é histórico de gosto, não log de auditoria.
+  - Derivados que a Fase 14 vai consumir: `artistasFrequentes(n)` (contagem com peso maior para
+    `manual` e para o que é recente) e `faixasRecentes(n)` (para a lista de bloqueio do T058).
+
+  ⚠️ **LGPD — isto não é igual ao toggle que já existe.** O opt-in `deteccaoTempoReal` cobre
+  *enviar a foto*. Mandar ao Gemini **os nomes dos artistas que a pessoa escolhe** é outra
+  divulgação, sobre gosto pessoal, e não está coberta por aquele consentimento. Ver **D7**.
+
+- [ ] **T058** [P1] **Reescrever os prompts: tirar "populares", proibir a repetição, dar papéis.**
+
+  Em [`music.ts`](../../src/services/music.ts), nos dois prompts (`askGemini` e
+  `askGeminiWithPhoto`):
+
+  1. **Remover a palavra "populares".** É a causa mais direta e mais barata.
+  2. **Lista de bloqueio**: injetar as últimas ~20 faixas já sugeridas para aquela vibe com
+     "não repita nenhuma destas". Guardar as sugeridas (não só as escolhidas) — pode ser um
+     campo à parte no `useTasteStore`.
+  3. **Papéis nos quatro slots**, que é o pedido do "chute bom" virado em estrutura. Peça ao
+     Gemini um campo `papel` por faixa:
+     - `afinidade` — artista que a pessoa já escolheu, ou vizinho direto dele;
+     - `certeira` — combina com a cena, sem risco;
+     - `descoberta` — **artista fora do histórico e menos conhecido**, com uma faixa boa;
+     - `curinga` — livre.
+     No máximo **uma** `afinidade`, para o histórico personalizar sem virar bolha.
+  4. Instruir variação explícita de época, idioma e origem entre os quatro.
+
+  O `papel` não é só interno: mostre-o como rótulo pequeno no `MusicSheet` (algo como
+  `DESCOBERTA`). Uma sugestão estranha sem explicação parece erro; com o rótulo, vira proposta —
+  e isso é Princípio II, não enfeite.
+
+- [ ] **T059** [P1] **Qualificar "menos conhecido" com número, não com opinião do modelo.**
+
+  O Gemini não sabe quão conhecido um artista é hoje; ele chuta. O Deezer sabe: o endpoint
+  `https://api.deezer.com/artist/{id}` devolve `nb_fan`. Na resolução da faixa de papel
+  `descoberta`, confira o `nb_fan` do artista e, se estiver acima de um limiar (comece em
+  ~1.000.000 e ajuste **medindo**), peça outra ou promova a próxima candidata. Registre o
+  limiar escolhido e por quê.
+
+  Sem isto, `descoberta` vira mais um slot de hit e a Fase 14 não terá mudado nada — só ganho
+  um rótulo bonito.
+
+- [ ] **T060** [P2] **Tirar a repetição do fallback do Deezer.**
+
+  Em `getSuggestions`, etapa 2: hoje é `searchDeezer(kw, 3)` sobre as duas primeiras keywords,
+  sempre do índice 0. Passe a variar o `index` (a busca do Deezer aceita paginação), use mais
+  keywords da vibe e descarte o que estiver em `faixasRecentes`. Este é o caminho de degradação
+  — ele aparece justamente quando o Gemini falhou, e é hoje o mais repetitivo dos três.
+
+  Amplie também o catálogo local (`FALLBACK`): duas faixas por vibe garantem repetição na
+  terceira captura offline. Suba para ~6 por vibe.
+
+- [ ] **T061** [P1] **Provar que mudou, com o mesmo roteiro do T056.**
+
+  Cinco capturas da mesma cena, mesma vibe, e a tabela lado a lado com o número do T056.
+  Critério de aceite: **≥ 15 faixas distintas em 20** (contra o que o T056 medir) e **pelo menos
+  uma `descoberta` por rodada com `nb_fan` abaixo do limiar**. Screenshots em
+  `docs/preview/fase14/`. Se o critério não bater, diga o número real — não arredonde a
+  conclusão.
+
+---
+
+## Fase 15 — Captura vira tela, não modal (P2) 🟡
+
+**Objetivo**: durante a edição do pacote, a câmera não está mais ligada.
+**Princípio**: III (Latência percebida é defeito).
+
+**O que o Sávio pediu**: "acho que não precisa ser um modal a captura, porque a câmera tá ligada
+atrás, isso pode perder performance; a captura pode ser uma tela separada, para não ter uma
+câmera ligada em segundo plano".
+
+- [ ] **T062** [P2] **Medir se a câmera atrás custa mesmo.**
+
+  A premissa é plausível e provavelmente certa, mas é premissa. Hoje
+  [`app/camera.tsx`](../../app/camera.tsx) renderiza `<CaptureSheet />` como `<Modal>` **por
+  cima da `CameraView` montada** — a `CameraView` continua na árvore o tempo todo. Meça com o
+  modal aberto: `dumpsys meminfo com.savioomiodev.synesthesia`, `dumpsys gfxinfo` e o consumo de
+  bateria. Registre em `baseline.md`. Se a diferença for irrelevante, **diga isso** — a mudança
+  ainda vale por arquitetura, mas o motivo declarado muda.
+
+- [ ] **T063** [P2] **Mover a captura para a rota `/capture`.**
+
+  - Nova tela `app/capture.tsx`; `CaptureSheet` deixa de ser `<Modal>` e vira o corpo dela.
+  - `capturar()` em `camera.tsx` passa a `router.push('/capture')` depois do `startSession`.
+  - `camera.tsx` para de renderizar `<CaptureSheet />`; a `CameraView` sai da árvore quando a
+    rota de captura está em cima.
+
+  **Armadilhas**:
+  1. O `descartar()` com `Alert` de confirmação estava no `onRequestClose` do Modal. Na tela,
+     ele precisa continuar valendo para o **gesto/botão de voltar** do Android — senão a pessoa
+     perde a captura sem confirmação, que é regressão direta da US2.
+  2. `previewRef` + `captureRef` (o `previewShot`) precisam continuar funcionando fora do Modal.
+     Verifique a exportação **com filtro** depois da mudança; é o caminho que gera o .mp4.
+  3. `preExport.limpar()` roda hoje no unmount do componente. Confirme que continua rodando ao
+     sair da tela, senão o cache de vídeo volta a crescer (foi o T040).
+  4. `PostSheet` e `MusicSheet` continuam sendo modais **sobre** a tela de captura — não
+     transforme os três de uma vez.
+
+- [ ] **T064** [P2] **Confirmar no device que a câmera realmente parou** e repetir a medição do
+  T062, lado a lado. `dumpsys media.camera` mostra clientes ativos.
+
+---
+
+## Fase 16 — Enquadramento e flash no visor (P1) 🔴
+
+**Objetivo**: a pessoa escolhe o formato da foto antes de disparar, e consegue luz no escuro.
+**Princípio**: II — hoje o app **força** um enquadramento só.
+
+**O que o Sávio pediu**: "colocar na câmera as opções de enquadramento, que o celular 1 por 1,
+essas coisas — não podemos forçar o cara a ter isso, por isso temos o Figma; se for possível ter
+o flash também".
+
+- [ ] **T065** [P1] **Painel "+ Opções" do Figma.**
+  Nó [462-889](https://www.figma.com/design/3yJ1nLbHljozr8qqfrQ6yX/JOVI-Challenge---FIAP-2026?node-id=462-889&m=dev)
+  — barra horizontal de 382×24 com dois estados (`Propriedade 1=Padrão` e `=Normal`). O estado
+  "Padrão" traz, da esquerda para a direita: **fechar (X)**, **flash**, **resolução ("12M")**,
+  **ajustes (engrenagem)**; o estado "Normal" traz o ícone de **quatro pontos** à direita, que é
+  o seletor de enquadramento/grade.
+
+  Hoje `camera.tsx` tem só um chip de texto `+ OPÇÕES` que empurra direto para `/settings`. Ele
+  passa a abrir este painel; a engrenagem é que leva aos Ajustes.
+
+  ⚠️ Puxe o nó você mesmo com o MCP do Figma antes de codar — a leitura acima veio de screenshot
+  e não substitui os valores reais de cor, espaçamento e ícone.
+
+- [ ] **T066** [P1] **Enquadramento 1:1 / 4:3 / 16:9.**
+
+  Duas metades que precisam bater:
+  1. **No visor**: máscara sobre a `CameraView` mostrando a área que será fotografada. Nada de
+     mudar o tamanho da `CameraView` — a prévia continua cheia, o que muda é a marcação.
+  2. **Na captura**: o recorte tem de ser **real** no arquivo salvo. `expo-image-manipulator` já
+     está no projeto e é o que o `photoToBase64` usa — recorte com ele depois do
+     `takePictureAsync`.
+
+  **Armadilha**: `sizes.photoAspect` (735/913) está cravado em `CaptureSheet` e na galeria. Com
+  enquadramento variável, o aspecto passa a ser propriedade da mídia — provavelmente um campo
+  novo em `Media`. Migração de galeria: as mídias já salvas não têm esse campo e não podem
+  quebrar.
+
+- [ ] **T067** [P2] **Flash.**
+  `CameraView` do `expo-camera` aceita `flash` (`'off' | 'on' | 'auto'`) e `enableTorch`. Ligar o
+  controle ao ícone do painel do T065, com os três estados visíveis (não um toggle cego). Câmera
+  frontal geralmente não tem flash — o controle precisa refletir isso em vez de mentir.
+
+- [ ] **T068** [P2] **Fundo base do Figma.**
+  Nó [563-52](https://www.figma.com/design/3yJ1nLbHljozr8qqfrQ6yX/JOVI-Challenge---FIAP-2026?node-id=563-52&m=dev):
+  gradiente `linear-gradient(180deg, rgba(141,21,20,0.5), rgba(39,6,6,0.25))` sobre `#090506`.
+
+  **Ele nunca foi implementado.** O `CLAUDE.md` descreve esse fundo desde o começo, os tokens
+  `rubyGradientTop`/`rubyGradientBottom` existem em [`tokens.ts`](../../src/theme/tokens.ts) — e
+  **nenhum componente os usa**. `expo-linear-gradient` **não está instalado**. Instale com
+  `npx expo install expo-linear-gradient` (é mudança nativa: exige
+  `./scripts/dev-android.sh build`).
+
+---
+
+## Fase 17 — Identidade visual (P3, só depois de 14–16) 🟢
+
+**Objetivo**: o app tem cara de produto, não de protótipo.
+**Só começa** quando a Fase 14 estiver fechada e não houver pendência de QA nas 15–16.
+
+- [ ] **T069** [P3] **Trocar os ícones do app pelos assets do Sávio.**
+  Já estão no repo: `assets/favicon.svg` (40×40), `assets/favicom.png` (160×160),
+  `assets/logo-full-name.svg` (170×40), `assets/logo-full-name.png` (680×160). A marca é um
+  conjunto de círculos concêntricos em `amber` sobre preto — uma íris/diafragma.
+  Faltam entregas do Sávio antes desta task: ver a lista no fim desta fase.
+
+  ⚠️ **Os dois SVGs vêm com `<rect width=... fill="black"/>` embutido como fundo.** Do jeito que
+  estão, não dá para pôr a marca sobre o ruby nem sobre o parchment sem um retângulo preto
+  aparecer. Precisa da versão sem esse `rect`.
+
+- [ ] **T070** [P3] **Loader animado a partir da marca.**
+  O símbolo é feito de círculos e arcos concêntricos — é praticamente um spinner desenhado.
+  Animação proposta: o arco externo gira, os anéis internos pulsam em contratempo.
+
+  **Custo real, para decidir com o número na mão**: exige `react-native-svg` **e**
+  `react-native-reanimated`, e **nenhum dos dois está instalado**. São duas dependências nativas
+  novas e um rebuild. Se não valer o custo, a alternativa honesta é uma animação de opacidade e
+  escala sobre o PNG com a `Animated` que já vem no React Native — some some sofisticação, zero
+  dependência nova.
+
+- [ ] **T071** [P3] **Splash screen com a marca**, usando o `backgroundColor: '#090506'` que já
+  está no `app.json`. `expo-splash-screen` também não está instalado.
+
+### O que o Sávio precisa entregar antes da Fase 17
+
+Isto é a lista pedida — o que falta subir em `assets/`:
+
+1. **Ícone do app — 1024×1024 PNG, sem transparência e sem cantos arredondados.** O sistema
+   arredonda sozinho; se vier arredondado, arredonda duas vezes.
+2. **Adaptive icon do Android — três arquivos 1024×1024**: `foreground` (transparente, com o
+   desenho todo dentro dos ~66% centrais, porque o Android corta as bordas em formatos
+   diferentes por fabricante), `background` (cor sólida ou imagem) e `monochrome` (silhueta
+   branca sobre transparente, para o tema dinâmico do Android 13+).
+3. **Splash — 1024×1024 PNG transparente**, só a marca. O fundo vem do `backgroundColor`.
+4. **Favicon web — 48×48 e 196×196 PNG.** O de 160×160 quebra o galho, mas os dois tamanhos
+   evitam reescala borrada.
+5. **Os dois SVGs sem o retângulo preto de fundo** (ver T069). É o item que mais trava trabalho.
+6. **Versão monocromática da marca** em `parchment` puro, para usar sobre fundo escuro e sobre
+   fundo claro sem depender do amber.
+7. *(Opcional, mas ajuda o T070)* **símbolo e wordmark separados** — o círculo sozinho num SVG e
+   o texto "Synesthesia" noutro. Assim o loader anima só o símbolo.
+
+---
+
+---
+
 ## Dúvidas para o Sávio
 
 > Preencher aqui qualquer decisão de produto que aparecer durante a execução autônoma, em vez de inventar. Implementar a alternativa mais conservadora e seguir.
@@ -795,3 +1070,26 @@ atacou (controle que não entrega o que promete), agora por tipografia em vez de
 `PostSheet`, `MusicSheet` e `camera.tsx` — decisão de produto sobre até que ampliação o app se
 compromete a suportar. **Para o Sávio decidir**: vale uma fase própria de tipografia
 responsiva, ou o app declara suporte só até ~1.3?
+
+### D7 — Mandar o gosto musical da pessoa ao Gemini precisa de consentimento próprio (Fase 14, T057)
+
+A Fase 14 só funciona se o prompt levar **os artistas que a pessoa escolhe**. Isso é dado sobre
+gosto pessoal saindo do aparelho para um serviço do Google — e **não está coberto** pelo opt-in
+que existe hoje. O toggle "Leitura da cena (IA)" (`deteccaoTempoReal`) foi apresentado ao usuário
+como autorização para enviar **a foto**; usá-lo também para enviar histórico de gosto seria
+ampliar o consentimento sem avisar, que é exatamente o que a nota de privacidade dos Ajustes
+promete não fazer.
+
+Três saídas, da mais conservadora para a mais capaz:
+
+1. **Não enviar nada.** O histórico fica só no aparelho e é usado para *filtrar e reordenar* o
+   que o Gemini devolveu, sem entrar no prompt. Personaliza menos, não muda consentimento nenhum.
+2. **Enviar só a forma, não o nome.** Em vez de "ela gosta de Anitta", mandar gêneros/descritores
+   derivados localmente. Menos identificável, ainda útil, mas depende de um mapa artista→gênero
+   que hoje não existe.
+3. **Toggle próprio nos Ajustes** — algo como "Curadoria personalizada", desligado por padrão,
+   com a nota explicando que os nomes dos artistas escolhidos vão junto do pedido ao Gemini.
+
+**Implementada por ora a alternativa 1** (regra 5 das execuções autônomas: a que menos altera
+comportamento). Se o Sávio quiser a 3, é um toggle e um parágrafo na nota de privacidade — mas é
+decisão dele, não do loop.
