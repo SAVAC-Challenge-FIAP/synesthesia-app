@@ -198,6 +198,19 @@ function emojiFor(index: number, vibe: Vibe): string {
   return index === 0 ? vibe.emoji : EMOJIS_MOOD[index % EMOJIS_MOOD.length];
 }
 
+/**
+ * Lista compacta das faixas efetivamente entregues. Instrumentação do T056:
+ * `ORIGEM=` já dizia de qual camada as faixas vieram, mas não **quais** eram —
+ * e é exatamente isso que precisa ser contado para medir a repetição entre
+ * curadorias. Mesma natureza do `[music][tempo]` do T020: só observa.
+ */
+function registrarFaixas(origem: string, sugestoes: MusicSuggestion[]) {
+  console.log(
+    `[music][faixas] origem=${origem} ` +
+      sugestoes.map((s) => `«${s.titulo} — ${s.artista}»`).join(' | '),
+  );
+}
+
 /** Resolve as ideias do Gemini em sugestões com preview real (Deezer). */
 async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<MusicSuggestion[]> {
   const resolved = await Promise.all(
@@ -285,6 +298,7 @@ export async function analyzePhotoAndSuggest(
       const tDeezer = Date.now() - marcoDeezer;
       if (sugestoes.length > 0) {
         console.log(`[music] ORIGEM=gemini-foto — ${sugestoes.length} sugestão(ões) da cena real`);
+        registrarFaixas('gemini-foto', sugestoes);
         registrar('gemini-foto', tDeezer);
         return { vibeId: vibeReal?.id ?? null, sugestoes };
       }
@@ -330,6 +344,7 @@ export async function getSuggestions(
       const ok = await resolveWithDeezer(ideas, vibe);
       if (ok.length > 0) {
         console.log(`[music] ORIGEM=gemini — ${ok.length} sugestão(ões) usadas`);
+        registrarFaixas('gemini', ok);
         return ok;
       }
     }
@@ -351,7 +366,7 @@ export async function getSuggestions(
     });
     if (tracks.length > 0) {
       console.log(`[music] ORIGEM=deezer — ${tracks.length} faixa(s) via keywords`, vibe.musicaKeywords);
-      return tracks.slice(0, 4).map((t, i) => ({
+      const viaKeywords = tracks.slice(0, 4).map((t, i) => ({
         id: `deezer-${t.id}`,
         titulo: t.title,
         artista: t.artist.name,
@@ -360,6 +375,8 @@ export async function getSuggestions(
         previewUrl: t.preview,
         origem: 'deezer' as const,
       }));
+      registrarFaixas('deezer', viaKeywords);
+      return viaKeywords;
     }
   } catch (e) {
     console.log('[music] Deezer (keywords) falhou (caiu para catálogo local):', e);
@@ -367,9 +384,11 @@ export async function getSuggestions(
 
   // 3) Offline — catálogo herdado do MVP Python
   console.log(`[music] ORIGEM=local — catálogo offline para vibe="${vibe.id}"`);
-  return (FALLBACK[vibe.id] ?? []).map((s, i) => ({
+  const local = (FALLBACK[vibe.id] ?? []).map((s, i) => ({
     ...s,
     id: `local-${vibe.id}-${i}`,
     origem: 'local' as const,
   }));
+  registrarFaixas('local', local);
+  return local;
 }

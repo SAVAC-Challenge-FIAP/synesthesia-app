@@ -435,3 +435,85 @@ o triângulo em `ink`. "Postar agora" voltou a ser escuro sobre âmbar.
 > desenho entre fabricantes; o force-dark mudava a *paleta inteira* conforme uma
 > configuração do aparelho, e mudaria na mão do avaliador sem ninguém entender por quê.
 > Só apareceu porque a US5 obrigou a conferir cor de ícone pixel a pixel.
+
+---
+
+## T056 — Linha de base da repetição da curadoria (Fase 14)
+
+Medido em 2026-08-16, aparelho `192.168.15.3`, leitura de cena ligada, **antes de
+qualquer mudança em `music.ts`**. Dez capturas: cinco por cena, com o aparelho
+apoiado e sem mexer no enquadramento — a segunda cena veio de virar para a câmera
+frontal, não de mover o aparelho.
+
+Para contar as faixas foi preciso instrumentar: `ORIGEM=` já dizia de qual camada
+elas vinham, mas não **quais** eram. Acrescentado `[music][faixas]`, do mesmo tipo
+do `[music][tempo]` do T020 — só observa, não muda comportamento.
+
+> Os logs do JS saíram no **`/tmp/metro.log`**, não no logcat. Nesta sessão o
+> `adb logcat ReactNativeJS:V '*:S'` voltou **vazio** durante as dez capturas,
+> enquanto o `metro.log` tinha tudo. Ou seja: as duas notas anteriores do topo do
+> `tasks.md` valem cada uma em seu caso — o que decide é quem subiu o Metro.
+> Com o Metro subido por esta sessão redirecionando para arquivo, `metro.log` é a
+> fonte confiável.
+
+### Cena A — mousepad estampado (câmera traseira)
+
+O Gemini leu a cena com precisão e estabilidade nas quatro vezes em que respondeu
+("mousepad com arte de dragão em mesa com luzes neon"), classificando **`noturna`
+em 4/4**. O problema não está na leitura da cena.
+
+| # | Origem | Faixas |
+|---|---|---|
+| A1 | deezer (Gemini abortou) | Activation Frequency / Chakra Healing Music Academy · Top Hit Dance Song / Fred's Dance Instrumentals · I Wanna Dance Again / Top 40 Pop Hits · funk brasileiro / RVDENT |
+| A2 | gemini-foto | Nightcall / Kavinsky · After Dark / Mr. Kitty · Midnight City / M83 · Blinding Lights / The Weeknd |
+| A3 | gemini-foto | **idênticas às da A2, na mesma ordem** |
+| A4 | gemini-foto | After Hours / The Weeknd · Nightcall / Kavinsky · Midnight City / M83 · Resonance / HOME |
+| A5 | gemini-foto | Nightcall / Kavinsky · After Dark / Mr. Kitty · Starboy / The Weeknd · Midnight City / M83 |
+
+- **Faixas distintas: 11 de 20.** Só no caminho do Gemini: **7 em 16**.
+- **Artistas distintos: 9 de 20.** Só no Gemini: **5 em 16** — Kavinsky em 4/4,
+  M83 em 4/4, The Weeknd em 3/4, Mr. Kitty em 3/4.
+
+### Cena B — desenho de corações na tela do notebook (câmera frontal)
+
+Leitura igualmente boa ("tablet com desenho de corações e mensagem de amor"),
+`romantica` em 3/3.
+
+| # | Origem | Faixas |
+|---|---|---|
+| B1 | gemini-foto | Love Story / Taylor Swift · Just the Way You Are / Bruno Mars · All of Me / John Legend · Perfect / Ed Sheeran |
+| B2 | gemini-foto | Love Story · Just the Way You Are · Can't Help Falling in Love / Elvis Presley · Perfect |
+| B3 | gemini-foto | **as mesmas quatro da B1, só reordenadas** |
+| B4 | deezer (Gemini abortou) | Dream Pop (Club Mix) / Earth Trax · Dream Pop / Earth Trax · Dream Pop / Cafe del Mar Chillout · Synthwave / Rodriguez Jr. |
+| B5 | deezer (Gemini abortou) | **idênticas às da B4** |
+
+- **Faixas distintas: 9 de 20.** Só no caminho do Gemini: **5 em 12**.
+- **Artistas distintos: 8 de 20.**
+
+### O que os números mostram
+
+1. **A repetição é real e grande.** O alvo do T061 é ≥ 15 faixas distintas em 20;
+   a linha de base é **11 (cena A)** e **9 (cena B)**. No caminho principal — o
+   Gemini, que é o que o usuário vê na maioria das capturas — a diversidade cai
+   para ~43%.
+2. **As sugestões do Gemini convergem no catálogo local.** As quatro faixas da A2
+   (Nightcall, After Dark, Midnight City, Blinding Lights) estão **todas** no
+   `FALLBACK` de `music.ts`. O modelo e o catálogo escrito à mão chegaram
+   independentemente nos mesmos hits — que é a definição de "óbvio" e confirma que
+   pedir músicas "populares" é a causa direta.
+3. **O fallback do Deezer é 100% repetitivo**, como o T060 previa: B4 e B5 saíram
+   idênticas. E a qualidade é ruim de um jeito próprio — devolve a *keyword* como
+   se fosse faixa ("funk brasileiro / RVDENT", "Dream Pop / Earth Trax" três vezes).
+4. **O Gemini falhou em 3 de 10 capturas** (`AbortError` aos 22s), sempre caindo no
+   pior caminho. Quando responde, é rápido: 2,5–6,6 s (mediana ~3,8 s), coerente com
+   o SC-Q03 recalibrado na D1.
+
+### Armadilha achada ao preparar o T059
+
+`https://api.deezer.com/search/artist?q=<nome>` **não serve** para medir fama: devolve
+homônimos obscuros. Consultado assim, "Kavinsky" volta com `nb_fan=108`, "Anitta" com
+`177` e "Bon Iver" com `28`. O caminho correto é pegar o `artist.id` do resultado da
+busca de **faixa** e consultar `/artist/{id}` — aí os números batem: Kavinsky 491.886,
+M83 964.578, The Weeknd 14.622.743.
+
+Evidências em `docs/preview/fase14/t056-*.png`.

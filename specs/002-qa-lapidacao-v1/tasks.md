@@ -773,7 +773,7 @@ Ou seja: são quatro fontes de repetição empilhadas, e a mais barata de corrig
 **Não comece pelo store.** Meça primeiro (T056), senão não há como saber quanto cada camada
 contribuiu.
 
-- [ ] **T056** [P1] **Medir a repetição antes de mexer em qualquer código.**
+- [X] **T056** [P1] **Medir a repetição antes de mexer em qualquer código.**
 
   Roteiro: cinco capturas da **mesma cena** (apoie o aparelho, não mude o enquadramento), com a
   leitura de cena ligada. Registre em [`baseline.md`](./baseline.md) as 4 faixas de cada rodada,
