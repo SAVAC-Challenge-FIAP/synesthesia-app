@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
 import { FilteredImage } from '@/components/FilteredImage';
+import { FundoBase } from '@/components/FundoBase';
 import { FilterThumbs } from '@/components/FilterThumbs';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicSheet } from '@/components/MusicSheet';
@@ -507,6 +508,7 @@ export function CaptureSheet() {
 
   return (
     <View style={styles.backdrop}>
+      <FundoBase />
       <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>{editando ? 'Lapidar.' : 'Captura.'}</Text>

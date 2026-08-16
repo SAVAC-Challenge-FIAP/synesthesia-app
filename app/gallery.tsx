@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CaptureSheet } from '@/components/CaptureSheet';
 import { FilteredImage } from '@/components/FilteredImage';
+import { FundoBase } from '@/components/FundoBase';
 import { vibeById } from '@/constants/vibes';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
@@ -52,6 +53,7 @@ export default function GalleryScreen() {
 
   return (
     <SafeAreaView style={styles.root}>
+      <FundoBase />
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="chevron-back" size={30} color={colors.parchment} />

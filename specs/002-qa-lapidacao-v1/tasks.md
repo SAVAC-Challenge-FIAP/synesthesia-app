@@ -942,7 +942,7 @@ o flash também".
   controle ao ícone do painel do T065, com os três estados visíveis (não um toggle cego). Câmera
   frontal geralmente não tem flash — o controle precisa refletir isso em vez de mentir.
 
-- [ ] **T068** [P2] **Fundo base do Figma.**
+- [X] **T068** [P2] **Fundo base do Figma.**
   Nó [563-52](https://www.figma.com/design/3yJ1nLbHljozr8qqfrQ6yX/JOVI-Challenge---FIAP-2026?node-id=563-52&m=dev):
   gradiente `linear-gradient(180deg, rgba(141,21,20,0.5), rgba(39,6,6,0.25))` sobre `#090506`.
 
