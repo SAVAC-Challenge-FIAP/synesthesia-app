@@ -1,7 +1,7 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { VIBES } from '@/constants/vibes';
-import { useTasteStore } from '@/stores/useTasteStore';
+import { chaveDaFaixa, useTasteStore } from '@/stores/useTasteStore';
 import { MusicSuggestion, PapelFaixa, Vibe, VibeId } from '@/types';
 
 /**
@@ -111,20 +111,59 @@ async function fansDoArtista(artistId: number): Promise<number | null> {
   }
 }
 
+function normalizarNome(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(the|feat|ft)\b/g, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]/g, '');
+}
+
 /** Compara nomes de artista com folga — acentos, "&"/"and", "The" solto. */
 function mesmoArtista(a: string, b: string): boolean {
-  const normaliza = (s: string) =>
-    s
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\b(the|feat|ft)\b/g, '')
-      .replace(/&/g, 'and')
-      .replace(/[^a-z0-9]/g, '');
-  const x = normaliza(a);
-  const y = normaliza(b);
+  const x = normalizarNome(a);
+  const y = normalizarNome(b);
   if (!x || !y) return false;
   return x === y || x.includes(y) || y.includes(x);
+}
+
+/** Igualdade textual frouxa — pega o titulo que e so a keyword da busca. */
+function mesmoTexto(a: string, b: string): boolean {
+  const x = normalizarNome(a);
+  const y = normalizarNome(b);
+  return !!x && !!y && x === y;
+}
+
+/**
+ * Artistas que não são artistas: compilações, karaokê, playback, "tributos".
+ *
+ * A busca por keyword do Deezer é dominada por eles — o T056 colheu "Chakra
+ * Healing Music Academy", "Fred's Dance Instrumentals" e "Top 40 Pop Hits" numa
+ * só rodada. Não é um problema de repetição, é de curadoria: nenhuma dessas
+ * faixas seria escolhida por alguém, e elas ocupam o lugar de quem seria.
+ */
+const ARTISTA_DE_CATALOGO =
+  /(karaok|tribute|playback|cover band|instrumentals?\b|various artists|top \d+|hits\b|\bacademy\b|compilation|made famous by|as made popular|backing track|ringtones?\b|\bmix\b|\bdj regaeton\b)/i;
+
+/**
+ * Faixa boa o bastante para virar sugestão vinda da busca por keyword.
+ *
+ * O padrão é testado no **título também**, e não só no artista: o Deezer tem
+ * "Energetic Electro Pop Alarm Ringtone Instrumental" assinado por um artista de
+ * nome inocente. O lixo aparece nos dois campos.
+ */
+function faixaAproveitavel(t: DeezerTrack, vibe: Vibe): boolean {
+  // O título é a própria keyword: «funk brasileiro — RVDENT», três variações de
+  // «Dream Pop — Earth Trax». Ruído de catálogo, não música curada.
+  if (vibe.musicaKeywords.some((kw) => mesmoTexto(t.title, kw))) return false;
+  if (ARTISTA_DE_CATALOGO.test(t.artist.name)) return false;
+  if (ARTISTA_DE_CATALOGO.test(t.title)) return false;
+  // Título quilométrico é sinal de faixa de coletânea erudita/militar, que a
+  // paginação profunda trouxe à tona ("The Jacobite Sword Dance: ...").
+  if (t.title.length > 60) return false;
+  return true;
 }
 
 interface GeminiTrackIdea {
@@ -275,34 +314,66 @@ const FALLBACK: Record<string, Omit<MusicSuggestion, 'id' | 'origem'>[]> = {
   energetica: [
     { titulo: 'Envolver', artista: 'Anitta', emoji: '⚡', justificativa: 'Batida intensa para cenas cheias de energia', previewUrl: null },
     { titulo: 'Blinding Lights', artista: 'The Weeknd', emoji: '🎧', justificativa: 'Synths acelerados, movimento puro', previewUrl: null },
+    { titulo: 'Bagulho Doido', artista: 'BaianaSystem', emoji: '🥁', justificativa: 'Percussão baiana em alta rotação', previewUrl: null },
+    { titulo: 'Pump It Up', artista: 'Danzel', emoji: '🎸', justificativa: 'Eurodance sem freio', previewUrl: null },
+    { titulo: 'Tamally Maak', artista: 'Amr Diab', emoji: '🎹', justificativa: 'Pop árabe que não deixa parar', previewUrl: null },
+    { titulo: 'Zenit', artista: 'Meute', emoji: '🎷', justificativa: 'Techno tocado por banda marcial', previewUrl: null },
   ],
   sonhadora: [
     { titulo: 'Space Song', artista: 'Beach House', emoji: '💭', justificativa: 'Camadas etéreas como luz difusa', previewUrl: null },
     { titulo: 'Midnight City', artista: 'M83', emoji: '🌌', justificativa: 'Atmosfera flutuante e luminosa', previewUrl: null },
+    { titulo: 'Sunset', artista: 'Kaytranada', emoji: '🎧', justificativa: 'Deriva suave de fim de tarde', previewUrl: null },
+    { titulo: 'Kimi no Toriko', artista: 'Rainych', emoji: '🎹', justificativa: 'City pop em câmera lenta', previewUrl: null },
+    { titulo: 'An Ending (Ascent)', artista: 'Brian Eno', emoji: '🎻', justificativa: 'Ambiente puro, sem contorno', previewUrl: null },
+    { titulo: 'Sonho Meu', artista: 'Maria Bethânia', emoji: '🎸', justificativa: 'Sonho cantado em português', previewUrl: null },
   ],
   romantica: [
     { titulo: 'Eu Sei Que Vou Te Amar', artista: 'Tom Jobim', emoji: '💘', justificativa: 'Clássico íntimo e afetuoso', previewUrl: null },
     { titulo: 'Perfect', artista: 'Ed Sheeran', emoji: '❤️', justificativa: 'Balada quente para dois', previewUrl: null },
+    { titulo: 'La Vie en Rose', artista: 'Édith Piaf', emoji: '🎷', justificativa: 'O amor em francês, definitivo', previewUrl: null },
+    { titulo: 'Sodade', artista: 'Cesária Évora', emoji: '🎸', justificativa: 'Saudade cabo-verdiana em morna', previewUrl: null },
+    { titulo: 'Sabor a Mí', artista: 'Los Panchos', emoji: '🎹', justificativa: 'Bolero de outra época', previewUrl: null },
+    { titulo: 'First Day of My Life', artista: 'Bright Eyes', emoji: '🥁', justificativa: 'Declaração sem produção nenhuma', previewUrl: null },
   ],
   noturna: [
     { titulo: 'Nightcall', artista: 'Kavinsky', emoji: '🌙', justificativa: 'Sombras elétricas da madrugada', previewUrl: null },
     { titulo: 'After Dark', artista: 'Mr.Kitty', emoji: '🌒', justificativa: 'Pulso escuro e misterioso', previewUrl: null },
+    { titulo: 'Ready to Start', artista: 'Arcade Fire', emoji: '🎸', justificativa: 'Cidade acordando ao contrário', previewUrl: null },
+    { titulo: 'Nara', artista: 'E.S. Posthumus', emoji: '🎻', justificativa: 'Escuro com escala de cinema', previewUrl: null },
+    { titulo: 'Kyoto', artista: 'Yung Lean', emoji: '🎧', justificativa: 'Neblina noturna em trap', previewUrl: null },
+    { titulo: 'Preciso Me Encontrar', artista: 'Cartola', emoji: '🎹', justificativa: 'Samba de quem anda de madrugada', previewUrl: null },
   ],
   nostalgica: [
     { titulo: 'Take On Me', artista: 'a-ha', emoji: '📼', justificativa: 'Oitentista até o último frame', previewUrl: null },
     { titulo: 'Plastic Love', artista: 'Mariya Takeuchi', emoji: '📷', justificativa: 'City pop, memória em VHS', previewUrl: null },
+    { titulo: 'Ceremony', artista: 'New Order', emoji: '🎸', justificativa: 'Pós-punk que virou memória afetiva', previewUrl: null },
+    { titulo: 'Fio Maravilha', artista: 'Jorge Ben Jor', emoji: '🥁', justificativa: 'Brasil em fita cassete', previewUrl: null },
+    { titulo: 'Baby I Love You', artista: 'The Ronettes', emoji: '🎹', justificativa: 'Wall of sound dos anos 60', previewUrl: null },
+    { titulo: 'Aquellos Ojos Verdes', artista: 'Nat King Cole', emoji: '🎷', justificativa: 'Bolero em disco de vinil', previewUrl: null },
   ],
   aconchegante: [
     { titulo: 'Garota de Ipanema', artista: 'João Gilberto', emoji: '🕯️', justificativa: 'Bossa morna de fim de tarde', previewUrl: null },
     { titulo: 'Holocene', artista: 'Bon Iver', emoji: '🍂', justificativa: 'Folk quente como lareira', previewUrl: null },
+    { titulo: 'Ordinary Day', artista: 'Kina Grannis', emoji: '🎸', justificativa: 'Violão de manhã devagar', previewUrl: null },
+    { titulo: 'Tsuki', artista: 'Ichiko Aoba', emoji: '🎻', justificativa: 'Voz e violão, quase sussurro', previewUrl: null },
+    { titulo: 'Trem das Onze', artista: 'Demônios da Garoa', emoji: '🎹', justificativa: 'Samba de sala de estar', previewUrl: null },
+    { titulo: 'Coffee', artista: 'Sylvan Esso', emoji: '🎧', justificativa: 'Eletrônico de temperatura ambiente', previewUrl: null },
   ],
   gelada: [
     { titulo: 'Comptine d’un autre été', artista: 'Yann Tiersen', emoji: '🧊', justificativa: 'Piano cristalino e frio', previewUrl: null },
     { titulo: 'Intro', artista: 'The xx', emoji: '❄️', justificativa: 'Minimalismo de ar gelado', previewUrl: null },
+    { titulo: 'Near Light', artista: 'Ólafur Arnalds', emoji: '🎻', justificativa: 'Cordas islandesas em fio de gelo', previewUrl: null },
+    { titulo: 'Hoppípolla', artista: 'Sigur Rós', emoji: '🎹', justificativa: 'Islândia inteira num crescendo', previewUrl: null },
+    { titulo: 'Avril 14th', artista: 'Aphex Twin', emoji: '🎧', justificativa: 'Dois minutos de vidro', previewUrl: null },
+    { titulo: 'Svefn-g-englar', artista: 'Sigur Rós', emoji: '🎷', justificativa: 'Suspensão em temperatura baixa', previewUrl: null },
   ],
   dourada: [
     { titulo: 'Golden Hour', artista: 'JVKE', emoji: '🌅', justificativa: 'Literalmente a hora dourada', previewUrl: null },
     { titulo: 'Wave', artista: 'Tom Jobim', emoji: '🌞', justificativa: 'Luz quente em forma de som', previewUrl: null },
+    { titulo: 'September', artista: 'Earth, Wind & Fire', emoji: '🥁', justificativa: 'Soul cor de fim de tarde', previewUrl: null },
+    { titulo: 'Zanzibar', artista: 'Bebel Gilberto', emoji: '🎸', justificativa: 'Brasil ensolarado e macio', previewUrl: null },
+    { titulo: 'Sunlight', artista: 'Hozier', emoji: '🎹', justificativa: 'Luz cantada com alma', previewUrl: null },
+    { titulo: 'Bana Ellerini Ver', artista: 'Barış Manço', emoji: '🎧', justificativa: 'Psicodelia turca em tom quente', previewUrl: null },
   ],
 };
 
@@ -551,21 +622,87 @@ export async function getSuggestions(
     console.log('[music] Gemini falhou (caiu para Deezer puro):', e);
   }
 
-  // 2) Deezer direto pelas keywords da vibe
+  // 2) Catálogo curado da vibe, com o preview resolvido no Deezer
+  //
+  // Vem **antes** da busca por keyword porque é melhor música: o catálogo é
+  // escrito à mão, a busca por keyword é o que o Deezer tiver. Medido no
+  // aparelho com a chave do Gemini removida, a etapa por keyword devolvia
+  // «Funk brasileño — JflowProduciendo» e «ESPAÇO FUNK BRASILEIRO — Eilon»;
+  // o catálogo devolve BaianaSystem e Meute. A única coisa que faltava ao
+  // catálogo era áudio, e é exatamente isso que o Deezer sabe dar.
+  //
+  // Só as faixas ainda não oferecidas: esgotadas as seis da vibe, a busca por
+  // keyword assume — ela é pobre, mas é infinita, e é o que evita a terceira
+  // captura offline repetir tudo.
+  let curadasComAudio: MusicSuggestion[] = [];
+  try {
+    const inéditasCuradas = (FALLBACK[vibe.id] ?? []).filter(
+      (s) =>
+        !new Set(useTasteStore.getState().faixasSugeridasRecentes(vibe.id, 20)).has(
+          chaveDaFaixa(s.titulo, s.artista),
+        ),
+    );
+    if (inéditasCuradas.length > 0) {
+      onEtapa?.('buscando');
+      const comPreview = await resolveWithDeezer(
+        inéditasCuradas.slice(0, 4).map((s) => ({
+          titulo: s.titulo,
+          artista: s.artista,
+          justificativa: s.justificativa,
+          papel: 'certeira',
+        })),
+        vibe,
+      );
+      curadasComAudio = comPreview
+        .filter((s) => s.previewUrl)
+        .map((s) => ({ ...s, origem: 'local' as const }));
+      // Só encerra aqui com o conjunto cheio. Nem toda faixa curada existe no
+      // Deezer com o artista certo — quando sobram uma ou duas, a busca por
+      // keyword abaixo completa em vez de a pessoa receber uma lista magra.
+      if (curadasComAudio.length >= 4) {
+        useTasteStore.getState().registrarSugeridas(vibe.id, curadasComAudio);
+        console.log(`[music] ORIGEM=curado — ${curadasComAudio.length} do catálogo com preview`);
+        registrarFaixas('curado', curadasComAudio);
+        return curadasComAudio;
+      }
+    }
+  } catch (e) {
+    console.log('[music] catálogo curado não resolveu no Deezer:', e);
+  }
+
+  // 3) Deezer direto pelas keywords da vibe
+  //
+  // Este é o caminho que aparece quando nem o Gemini nem o catálogo curado
+  // serviram, e o T056 o pegou sendo o pior dos três: duas capturas seguidas
+  // devolveram as MESMAS quatro faixas, porque a busca usava só as duas
+  // primeiras keywords e sempre do índice 0. Agora usa todas as keywords, entra
+  // por um ponto variável e descarta o que já foi oferecido.
   try {
     onEtapa?.('buscando');
+    const jaOferecidas = new Set(
+      useTasteStore.getState().faixasSugeridasRecentes(vibe.id, 20),
+    );
+    // Ponto de entrada variável na lista do Deezer — mas raso de propósito.
+    // Testado no aparelho com amplitude maior (até o índice 21), a variação
+    // funcionava e a relevância desabava: vinham banda militar escocesa e Hino
+    // Nacional para a vibe "energética". Fundo da busca por keyword é ruído,
+    // não descoberta. Buscando 10 por keyword, os índices 0–6 já dão material
+    // de sobra para quatro slots depois da filtragem.
+    const inicio = Math.floor(Math.random() * 4) * 2;
     const perKeyword = await Promise.all(
-      vibe.musicaKeywords.slice(0, 2).map((kw) => searchDeezer(kw, 3).catch(() => [])),
+      vibe.musicaKeywords.map((kw) => searchDeezer(kw, 10, inicio).catch(() => [])),
     );
     const seen = new Set<number>();
     const tracks = perKeyword.flat().filter((t) => {
       if (seen.has(t.id)) return false;
       seen.add(t.id);
-      return true;
+      if (jaOferecidas.has(chaveDaFaixa(t.title, t.artist.name))) return false;
+      return faixaAproveitavel(t, vibe);
     });
-    if (tracks.length > 0) {
+    if (tracks.length > 0 || curadasComAudio.length > 0) {
       console.log(`[music] ORIGEM=deezer — ${tracks.length} faixa(s) via keywords`, vibe.musicaKeywords);
-      const viaKeywords = tracks.slice(0, 4).map((t, i) => ({
+      const faltam = Math.max(0, 4 - curadasComAudio.length);
+      const viaKeywords = tracks.slice(0, faltam).map((t, i) => ({
         id: `deezer-${t.id}`,
         titulo: t.title,
         artista: t.artist.name,
@@ -573,21 +710,45 @@ export async function getSuggestions(
         justificativa: `Combina com a atmosfera ${vibe.nome.toLowerCase()} da cena`,
         previewUrl: t.preview,
         origem: 'deezer' as const,
+        artistaId: t.artist.id,
       }));
-      registrarFaixas('deezer', viaKeywords);
-      return viaKeywords;
+      // Curadas primeiro: são as boas, a keyword só preenche o que sobrou.
+      const combinadas = [...curadasComAudio, ...viaKeywords];
+      useTasteStore.getState().registrarSugeridas(vibe.id, combinadas);
+      registrarFaixas(curadasComAudio.length ? 'curado+deezer' : 'deezer', combinadas);
+      return combinadas;
     }
   } catch (e) {
     console.log('[music] Deezer (keywords) falhou (caiu para catálogo local):', e);
   }
 
-  // 3) Offline — catálogo herdado do MVP Python
+  // Rede caiu no meio: o que o catálogo curado já resolveu vale mais que nada.
+  if (curadasComAudio.length > 0) {
+    useTasteStore.getState().registrarSugeridas(vibe.id, curadasComAudio);
+    registrarFaixas('curado', curadasComAudio);
+    return curadasComAudio;
+  }
+
+  // 4) Sem rede nenhuma — catálogo do MVP Python, ampliado no T060, sem áudio
+  //
+  // São 6 por vibe e a interface mostra 4: a escolha prioriza o que ainda não
+  // foi oferecido. Com as 2 fixas de antes, a terceira captura offline seguida
+  // repetia tudo; agora só repete a partir da quarta, e mesmo assim variando.
   console.log(`[music] ORIGEM=local — catálogo offline para vibe="${vibe.id}"`);
-  const local = (FALLBACK[vibe.id] ?? []).map((s, i) => ({
+  const catalogo = (FALLBACK[vibe.id] ?? []).map((s, i) => ({
     ...s,
     id: `local-${vibe.id}-${i}`,
     origem: 'local' as const,
   }));
+  const jaOferecidasLocal = new Set(
+    useTasteStore.getState().faixasSugeridasRecentes(vibe.id, 20),
+  );
+  const inéditas = catalogo.filter(
+    (s) => !jaOferecidasLocal.has(chaveDaFaixa(s.titulo, s.artista)),
+  );
+  // Nunca devolver lista vazia: esgotadas as inéditas, vale o catálogo inteiro.
+  const local = [...inéditas, ...catalogo.filter((s) => !inéditas.includes(s))].slice(0, 4);
+  useTasteStore.getState().registrarSugeridas(vibe.id, local);
   registrarFaixas('local', local);
   return local;
 }

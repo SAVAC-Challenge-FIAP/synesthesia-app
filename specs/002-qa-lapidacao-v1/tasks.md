@@ -829,7 +829,7 @@ contribuiu.
   `DESCOBERTA`). Uma sugestão estranha sem explicação parece erro; com o rótulo, vira proposta —
   e isso é Princípio II, não enfeite.
 
-- [ ] **T059** [P1] **Qualificar "menos conhecido" com número, não com opinião do modelo.**
+- [X] **T059** [P1] **Qualificar "menos conhecido" com número, não com opinião do modelo.**
 
   O Gemini não sabe quão conhecido um artista é hoje; ele chuta. O Deezer sabe: o endpoint
   `https://api.deezer.com/artist/{id}` devolve `nb_fan`. Na resolução da faixa de papel
