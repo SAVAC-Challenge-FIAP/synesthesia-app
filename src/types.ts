@@ -70,6 +70,11 @@ export interface MusicSuggestion {
   origem: 'deezer' | 'gemini' | 'local';
   /** Ausente nas faixas do catálogo local e do Deezer puro. */
   papel?: PapelFaixa;
+  /**
+   * Id do artista no Deezer, quando a faixa foi resolvida lá. É o que permite
+   * conferir `nb_fan` sem cair em homônimo — ver `verificarDescobertas`.
+   */
+  artistaId?: number;
 }
 
 export interface Media {

@@ -55,18 +55,76 @@ interface DeezerTrack {
   id: number;
   title: string;
   preview: string;
-  artist: { name: string };
+  artist: { id: number; name: string };
 }
 
-async function searchDeezer(query: string, limit: number): Promise<DeezerTrack[]> {
+async function searchDeezer(
+  query: string,
+  limit: number,
+  index = 0,
+): Promise<DeezerTrack[]> {
   const res = await fetchComLimite(
-    `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+    `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=${limit}&index=${index}`,
     {},
     LIMITE_DEEZER_MS,
   );
   if (!res.ok) throw new Error(`Deezer ${res.status}`);
   const json = (await res.json()) as { data?: DeezerTrack[] };
   return (json.data ?? []).filter((t) => !!t.preview);
+}
+
+/**
+ * Teto de fãs no Deezer para uma faixa poder se chamar `descoberta` (T059).
+ *
+ * O T058 mandava começar em ~1.000.000 e ajustar medindo — medido, 1.000.000 é
+ * permissivo demais. O `nb_fan` do Deezer conta quem favoritou o artista, não
+ * quem ouve, e a escala fica comprimida: M83 tem 964.578 e Kavinsky 491.886, ou
+ * seja, os dois artistas que o T056 pegou repetindo em 4/4 rodadas passariam
+ * como "descoberta" a 1.000.000.
+ *
+ * Em 250.000 a separação bate com a intuição: ficam de fora M83, Kavinsky
+ * (491.886), Yann Tiersen (598.035), Beach House (294.372), The xx (1.101.216) e
+ * The Cure (2.518.360); entram Mr.Kitty (51.085), JVKE (141.826), Mariya
+ * Takeuchi (11.854) e HOME (1.630).
+ */
+const LIMITE_DESCOBERTA_FAS = 250_000;
+
+/** `nb_fan` por artista, com cache — a mesma curadoria consulta poucos ids. */
+const fansPorArtista = new Map<number, number>();
+
+async function fansDoArtista(artistId: number): Promise<number | null> {
+  const cacheado = fansPorArtista.get(artistId);
+  if (cacheado !== undefined) return cacheado;
+  try {
+    const res = await fetchComLimite(
+      `https://api.deezer.com/artist/${artistId}`,
+      {},
+      LIMITE_DEEZER_MS,
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as { nb_fan?: number };
+    const fas = json.nb_fan ?? null;
+    if (fas !== null) fansPorArtista.set(artistId, fas);
+    return fas;
+  } catch {
+    return null;
+  }
+}
+
+/** Compara nomes de artista com folga — acentos, "&"/"and", "The" solto. */
+function mesmoArtista(a: string, b: string): boolean {
+  const normaliza = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\b(the|feat|ft)\b/g, '')
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]/g, '');
+  const x = normaliza(a);
+  const y = normaliza(b);
+  if (!x || !y) return false;
+  return x === y || x.includes(y) || y.includes(x);
 }
 
 interface GeminiTrackIdea {
@@ -265,14 +323,32 @@ function registrarFaixas(origem: string, sugestoes: MusicSuggestion[]) {
   );
 }
 
-/** Resolve as ideias do Gemini em sugestões com preview real (Deezer). */
+/**
+ * Resolve as ideias do Gemini em sugestões com preview real (Deezer).
+ *
+ * Busca 5 candidatas em vez de 1 e escolhe a que é **do artista certo**. Antes
+ * pegava sempre a primeira, e o Deezer devolve covers no topo: "La Vie en Rose
+ * / Edith Piaf" resolvia com um preview do Andrea Bocelli. O cartão dizia um
+ * artista e o áudio era de outro — e num app cujo produto é o casamento entre
+ * imagem e som, isso quebra o pacote inteiro.
+ */
 async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<MusicSuggestion[]> {
   const resolved = await Promise.all(
     ideas.slice(0, 4).map(async (idea, i): Promise<MusicSuggestion | null> => {
       try {
-        const [track] = await searchDeezer(`${idea.titulo} ${idea.artista}`, 1);
+        const candidatas = await searchDeezer(`${idea.titulo} ${idea.artista}`, 5);
+        const track =
+          candidatas.find((t) => mesmoArtista(t.artist.name, idea.artista)) ?? null;
+        // Sem casamento de artista, a faixa fica sem preview em vez de tocar
+        // outra pessoa. Perder o áudio é menos grave que entregar o áudio errado.
+        if (candidatas.length > 0 && !track) {
+          console.log(
+            `[music] preview descartado: Deezer devolveu "${candidatas[0].artist.name}" ` +
+              `para «${idea.titulo} — ${idea.artista}»`,
+          );
+        }
         return {
-          id: `gemini-${track ? track.id : i}`,
+          id: `gemini-${track ? track.id : `${i}-${idea.titulo.slice(0, 12)}`}`,
           titulo: idea.titulo,
           artista: idea.artista,
           emoji: emojiFor(i, vibe),
@@ -280,6 +356,7 @@ async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<
           previewUrl: track?.preview ?? null,
           origem: 'gemini',
           papel: papelDe(idea, i),
+          artistaId: track?.artist.id,
         };
       } catch (e) {
         console.log(`[music] Deezer falhou ao resolver preview de "${idea.titulo}"`, e);
@@ -288,6 +365,41 @@ async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<
     }),
   );
   return resolved.filter((s): s is MusicSuggestion => s !== null);
+}
+
+/**
+ * Confere com número, não com opinião do modelo, quem pode se chamar
+ * `descoberta` (T059).
+ *
+ * O Gemini não sabe quão conhecido um artista é hoje — ele chuta, e o T056
+ * mostrou o resultado do chute. O Deezer sabe: `nb_fan`. Reprovada, a faixa
+ * **não é removida** (ela pode ser ótima); o que cai é o rótulo, que passa a
+ * `curinga`. Um rótulo que mente é pior que rótulo nenhum: destrói a confiança
+ * na única coisa que faz uma sugestão estranha parecer proposta e não defeito.
+ *
+ * A verificação usa o `artistaId` que veio da resolução da faixa. Consultar
+ * `search/artist?q=<nome>` seria o caminho óbvio e está **errado**: devolve
+ * homônimos obscuros — "Kavinsky" volta com 108 fãs, "Anitta" com 177.
+ */
+async function verificarDescobertas(sugestoes: MusicSuggestion[]): Promise<MusicSuggestion[]> {
+  return Promise.all(
+    sugestoes.map(async (s) => {
+      if (s.papel !== 'descoberta') return s;
+      // Sem id não dá para medir. Faixa que o Deezer nem tem é, por definição,
+      // fora do mainstream — o benefício da dúvida vai para a descoberta.
+      if (s.artistaId === undefined) return s;
+      const fas = await fansDoArtista(s.artistaId);
+      if (fas === null) return s;
+      if (fas <= LIMITE_DESCOBERTA_FAS) {
+        console.log(`[music] descoberta confirmada: ${s.artista} nb_fan=${fas}`);
+        return s;
+      }
+      console.log(
+        `[music] descoberta rebaixada: ${s.artista} nb_fan=${fas} > ${LIMITE_DESCOBERTA_FAS}`,
+      );
+      return { ...s, papel: 'curinga' as PapelFaixa };
+    }),
+  );
 }
 
 /**
@@ -377,7 +489,7 @@ export async function analyzePhotoAndSuggest(
       const resolvidas = await resolveWithDeezer(scene.musicas ?? [], vibe);
       const tDeezer = Date.now() - marcoDeezer;
       if (resolvidas.length > 0) {
-        const sugestoes = rotularAfinidade(resolvidas);
+        const sugestoes = rotularAfinidade(await verificarDescobertas(resolvidas));
         // A lista de bloqueio da próxima curadoria é esta: o que acabou de ser
         // oferecido. Guardar aqui, e não em quem consome, garante que vale para
         // todo caminho que devolve faixas do Gemini.
@@ -428,7 +540,7 @@ export async function getSuggestions(
       onEtapa?.('buscando');
       const resolvidas = await resolveWithDeezer(ideas, vibe);
       if (resolvidas.length > 0) {
-        const ok = rotularAfinidade(resolvidas);
+        const ok = rotularAfinidade(await verificarDescobertas(resolvidas));
         useTasteStore.getState().registrarSugeridas(vibe.id, ok);
         console.log(`[music] ORIGEM=gemini — ${ok.length} sugestão(ões) usadas`);
         registrarFaixas('gemini', ok);

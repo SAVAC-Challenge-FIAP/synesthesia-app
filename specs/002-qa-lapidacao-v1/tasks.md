@@ -807,7 +807,7 @@ contribuiu.
   *enviar a foto*. Mandar ao Gemini **os nomes dos artistas que a pessoa escolhe** é outra
   divulgação, sobre gosto pessoal, e não está coberta por aquele consentimento. Ver **D7**.
 
-- [ ] **T058** [P1] **Reescrever os prompts: tirar "populares", proibir a repetição, dar papéis.**
+- [X] **T058** [P1] **Reescrever os prompts: tirar "populares", proibir a repetição, dar papéis.**
 
   Em [`music.ts`](../../src/services/music.ts), nos dois prompts (`askGemini` e
   `askGeminiWithPhoto`):
