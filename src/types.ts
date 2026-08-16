@@ -83,7 +83,7 @@ export interface MusicSuggestion {
  * Enquadramentos que o visor oferece (T066). O app forçava um só — 735/913 do
  * Figma —, e forçar enquadramento é decisão que pertence a quem fotografa.
  */
-export type EnquadramentoId = '1:1' | '4:3' | '16:9' | 'full';
+export type EnquadramentoId = '1:1' | '4:3' | '16:9';
 
 export interface Media {
   id: string;

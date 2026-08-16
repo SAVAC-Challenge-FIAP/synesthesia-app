@@ -16,7 +16,9 @@ import { EnquadramentoId } from '@/types';
  *                 não cabe na área útil; ancorando embaixo, ele nunca deixa
  *                 aquela faixa órfã de imagem entre os filtros e os botões, e
  *                 nunca cobre um controle.
- * - `tela`      — a tela inteira, atrás de tudo.
+ * - `tela`      — a tela inteira, atrás de tudo. Sem uso desde que o FULL saiu
+ *                 (decisão do Sávio); a âncora fica porque o cálculo já a trata
+ *                 e reintroduzir o modo é uma linha.
  */
 export type AncoraEnquadramento = 'util' | 'controles' | 'tela';
 
@@ -32,7 +34,6 @@ export const ENQUADRAMENTOS: Enquadramento[] = [
   { id: '4:3', razao: 3 / 4, rotulo: '4:3', ancora: 'util' },
   { id: '1:1', razao: 1, rotulo: '1:1', ancora: 'util' },
   { id: '16:9', razao: 9 / 16, rotulo: '16:9', ancora: 'controles' },
-  { id: 'full', razao: null, rotulo: 'FULL', ancora: 'tela' },
 ];
 
 export const ENQUADRAMENTO_PADRAO: EnquadramentoId = '4:3';

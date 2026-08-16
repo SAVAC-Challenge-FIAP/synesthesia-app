@@ -16,7 +16,18 @@ const MARCA = require('../../assets/splash-icon.png');
  * O símbolo é uma íris, então respirar e girar devagar já lê como "processando"
  * sem prometer progresso que o sistema não sabe medir (contrato C-04).
  */
-export function LoaderMarca({ tamanho = 44 }: { tamanho?: number }) {
+export function LoaderMarca({
+  tamanho = 44,
+  /**
+   * Piso do pulso. 0,45 é o do loader dentro de um card, onde o contraste é
+   * alto. Sobre o gradiente ruby da abertura, esse mesmo piso deixa o amber
+   * marrom — quase invisível (visto no aparelho), e ali o piso sobe.
+   */
+  opacidadeMinima = 0.45,
+}: {
+  tamanho?: number;
+  opacidadeMinima?: number;
+}) {
   const pulso = useRef(new Animated.Value(0)).current;
   const giro = useRef(new Animated.Value(0)).current;
 
@@ -64,7 +75,7 @@ export function LoaderMarca({ tamanho = 44 }: { tamanho?: number }) {
         {
           width: tamanho,
           height: tamanho,
-          opacity: pulso.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
+          opacity: pulso.interpolate({ inputRange: [0, 1], outputRange: [opacidadeMinima, 1] }),
           transform: [
             { scale: pulso.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) },
             {

@@ -146,32 +146,34 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
           </Text>
           <Text style={styles.subtitle}>{resultado.detalhe}</Text>
 
-          {/* Um caminho, e ele é real (T088). */}
-          <Pressable style={styles.compartilharUnico} accessibilityRole="button" onPress={postar}>
-            <Ionicons name="share-social" size={18} color={colors.parchment} />
-            <Text style={styles.compartilharUnicoText}>Postar</Text>
-          </Pressable>
-
+          {/* Baixar fica **acima** da dupla e ocupa a linha inteira: é a ação
+              secundária, e o app já trata secundário assim (o "Trocar música"
+              da captura). Antes ele vinha depois do Postar, com moldura
+              vermelha e texto em caixa alta — o único botão da tela nesse
+              registro, e por isso o que parecia fora do lugar (T095). */}
           {temVideo ? (
             <Pressable
-              style={[styles.baixarBtn, baixado && styles.baixarBtnFeito]}
+              style={[styles.baixar, baixado && styles.baixarFeito]}
               hitSlop={hitSlops.botao}
               disabled={baixando}
+              accessibilityRole="button"
               onPress={baixarVideo}
             >
               <Ionicons
-                name={baixado ? 'checkmark' : falhouBaixar ? 'alert-circle-outline' : 'download-outline'}
-                size={14}
-                color={baixado ? 'rgba(9,5,6,0.5)' : colors.ruby}
+                name={
+                  baixado ? 'checkmark' : falhouBaixar ? 'alert-circle-outline' : 'download-outline'
+                }
+                size={17}
+                color={baixado ? 'rgba(9,5,6,0.45)' : colors.ink}
               />
-              <Text style={styles.baixarBtnText}>
+              <Text style={[styles.baixarText, baixado && styles.baixarTextFeito]}>
                 {baixando
-                  ? 'BAIXANDO...'
+                  ? 'Baixando...'
                   : baixado
-                    ? 'SALVO NA GALERIA'
+                    ? 'Salvo na galeria'
                     : falhouBaixar
-                      ? 'NÃO DEU — TOQUE PARA TENTAR DE NOVO'
-                      : 'BAIXAR VÍDEO'}
+                      ? 'Não deu — tocar de novo'
+                      : 'Baixar vídeo'}
               </Text>
             </Pressable>
           ) : null}
@@ -203,9 +205,21 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
             </View>
           ) : null}
 
-          <Pressable style={styles.fechar} onPress={onClose}>
-            <Text style={styles.fecharText}>Fechar</Text>
-          </Pressable>
+          {/* Fechar à esquerda, Postar à direita — a ordem que o Sávio pediu, e
+              a mesma da captura: sair de um lado, seguir do outro. */}
+          <View style={styles.linhaAcoes}>
+            <Pressable style={[styles.acao, styles.acaoFechar]} onPress={onClose}>
+              <Text style={[styles.acaoText, { color: colors.parchment }]}>Fechar</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.acao, styles.acaoPostar]}
+              accessibilityRole="button"
+              onPress={postar}
+            >
+              <Ionicons name="share-social" size={17} color={colors.ink} />
+              <Text style={[styles.acaoText, { color: colors.ink }]}>Postar</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </Modal>
@@ -263,42 +277,61 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
-  compartilharUnico: {
+  /**
+   * Ação secundária, na linguagem do resto do app: pílula cheia em `parchment`
+   * escurecido sobre a folha clara, texto em caixa normal. O registro anterior
+   * — moldura ruby + caixa alta com `letterSpacing` — é o das *labels técnicas*
+   * do visor, e num modal claro de conclusão ele soava como aviso.
+   */
+  baixar: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    backgroundColor: colors.ink,
+    gap: 9,
+    backgroundColor: 'rgba(9,5,6,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(9,5,6,0.14)',
     borderRadius: radii.card,
-    paddingVertical: 15,
-    marginBottom: 20,
+    paddingVertical: 14,
+    marginBottom: 12,
   },
-  compartilharUnicoText: {
-    color: colors.parchment,
-    fontFamily: fonts.display,
-    fontSize: 15,
+  baixarFeito: {
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(9,5,6,0.10)',
   },
-  baixarBtn: {
+  baixarText: {
+    color: colors.ink,
+    fontFamily: fonts.labelForte,
+    fontSize: 14,
+  },
+  baixarTextFeito: {
+    color: 'rgba(9,5,6,0.45)',
+  },
+  linhaAcoes: {
     width: '100%',
     flexDirection: 'row',
+    gap: 12,
+  },
+  acao: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderWidth: 1,
-    borderColor: colors.ruby,
     borderRadius: radii.card,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 20,
+    paddingVertical: 15,
   },
-  baixarBtnFeito: {
-    borderColor: 'rgba(9,5,6,0.15)',
+  acaoFechar: {
+    backgroundColor: colors.ruby,
   },
-  baixarBtnText: {
-    color: colors.ruby,
-    fontFamily: fonts.labelForte,
-    fontSize: 11,
-    letterSpacing: 1,
+  // Amber é a cor da ação que conclui, igual ao "Postar agora" da captura.
+  acaoPostar: {
+    backgroundColor: colors.amber,
+  },
+  acaoText: {
+    fontFamily: fonts.display,
+    fontSize: 15,
   },
   trilhaBox: {
     width: '100%',
@@ -342,17 +375,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.labelLight,
     fontSize: 10,
     lineHeight: 15,
-  },
-  fechar: {
-    width: '100%',
-    backgroundColor: colors.ruby,
-    borderRadius: radii.card,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  fecharText: {
-    color: colors.parchment,
-    fontFamily: fonts.display,
-    fontSize: 15,
   },
 });

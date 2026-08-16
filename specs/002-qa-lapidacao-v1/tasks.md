@@ -1434,3 +1434,35 @@ Terceira rodada do mesmo dia, sobre o que a Fase 19 entregou.
     dela**. Ancorar "no topo dos controles" sem descontar `insets.bottom` põe o
     visor a uma barra de navegação inteira de distância — foi exatamente por
     isso que a primeira tentativa do 16:9 continuou invadindo os botões.
+
+- [X] **T094** [P2] **Abertura com a marca em movimento** (absorve o **T080**).
+  *"a animação de entrada tá dudida, acho que tá até bugada, pq ela aparece a
+  logo e depois troca para logo tipo em uma piscada"*.
+
+  Não era bug, eram **três** imagens em sequência: o Android 12+ mostra sozinho
+  o ícone do app enquanto o processo sobe, o `expo-splash-screen` mostrava a
+  mesma arte em outra escala (220 contra ~150), e no fim vinha o `ink` chapado
+  enquanto o bundle carregava — medido no aparelho: **vários segundos de preto**,
+  porque o splash só saía com as fontes prontas.
+
+  Agora o splash nativo sai no primeiro frame de JS e quem assume é a
+  `AberturaMarca`, que fica em cena por no mínimo 1,1s, escreve o nome quando as
+  fontes chegam e sai por fade com uma leve abertura de escala. O `imageWidth`
+  do splash caiu para 150, na escala do ícone do sistema.
+
+  O nome é **escrito** com a tipografia do app, e não o `logo-full-name.png`:
+  aquele arquivo tem o retângulo preto embutido (a pendência velha dos assets) e
+  aparecia como uma caixa preta sobre o gradiente. Escrito, resolve hoje e não
+  depende mais do arquivo.
+
+- [X] **T095** [P2] [DESIGN] **Botões do modal de vídeo no padrão do app.**
+  *"Fechar em um canto esquerdo, depois Postar no direito, e em cima dos dois o
+  de baixar vídeo, dá uma melhorada nesse que tá bem fora do padrão"*. Era o
+  único botão do app com moldura ruby e caixa alta com `letterSpacing` — registro
+  das *labels técnicas* do visor, que num modal claro de conclusão soa como
+  aviso. Virou pílula secundária de linha inteira, e embaixo a dupla
+  Fechar (ruby) / Postar (amber), na mesma gramática da tela de captura.
+
+- [X] **T096** [P3] **Modo FULL removido**, por decisão do Sávio no uso — durou
+  uma rodada. A âncora `tela` fica no código porque o cálculo já a trata e
+  reintroduzir custa uma linha.
