@@ -593,3 +593,60 @@ vide presente · soun presente · avc1 presente · mp4a presente · duração 30
 ```
 
 Nada do que a Fase 14 mexeu tocou no muxer, e a exportação continua íntegra.
+
+---
+
+## T062 — A câmera atrás do modal custa? (Fase 15)
+
+Medido em 2026-08-16 com `dumpsys media.camera` (clientes ativos) e
+`dumpsys meminfo`, em três estados, com 12 s de observação cada.
+
+| Estado | PSS | Cliente de câmera |
+|---|---|---|
+| A — visor da câmera | 513.883 kB | **1** |
+| B — modal de captura aberto | 572.501 kB | **1** |
+| C — tela de Ajustes (`/settings`, outra rota) | 578.877 kB | **1** |
+| — app em segundo plano (controle) | — | **0** |
+
+O controle em segundo plano prova que o indicador funciona: quando a câmera de fato
+solta, o contador vai a zero.
+
+### A premissa do Sávio está certa — e a solução prevista no T063, não
+
+Confirmado: com o modal aberto, **a câmera continua ligada** (estado B). Era isso que
+ele suspeitava.
+
+Mas o estado C derruba o remédio. Em `/settings`, que é uma **rota separada**, empilhada
+por cima da câmera, o cliente de câmera **continua em 1**. O `expo-router` empilha a
+rota nova e mantém a anterior montada; a `CameraView` não sai da árvore por ter uma tela
+em cima dela.
+
+Ou seja: **mover a captura de modal para rota, sozinho, não desliga a câmera.** O T063
+dizia "a `CameraView` sai da árvore quando a rota de captura está em cima" — não sai.
+A mudança continua valendo por arquitetura, mas o motivo declarado (performance) só se
+realiza com um controle explícito de ciclo de vida junto.
+
+### E o controle explícito tem uma pegadinha de plataforma
+
+`CameraView` tem a prop `active`, que parece feita para isto. Lendo
+`node_modules/expo-camera/build/Camera.types.d.ts:341`:
+
+```
+A boolean that determines whether the camera should be active.
+Useful in situations where the camera may not have unmounted but you still
+want to stop the camera session.
+@default true
+@platform ios
+```
+
+**`@platform ios`.** No Android, que é o alvo deste projeto, `active` não faz nada. A
+única alavanca real no Android é **não renderizar a `<CameraView>`** — desmontar de
+verdade.
+
+### Sobre memória, a resposta honesta é: não é aí
+
+A diferença de PSS entre A e B é de ~59 MB, e ela é da **foto capturada mais as oito
+miniaturas de filtro** que o modal monta (T054), não da câmera: o estado C, sem modal
+nenhum, gasta ainda mais que B. Memória não é o argumento. O argumento é o sensor e o
+pipeline de frames seguirem vivos enquanto ninguém olha para eles — que é energia, não
+RAM, e é o que o contador de clientes mostra.

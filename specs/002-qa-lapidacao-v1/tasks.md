@@ -869,7 +869,7 @@ contribuiu.
 atrás, isso pode perder performance; a captura pode ser uma tela separada, para não ter uma
 câmera ligada em segundo plano".
 
-- [ ] **T062** [P2] **Medir se a câmera atrás custa mesmo.**
+- [X] **T062** [P2] **Medir se a câmera atrás custa mesmo.**
 
   A premissa é plausível e provavelmente certa, mas é premissa. Hoje
   [`app/camera.tsx`](../../app/camera.tsx) renderiza `<CaptureSheet />` como `<Modal>` **por
