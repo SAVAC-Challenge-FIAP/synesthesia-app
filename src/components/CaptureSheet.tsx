@@ -33,6 +33,7 @@ import { saveToSystemGallery } from '@/services/systemGallery';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useTasteStore } from '@/stores/useTasteStore';
 import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
 import { FilterId, Media } from '@/types';
 
@@ -96,6 +97,7 @@ export function CaptureSheet() {
   const clear = useCaptureStore((s) => s.clear);
   const add = useGalleryStore((s) => s.add);
   const update = useGalleryStore((s) => s.update);
+  const registrarEscolha = useTasteStore((s) => s.registrarEscolha);
   const sugestaoAutomatica = useSettingsStore((s) => s.sugestaoAutomatica);
   const deteccaoTempoReal = useSettingsStore((s) => s.deteccaoTempoReal);
 
@@ -315,6 +317,13 @@ export function CaptureSheet() {
       // A mídia gravada reflete o pacote: com a trilha arquivada, o registro
       // sai sem música, igual ao que foi exportado.
       const musicaDoPacote = session.trilhaArquivada ? null : session.musica;
+      // Histórico de gosto (T057): vale a faixa que de fato foi no pacote, e só
+      // ela. Trilha arquivada é rejeição — não registra. O peso é `auto`, bem
+      // menor que o da troca no MusicSheet, porque aceitar passivamente o que o
+      // sistema escolheu diz pouco sobre gosto.
+      if (musicaDoPacote) {
+        registrarEscolha(musicaDoPacote, session.vibeId, 'auto');
+      }
       let media: Media;
       if (session.mediaId) {
         media = {

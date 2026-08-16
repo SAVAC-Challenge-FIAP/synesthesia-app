@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { vibeById } from '@/constants/vibes';
 import { getSuggestions } from '@/services/music';
 import { useCaptureStore } from '@/stores/useCaptureStore';
+import { useTasteStore } from '@/stores/useTasteStore';
 import { colors, fonts, hitSlops, radii } from '@/theme/tokens';
 import { MusicSuggestion } from '@/types';
 
@@ -25,6 +26,7 @@ import { MusicSuggestion } from '@/types';
 export function MusicSheet({ onClose }: { onClose: () => void }) {
   const session = useCaptureStore((s) => s.session);
   const patch = useCaptureStore((s) => s.patch);
+  const registrarEscolha = useTasteStore((s) => s.registrarEscolha);
 
   // Modal na própria janela: Cancelar / Confirmar escolha só ficam inteiramente
   // tocáveis com o inset real do aparelho (ver baseline.md T004).
@@ -85,7 +87,12 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
     // O recorte escolhido **sobrevive** à troca de faixa: toda prévia do Deezer
     // tem os mesmos 30s, então "quero 10 segundos de vídeo" continua valendo com
     // a música nova. Antes isto resetava para 0–30 e jogava a escolha fora.
-    if (escolhida) patch({ musica: escolhida, curadoria: 'pronta' });
+    if (escolhida) {
+      patch({ musica: escolhida, curadoria: 'pronta' });
+      // Sinal forte de gosto (T057): ela abriu a lista e trocou. Fica no
+      // aparelho — ver a nota de LGPD em `useTasteStore`.
+      registrarEscolha(escolhida, session.vibeId, 'manual');
+    }
     onClose();
   };
 
