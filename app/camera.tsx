@@ -4,11 +4,12 @@ import { CameraType, CameraView, FlashMode, useCameraPermissions } from 'expo-ca
 import * as Haptics from 'expo-haptics';
 import { Redirect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CameraOptionsBar, rotuloDeResolucao } from '@/components/CameraOptionsBar';
 import { FilterCarousel } from '@/components/FilterCarousel';
+import { FundoBase } from '@/components/FundoBase';
 import { FilterLayer } from '@/components/FilterLayer';
 import { FilteredImage } from '@/components/FilteredImage';
 import { filterById } from '@/constants/filters';
@@ -18,7 +19,7 @@ import { detectVibe } from '@/services/vibeEngine';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
-import { colors, fonts, hitSlops, sizes } from '@/theme/tokens';
+import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
 import { EnquadramentoId, FilterId } from '@/types';
 
 /**
@@ -65,6 +66,29 @@ export default function CameraScreen() {
   const [resolucao, setResolucao] = useState<string | null>(null);
   const [enquadramentoId, setEnquadramentoId] = useState<EnquadramentoId>(ENQUADRAMENTO_PADRAO);
   const [flash, setFlash] = useState<FlashMode>('off');
+
+  /**
+   * Aspecto do visor, animado (T077). O Sávio: "o visor da câmera se adapta de
+   * forma fluida e animada, eu não quero a câmera full na tela o tempo todo".
+   *
+   * O T066 mantinha a `CameraView` cheia e escurecia o que seria cortado — e era
+   * justamente esse véu cinza que ele não quis. Agora a prévia **é** do tamanho
+   * do enquadramento, e o que aparece em volta é o gradiente da identidade.
+   *
+   * `useNativeDriver` fica de fora porque `aspectRatio` é propriedade de layout;
+   * a animação roda no JS, e a 300ms de duração isso não aparece.
+   */
+  const aspectoAnimado = useRef(
+    new Animated.Value(enquadramentoPor(ENQUADRAMENTO_PADRAO).razao),
+  ).current;
+  useEffect(() => {
+    Animated.timing(aspectoAnimado, {
+      toValue: enquadramentoPor(enquadramentoId).razao,
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [enquadramentoId, aspectoAnimado]);
   // 'original' = usuário escolheu explicitamente sem filtro; null = automático
   const [manualFiltro, setManualFiltro] = useState<FilterId | 'original' | null>(null);
   const [capturando, setCapturando] = useState(false);
@@ -171,17 +195,20 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.root}>
-      {focada ? (
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          facing={facing}
-          flash={flash}
-        />
-      ) : null}
+      <FundoBase />
+      <View style={styles.palco} pointerEvents="none">
+        <Animated.View style={[styles.visor, { aspectRatio: aspectoAnimado }]}>
+          {focada ? (
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              flash={flash}
+            />
+          ) : null}
+        </Animated.View>
+      </View>
       {filtro ? <FilterLayer filter={filtro} /> : null}
-
-      <MascaraEnquadramento razao={enquadramentoPor(enquadramentoId).razao} />
 
       {gradeComposicao ? <GridOverlay /> : null}
 
@@ -301,23 +328,6 @@ export default function CameraScreen() {
   );
 }
 
-/**
- * Marca no visor a área que vai virar foto (T066).
- *
- * A `CameraView` continua em tela cheia — a prévia não muda de tamanho, como a
- * task pede. O que muda é o véu escuro sobre o que será cortado, para a pessoa
- * enquadrar sabendo o que perde.
- */
-function MascaraEnquadramento({ razao }: { razao: number }) {
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={styles.mascaraFora}>
-        <View style={[styles.mascaraDentro, { aspectRatio: razao }]} />
-      </View>
-    </View>
-  );
-}
-
 function GridOverlay() {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -330,19 +340,16 @@ function GridOverlay() {
 }
 
 const styles = StyleSheet.create({
-  mascaraFora: {
-    flex: 1,
+  palco: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    // O véu some quando a área útil ocupa tudo; a borda é o que dá a leitura.
-    backgroundColor: 'rgba(9,5,6,0.55)',
   },
-  mascaraDentro: {
+  visor: {
     width: '100%',
     maxHeight: '100%',
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.parchment25,
+    overflow: 'hidden',
+    borderRadius: radii.card,
   },
   flashSlot: {
     flexDirection: 'row',

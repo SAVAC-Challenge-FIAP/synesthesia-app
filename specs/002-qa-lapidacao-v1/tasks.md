@@ -1037,13 +1037,13 @@ curadoria ainda erra, e o enquadramento ficou feio.
 
 ### Visor e movimento
 
-- [ ] **T076** [P1] **Acabar com a borda cinza do enquadramento.** "não gostei de
+- [X] **T076** [P1] **Acabar com a borda cinza do enquadramento.** "não gostei de
   quando eu vou mudar a proporção ele fica uma borda cinza pra simbolizar isso não é
   legal, ele tem que ficar com o fundo daquela cor gradiente, é sempre esse o fundo".
   O véu `rgba(9,5,6,0.55)` do T066 sai; o que aparece fora do enquadramento é o
   `FundoBase` do T068.
 
-- [ ] **T077** [P1] **A `CameraView` passa a ter o tamanho do enquadramento, com
+- [X] **T077** [P1] **A `CameraView` passa a ter o tamanho do enquadramento, com
   animação.** "o visor da câmera se adapta de forma fluida e animada, eu não quero a
   câmera full na tela o tempo todo". Contraria a decisão do T066 (que manteve a
   prévia cheia por instrução da própria task) — **vale o que o Sávio pediu agora**.
