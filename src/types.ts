@@ -77,6 +77,12 @@ export interface MusicSuggestion {
   artistaId?: number;
 }
 
+/**
+ * Enquadramentos que o visor oferece (T066). O app forçava um só — 735/913 do
+ * Figma —, e forçar enquadramento é decisão que pertence a quem fotografa.
+ */
+export type EnquadramentoId = '1:1' | '4:3' | '16:9';
+
 export interface Media {
   id: string;
   /** URI persistente da foto (documentDirectory) */
@@ -88,6 +94,13 @@ export interface Media {
   /** Trecho da música em segundos (0–30) */
   trechoInicio: number;
   trechoFim: number;
+  /**
+   * Proporção largura/altura da foto (T066). **Opcional de propósito**: as
+   * mídias salvas antes do enquadramento variável não têm o campo, e não podem
+   * quebrar — quem lê usa `media.aspecto ?? sizes.photoAspect`, que é
+   * exatamente o valor com que elas foram criadas.
+   */
+  aspecto?: number;
   criadaEm: number;
   atualizadaEm: number;
 }

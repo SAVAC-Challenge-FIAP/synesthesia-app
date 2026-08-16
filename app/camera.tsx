@@ -12,12 +12,14 @@ import { FilterCarousel } from '@/components/FilterCarousel';
 import { FilterLayer } from '@/components/FilterLayer';
 import { FilteredImage } from '@/components/FilteredImage';
 import { filterById } from '@/constants/filters';
+import { ENQUADRAMENTO_PADRAO, ENQUADRAMENTOS, enquadramentoPor } from '@/constants/enquadramentos';
+import { recortarNoAspecto } from '@/services/enquadrar';
 import { detectVibe } from '@/services/vibeEngine';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { colors, fonts, hitSlops, sizes } from '@/theme/tokens';
-import { FilterId } from '@/types';
+import { EnquadramentoId, FilterId } from '@/types';
 
 /**
  * Visor principal (US1/US2): prévia de vibe determinística (hora + câmera),
@@ -61,6 +63,7 @@ export default function CameraScreen() {
   // a abrir a barra do Figma; quem leva aos Ajustes agora é a engrenagem dela.
   const [opcoesAbertas, setOpcoesAbertas] = useState(false);
   const [resolucao, setResolucao] = useState<string | null>(null);
+  const [enquadramentoId, setEnquadramentoId] = useState<EnquadramentoId>(ENQUADRAMENTO_PADRAO);
   // 'original' = usuário escolheu explicitamente sem filtro; null = automático
   const [manualFiltro, setManualFiltro] = useState<FilterId | 'original' | null>(null);
   const [capturando, setCapturando] = useState(false);
@@ -109,10 +112,20 @@ export default function CameraScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       const foto = await cameraRef.current.takePictureAsync({ quality: 0.85 });
       if (foto?.uri) {
+        // O recorte é REAL, no arquivo: a máscara do visor sem isto mostraria
+        // um 1:1 e o pacote sairia 4:3.
+        const enquadramento = enquadramentoPor(enquadramentoId);
+        const uriRecortada = await recortarNoAspecto(
+          foto.uri,
+          foto.width,
+          foto.height,
+          enquadramento.razao,
+        );
         router.push('/capture');
         startSession({
           mediaId: null,
-          photoUri: foto.uri,
+          photoUri: uriRecortada,
+          aspecto: enquadramento.razao,
           filtroId: filtroAtivo,
           filtroAuto,
           vibeId: vibe.id,
@@ -124,7 +137,7 @@ export default function CameraScreen() {
     } finally {
       setCapturando(false);
     }
-  }, [capturando, filtroAtivo, filtroAuto, router, startSession, vibe.id]);
+  }, [capturando, enquadramentoId, filtroAtivo, filtroAuto, router, startSession, vibe.id]);
 
   // Guards DEPOIS de todos os hooks (Rules of Hooks): um return antecipado
   // entre hooks muda a ordem entre renders e derruba a tela
@@ -144,6 +157,8 @@ export default function CameraScreen() {
       ) : null}
       {filtro ? <FilterLayer filter={filtro} /> : null}
 
+      <MascaraEnquadramento razao={enquadramentoPor(enquadramentoId).razao} />
+
       {gradeComposicao ? <GridOverlay /> : null}
 
       <SafeAreaView style={styles.ui} pointerEvents="box-none">
@@ -161,6 +176,26 @@ export default function CameraScreen() {
               resolucao={resolucao}
               onFechar={() => setOpcoesAbertas(false)}
               onAjustes={() => router.push('/settings')}
+              slotEnquadramento={
+                <View style={styles.enquadramentos}>
+                  {ENQUADRAMENTOS.map((e) => (
+                    <Pressable
+                      key={e.id}
+                      hitSlop={hitSlops.chip}
+                      onPress={() => setEnquadramentoId(e.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.enquadramentoChip,
+                          e.id === enquadramentoId && styles.enquadramentoAtivo,
+                        ]}
+                      >
+                        {e.rotulo}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              }
             />
           ) : (
             <Pressable
@@ -219,6 +254,23 @@ export default function CameraScreen() {
   );
 }
 
+/**
+ * Marca no visor a área que vai virar foto (T066).
+ *
+ * A `CameraView` continua em tela cheia — a prévia não muda de tamanho, como a
+ * task pede. O que muda é o véu escuro sobre o que será cortado, para a pessoa
+ * enquadrar sabendo o que perde.
+ */
+function MascaraEnquadramento({ razao }: { razao: number }) {
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View style={styles.mascaraFora}>
+        <View style={[styles.mascaraDentro, { aspectRatio: razao }]} />
+      </View>
+    </View>
+  );
+}
+
 function GridOverlay() {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -231,6 +283,35 @@ function GridOverlay() {
 }
 
 const styles = StyleSheet.create({
+  mascaraFora: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // O véu some quando a área útil ocupa tudo; a borda é o que dá a leitura.
+    backgroundColor: 'rgba(9,5,6,0.55)',
+  },
+  mascaraDentro: {
+    width: '100%',
+    maxHeight: '100%',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.parchment25,
+  },
+  enquadramentos: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  enquadramentoChip: {
+    color: colors.parchment50,
+    fontFamily: fonts.label,
+    fontSize: 12,
+    letterSpacing: 1,
+  },
+  enquadramentoAtivo: {
+    color: colors.amber,
+    fontFamily: fonts.labelForte,
+  },
   root: {
     flex: 1,
     backgroundColor: colors.ink,

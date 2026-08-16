@@ -362,6 +362,7 @@ export function CaptureSheet() {
           musica: musicaDoPacote,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
+          aspecto: session.aspecto,
           criadaEm: 0,
           atualizadaEm: Date.now(),
         };
@@ -390,6 +391,7 @@ export function CaptureSheet() {
           musica: musicaDoPacote,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
+          aspecto: session.aspecto,
           criadaEm: Date.now(),
           atualizadaEm: Date.now(),
         };
@@ -519,7 +521,7 @@ export function CaptureSheet() {
               <FilteredImage
                 uri={session.photoUri}
                 filtroId={session.filtroId}
-                style={styles.preview}
+                style={[styles.preview, { aspectRatio: session.aspecto }]}
               />
             </View>
 
@@ -769,7 +771,6 @@ const styles = StyleSheet.create({
   },
   preview: {
     width: '100%',
-    aspectRatio: sizes.photoAspect,
     borderRadius: radii.card,
   },
   filtroRow: {

@@ -923,7 +923,7 @@ o flash também".
   ⚠️ Puxe o nó você mesmo com o MCP do Figma antes de codar — a leitura acima veio de screenshot
   e não substitui os valores reais de cor, espaçamento e ícone.
 
-- [ ] **T066** [P1] **Enquadramento 1:1 / 4:3 / 16:9.**
+- [X] **T066** [P1] **Enquadramento 1:1 / 4:3 / 16:9.**
 
   Duas metades que precisam bater:
   1. **No visor**: máscara sobre a `CameraView` mostrando a área que será fotografada. Nada de

@@ -33,6 +33,9 @@ export default function GalleryScreen() {
       musica: m.musica,
       trechoInicio: m.trechoInicio,
       trechoFim: m.trechoFim,
+      // Mídias salvas antes do T066 não têm `aspecto`; o padrão é exatamente a
+      // proporção com que elas foram criadas, então reabrir não as deforma.
+      aspecto: m.aspecto ?? sizes.photoAspect,
     });
   };
 
@@ -77,7 +80,7 @@ export default function GalleryScreen() {
             const vibe = vibeById(item.vibeId);
             return (
               <Pressable
-                style={styles.card}
+                style={[styles.card, { aspectRatio: item.aspecto ?? sizes.photoAspect }]}
                 onPress={() => lapidar(item)}
                 onLongPress={() => excluir(item)}
               >
@@ -156,7 +159,6 @@ const styles = StyleSheet.create({
   },
   photo: {
     width: '100%',
-    aspectRatio: sizes.photoAspect,
   },
   meta: {
     padding: 10,

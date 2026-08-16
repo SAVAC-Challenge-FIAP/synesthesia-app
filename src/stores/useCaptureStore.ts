@@ -38,6 +38,12 @@ export interface CaptureSession {
    */
   filtroAuto: boolean;
   vibeId: VibeId;
+  /**
+   * Proporção largura/altura da foto já recortada (T066). Viaja na sessão para
+   * a tela de captura desenhar a prévia no formato certo e para o registro
+   * salvo na galeria nascer com o campo.
+   */
+  aspecto: number;
   musica: MusicSuggestion | null;
   sugestoes: MusicSuggestion[];
   curadoria: EstadoCuradoria;
