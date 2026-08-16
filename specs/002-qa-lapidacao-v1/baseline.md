@@ -722,3 +722,33 @@ Depois de toda a Fase 16, incluindo o APK reconstruído com `expo-linear-gradien
 ```
 vide presente · soun presente · avc1 presente · mp4a presente · duração 30,00 s
 ```
+
+---
+
+## Achado tardio: o T063 quebrou a reabertura pela galeria
+
+Descoberto em 2026-08-16, ao tentar produzir a evidência do T070.
+
+Reabrir uma mídia da galeria para lapidar **deixou de funcionar**, sem erro nenhum.
+A galeria chamava `start()` e renderizava `<CaptureSheet />` quando havia sessão —
+o que bastava enquanto ele era `<Modal>`, porque um Modal desenha na própria janela,
+por cima de tudo. Virando corpo de tela no T063, o mesmo JSX passou a ser conteúdo
+no fluxo normal: ia parar **abaixo da lista**, fora da vista.
+
+Sintoma enganoso: o toque no card parecia não registrar. Só ficou claro ao notar que
+o `dumpsys` mostrava a mesma tela e que a sessão *era* criada.
+
+Corrigido fazendo a galeria navegar para `/capture`, como o visor já faz. É o tipo de
+regressão que nenhum typecheck pega e que a validação da própria Fase 15 não cobriu,
+porque as armadilhas listadas no T063 falavam do caminho da câmera, não do da galeria.
+
+### Confirmação do `afinidade` local (T057/T058, D7)
+
+Na mesma sessão, o `MusicSheet` mostrou **"DO SEU GOSTO"** no topo, com
+«Midnight City / M83» promovida — e o log registrou
+`[music] afinidade local: «Midnight City — M83»`.
+
+É a prova de que a alternativa 1 da D7 entrega o que o Sávio pediu: a curadoria
+reage ao histórico de escolhas **sem que nome nenhum saia do aparelho**. O M83
+entrou no histórico por ter sido salvo em pacotes durante os testes.
+Evidência: `docs/preview/fase14/t058-afinidade-do-seu-gosto.png`.

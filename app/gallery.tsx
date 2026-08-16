@@ -4,7 +4,6 @@ import React from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CaptureSheet } from '@/components/CaptureSheet';
 import { FilteredImage } from '@/components/FilteredImage';
 import { FundoBase } from '@/components/FundoBase';
 import { vibeById } from '@/constants/vibes';
@@ -22,7 +21,6 @@ export default function GalleryScreen() {
   const medias = useGalleryStore((s) => s.medias);
   const remove = useGalleryStore((s) => s.remove);
   const start = useCaptureStore((s) => s.start);
-  const session = useCaptureStore((s) => s.session);
 
   const lapidar = (m: Media) => {
     start({
@@ -38,6 +36,12 @@ export default function GalleryScreen() {
       // proporção com que elas foram criadas, então reabrir não as deforma.
       aspecto: m.aspecto ?? sizes.photoAspect,
     });
+    // Empurra para a tela de captura. Enquanto o `CaptureSheet` era `<Modal>`,
+    // bastava a galeria renderizá-lo quando houvesse sessão: o Modal desenhava
+    // na própria janela, por cima. Virando corpo de tela (T063), o mesmo JSX
+    // passou a ser conteúdo no fluxo normal — ia parar embaixo da lista, fora
+    // da vista, e reabrir uma mídia deixou de funcionar sem erro nenhum.
+    router.push('/capture');
   };
 
   const excluir = (m: Media) => {
@@ -109,7 +113,6 @@ export default function GalleryScreen() {
         />
       )}
 
-      {session ? <CaptureSheet /> : null}
     </SafeAreaView>
   );
 }
