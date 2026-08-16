@@ -582,3 +582,14 @@ todas tinham ao menos uma faixa com áudio.
 Fica como pendência real, e é do tipo que precisa de decisão de produto: uma
 `descoberta` sem preview aparece na lista com o play apagado. Ela cumpre o papel de
 sugerir, mas não dá para ouvir antes de escolher. Ver **D8**.
+
+### Não-regressão do pacote exportado (regra 6, fechando a Fase 14)
+
+Capturado e postado depois de toda a Fase 14, com a trilha vinda do caminho novo
+(«Midnight City / M83» como `certeira`). O `.mp4` gerado:
+
+```
+vide presente · soun presente · avc1 presente · mp4a presente · duração 30,00 s
+```
+
+Nada do que a Fase 14 mexeu tocou no muxer, e a exportação continua íntegra.

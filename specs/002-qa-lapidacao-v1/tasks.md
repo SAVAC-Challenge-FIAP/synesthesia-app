@@ -850,7 +850,7 @@ contribuiu.
   Amplie também o catálogo local (`FALLBACK`): duas faixas por vibe garantem repetição na
   terceira captura offline. Suba para ~6 por vibe.
 
-- [ ] **T061** [P1] **Provar que mudou, com o mesmo roteiro do T056.**
+- [X] **T061** [P1] **Provar que mudou, com o mesmo roteiro do T056.**
 
   Cinco capturas da mesma cena, mesma vibe, e a tabela lado a lado com o número do T056.
   Critério de aceite: **≥ 15 faixas distintas em 20** (contra o que o T056 medir) e **pelo menos
