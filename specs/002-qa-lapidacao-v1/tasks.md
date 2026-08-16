@@ -910,7 +910,7 @@ câmera ligada em segundo plano".
 essas coisas — não podemos forçar o cara a ter isso, por isso temos o Figma; se for possível ter
 o flash também".
 
-- [ ] **T065** [P1] **Painel "+ Opções" do Figma.**
+- [X] **T065** [P1] **Painel "+ Opções" do Figma.**
   Nó [462-889](https://www.figma.com/design/3yJ1nLbHljozr8qqfrQ6yX/JOVI-Challenge---FIAP-2026?node-id=462-889&m=dev)
   — barra horizontal de 382×24 com dois estados (`Propriedade 1=Padrão` e `=Normal`). O estado
   "Padrão" traz, da esquerda para a direita: **fechar (X)**, **flash**, **resolução ("12M")**,

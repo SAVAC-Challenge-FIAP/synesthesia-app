@@ -3,10 +3,11 @@ import { useIsFocused } from '@react-navigation/native';
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Redirect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CameraOptionsBar, rotuloDeResolucao } from '@/components/CameraOptionsBar';
 import { FilterCarousel } from '@/components/FilterCarousel';
 import { FilterLayer } from '@/components/FilterLayer';
 import { FilteredImage } from '@/components/FilteredImage';
@@ -56,6 +57,10 @@ export default function CameraScreen() {
   const focada = useIsFocused();
 
   const [facing, setFacing] = useState<CameraType>('back');
+  // Painel "+ Opções" (T065): o chip deixou de empurrar para os Ajustes e passou
+  // a abrir a barra do Figma; quem leva aos Ajustes agora é a engrenagem dela.
+  const [opcoesAbertas, setOpcoesAbertas] = useState(false);
+  const [resolucao, setResolucao] = useState<string | null>(null);
   // 'original' = usuário escolheu explicitamente sem filtro; null = automático
   const [manualFiltro, setManualFiltro] = useState<FilterId | 'original' | null>(null);
   const [capturando, setCapturando] = useState(false);
@@ -72,6 +77,25 @@ export default function CameraScreen() {
     (id: FilterId | null) => setManualFiltro(id ?? 'original'),
     [],
   );
+
+  /**
+   * Lê a resolução real do sensor para o rótulo do painel. O Figma traz "12M"
+   * cravado; repetir isso seria inventar um número sobre o aparelho de quem usa.
+   * Só roda quando o painel abre — antes disso não há o que mostrar.
+   */
+  useEffect(() => {
+    if (!opcoesAbertas || resolucao || !cameraRef.current) return;
+    let vivo = true;
+    cameraRef.current
+      .getAvailablePictureSizesAsync()
+      .then((tamanhos) => {
+        if (vivo) setResolucao(rotuloDeResolucao(tamanhos));
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [opcoesAbertas, resolucao]);
 
   const flip = () => {
     // flip recalcula a prévia da vibe (FR-001): frontal puxa vibes pessoais
@@ -132,13 +156,21 @@ export default function CameraScreen() {
               <Text style={styles.vibeNome}>{vibe.nome.toUpperCase()}</Text>
             </View>
           </View>
-          <Pressable
-            style={styles.opcoes}
-            hitSlop={hitSlops.chip}
-            onPress={() => router.push('/settings')}
-          >
-            <Text style={styles.opcoesText}>+ OPÇÕES</Text>
-          </Pressable>
+          {opcoesAbertas ? (
+            <CameraOptionsBar
+              resolucao={resolucao}
+              onFechar={() => setOpcoesAbertas(false)}
+              onAjustes={() => router.push('/settings')}
+            />
+          ) : (
+            <Pressable
+              style={styles.opcoes}
+              hitSlop={hitSlops.chip}
+              onPress={() => setOpcoesAbertas(true)}
+            >
+              <Text style={styles.opcoesText}>+ OPÇÕES</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.bottom} pointerEvents="box-none">
