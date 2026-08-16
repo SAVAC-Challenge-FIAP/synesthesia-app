@@ -517,3 +517,68 @@ busca de **faixa** e consultar `/artist/{id}` — aí os números batem: Kavinsk
 M83 964.578, The Weeknd 14.622.743.
 
 Evidências em `docs/preview/fase14/t056-*.png`.
+
+---
+
+## T061 — Verificação da Fase 14, mesmo roteiro do T056
+
+Cinco capturas da mesma cena (teclado mecânico no escuro → `noturna` em 5/5),
+depois do T057–T060.
+
+| # | Faixas |
+|---|---|
+| f1 | Midnight City / M83 · Komorebi / Swayzak · Faintly / Lullatone · Águas de Março / Elis Regina e Tom Jobim |
+| f2 | Nightcall / Kavinsky · Kimi wa Bara yori Utsukushii / Akira Fuse · Apenas Mais uma de Amor / Lulu Santos · Windowlicker / Aphex Twin |
+| f3 | Resonance / Home · Natsu no Hi / Taeko Onuki · L'inverno / Mino Capelli · Blue Monday / New Order |
+| f4 | Giorgio by Moroder / Daft Punk · Sigh / Cymande · Kaerukana / Lamp · Canto de Ossanha / Baden Powell e Vinícius |
+| f5 | Nightcall / Kavinsky · Samba do Avião / Célia · Sorrowful Rain / H.u.d.a · Merry Christmas Mr. Lawrence / Ryuichi Sakamoto |
+
+### Lado a lado com a linha de base
+
+| Métrica | T056 (cena A) | T056 (cena B) | T061 | Critério |
+|---|---|---|---|---|
+| Faixas distintas em 20 | 11 | 9 | **19** | ≥ 15 ✅ |
+| Artistas distintos em 20 | 9 | 8 | **19** | — |
+| Artista mais repetido | Kavinsky 4/5 | Taylor Swift 3/5 | Kavinsky 2/5 | — |
+
+A única repetição em 20 posições foi «Nightcall / Kavinsky», entre f2 e f5.
+**Critério de faixas distintas: atingido (19 de 20, contra 11 e 9).**
+
+### O segundo critério **não** foi verificado, e o motivo importa
+
+O T061 também pedia "pelo menos uma `descoberta` por rodada com `nb_fan` abaixo do
+limiar". Isso só pôde ser **comprovado numericamente em 1 das 5 rodadas** (Akira
+Fuse, `nb_fan=158`). Nas outras a verificação não teve o que medir: consultados um a
+um, **6 dos 8 artistas dos slots de descoberta não existem no Deezer** — Swayzak,
+Lullatone, Taeko Onuki, Mino Capelli, Lamp, H.u.d.a.
+
+Não é o rótulo mentindo: é o contrário. Um artista que o Deezer sequer cataloga está
+bem além do limiar de "menos conhecido". Mas a prova numérica que a task pediu não
+existe para eles, e o número real é **1 de 5**, não 5 de 5.
+
+Onde a verificação teve dado, ela funcionou nos dois sentidos: **Lulu Santos foi
+rebaixado** para `curinga` (`nb_fan=1.263.164`) e Akira Fuse confirmado.
+
+### O custo escondido da diversidade: som
+
+Medido com o marcador de preview no log, a assinatura típica de uma curadoria do
+Gemini agora é **`audio=2/4`**:
+
+```
+audio=2/4 ♪«Nightcall — Kavinsky»[certeira] | ·«Sintetizador — Gorduratrans»[descoberta]
+        | ·«Friction — Plaid»[descoberta] | ♪«Canto de Ossanha — Baden Powell»[curinga]
+```
+
+Quanto mais obscura a faixa, menor a chance de o Deezer tê-la — e é o preview que dá
+a **metade sonora** do pacote, que é o Pilar 2 do produto. Diversificar sem olhar isto
+seria trocar repetição por silêncio.
+
+O que segura o produto é a própria distribuição de papéis: `certeira` e `curinga`
+resolvem quase sempre, e o `CaptureSheet` já escolhe automaticamente
+`sugestoes.find(m => m.previewUrl)`. Ou seja, **o pacote nunca sai mudo por causa da
+descoberta** — ela ocupa um slot de proposta, não o slot da trilha. Em 5 rodadas,
+todas tinham ao menos uma faixa com áudio.
+
+Fica como pendência real, e é do tipo que precisa de decisão de produto: uma
+`descoberta` sem preview aparece na lista com o play apagado. Ela cumpre o papel de
+sugerir, mas não dá para ouvir antes de escolher. Ver **D8**.

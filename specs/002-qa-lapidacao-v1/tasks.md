@@ -840,7 +840,7 @@ contribuiu.
   Sem isto, `descoberta` vira mais um slot de hit e a Fase 14 não terá mudado nada — só ganho
   um rótulo bonito.
 
-- [ ] **T060** [P2] **Tirar a repetição do fallback do Deezer.**
+- [X] **T060** [P2] **Tirar a repetição do fallback do Deezer.**
 
   Em `getSuggestions`, etapa 2: hoje é `searchDeezer(kw, 3)` sobre as duas primeiras keywords,
   sempre do índice 0. Passe a variar o `index` (a busca do Deezer aceita paginação), use mais
@@ -1093,3 +1093,50 @@ Três saídas, da mais conservadora para a mais capaz:
 **Implementada por ora a alternativa 1** (regra 5 das execuções autônomas: a que menos altera
 comportamento). Se o Sávio quiser a 3, é um toggle e um parágrafo na nota de privacidade — mas é
 decisão dele, não do loop.
+
+**Como ficou, na prática (implementado em 2026-08-16, T057–T059).** A alternativa 1 parecia
+esvaziar o slot `afinidade`, já que ele nasceu justamente da ideia de contar ao Gemini quem a
+pessoa escuta. Não esvaziou — só mudou de lugar:
+
+- O `useTasteStore` guarda as escolhas **no aparelho** e nada dele entra em prompt nenhum.
+- O Gemini devolve as quatro faixas com os papéis `certeira`, `descoberta`, `descoberta` e
+  `curinga`, sem saber nada sobre a pessoa.
+- Aí sim, **localmente**, `rotularAfinidade` procura entre as quatro devolvidas alguma de artista
+  que a pessoa já escolheu; achando, promove ao topo e troca o rótulo para `afinidade`
+  ("DO SEU GOSTO" na tela). No máximo uma, como o T058 pede.
+
+O resultado visível é quase o da alternativa 3 — a curadoria reage ao histórico —, e nenhum nome
+sai do aparelho. **A diferença que resta**, e que é decisão do Sávio: assim o histórico só pode
+*reordenar o que o Gemini já escolheu*, nunca fazer o Gemini **buscar** algo do gosto dela. Se em
+5 capturas nenhuma faixa cair perto do histórico, o rótulo `afinidade` simplesmente não aparece.
+Para ele aparecer sempre, aí sim seria preciso a alternativa 3 (toggle próprio).
+
+Uma nota separada, porque é outro regime: a **lista de bloqueio** do T058 (as ~20 faixas já
+sugeridas) **vai** ao prompt, e isso não amplia consentimento nenhum — são as faixas que o próprio
+modelo propôs, não escolhas da pessoa. É o modelo lendo a própria saída anterior.
+
+### D8 — A `descoberta` chega sem áudio, e isso é decisão de produto (Fase 14, T061)
+
+Medido no T061: a curadoria do Gemini entrega tipicamente **`audio=2/4`**. As faixas de
+papel `certeira` e `curinga` resolvem no Deezer; as duas `descoberta`, não — 6 dos 8
+artistas de descoberta das 5 rodadas **não existem no catálogo do Deezer**.
+
+Isso não quebra o pacote: o `CaptureSheet` escolhe automaticamente a primeira faixa
+**com** preview, então a trilha exportada sempre tem som. Mas no `MusicSheet` a
+descoberta aparece com o play apagado — ela pode ser escolhida, e não pode ser ouvida
+antes. É esquisito justamente na sugestão que mais precisaria convencer.
+
+Três saídas, da mais conservadora para a mais capaz:
+
+1. **Deixar como está** e assumir: a descoberta é uma proposta para procurar depois,
+   não uma faixa para ouvir agora. Custo zero. É o que está no ar.
+2. **Marcar na tela** que aquela faixa não tem prévia disponível, em vez de só apagar o
+   play — hoje o botão apagado parece defeito. Custo baixo, resolve a estranheza sem
+   resolver a falta de áudio.
+3. **Exigir preview para a descoberta**: quando não resolver, pedir outra ao Gemini ou
+   promover uma candidata do Deezer com `nb_fan` baixo. Resolve de verdade, mas custa
+   uma chamada a mais no caminho crítico — e o SC-Q03 (mediana ≤ 6 s) foi recalibrado
+   na D1 justamente por não haver folga aí.
+
+**Implementada a alternativa 1** por ora (regra 5). A 2 é barata e provavelmente vale;
+a 3 troca latência por completude, e essa é escolha do Sávio, não do loop.

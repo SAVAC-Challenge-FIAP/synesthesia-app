@@ -388,9 +388,15 @@ function emojiFor(index: number, vibe: Vibe): string {
  * curadorias. Mesma natureza do `[music][tempo]` do T020: só observa.
  */
 function registrarFaixas(origem: string, sugestoes: MusicSuggestion[]) {
+  // O marcador de preview não é detalhe: quanto mais obscura a `descoberta`,
+  // maior a chance de o Deezer não tê-la, e é o preview que dá a metade sonora
+  // do pacote. Sem contar isto, "diversificamos" e perdíamos o som sem ver.
+  const comAudio = sugestoes.filter((s) => s.previewUrl).length;
   console.log(
-    `[music][faixas] origem=${origem} ` +
-      sugestoes.map((s) => `«${s.titulo} — ${s.artista}»`).join(' | '),
+    `[music][faixas] origem=${origem} audio=${comAudio}/${sugestoes.length} ` +
+      sugestoes
+        .map((s) => `${s.previewUrl ? '♪' : '·'}«${s.titulo} — ${s.artista}»[${s.papel ?? '-'}]`)
+        .join(' | '),
   );
 }
 
