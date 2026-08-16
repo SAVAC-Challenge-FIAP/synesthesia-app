@@ -979,7 +979,7 @@ o flash também".
   escala sobre o PNG com a `Animated` que já vem no React Native — some some sofisticação, zero
   dependência nova.
 
-- [ ] **T071** [P3] **Splash screen com a marca**, usando o `backgroundColor: '#090506'` que já
+- [X] **T071** [P3] **Splash screen com a marca**, usando o `backgroundColor: '#090506'` que já
   está no `app.json`. `expo-splash-screen` também não está instalado.
 
 ### O que o Sávio precisa entregar antes da Fase 17
