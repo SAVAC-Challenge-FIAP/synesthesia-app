@@ -17,7 +17,28 @@ import { getSuggestions } from '@/services/music';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useTasteStore } from '@/stores/useTasteStore';
 import { colors, fonts, hitSlops, radii } from '@/theme/tokens';
-import { MusicSuggestion } from '@/types';
+import { MusicSuggestion, PapelFaixa } from '@/types';
+
+/**
+ * Rótulo do papel de cada faixa (T058). Não é enfeite: uma faixa de artista
+ * desconhecido no meio de três conhecidas parece erro da curadoria. Dito o
+ * papel, a mesma faixa vira proposta — que é o Princípio II.
+ */
+const PAPEL_ROTULO: Record<PapelFaixa, string> = {
+  afinidade: 'DO SEU GOSTO',
+  certeira: 'CERTEIRA',
+  descoberta: 'DESCOBERTA',
+  curinga: 'CURINGA',
+};
+
+const PAPEL_ESTILO: Record<PapelFaixa, { color: string }> = {
+  afinidade: { color: colors.ruby },
+  certeira: { color: 'rgba(9,5,6,0.45)' },
+  // A descoberta é a razão de ser da Fase 14; ganha o âmbar, que é a cor de
+  // acento da música no produto.
+  descoberta: { color: '#8A5A00' },
+  curinga: { color: 'rgba(9,5,6,0.45)' },
+};
 
 /**
  * Modal "Trocar música" (US4) — superfície clara (parchment) do Figma.
@@ -132,6 +153,11 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
                   >
                     <Text style={styles.itemEmoji}>{m.emoji}</Text>
                     <View style={styles.itemText}>
+                      {m.papel ? (
+                        <Text style={[styles.itemPapel, PAPEL_ESTILO[m.papel]]}>
+                          {PAPEL_ROTULO[m.papel]}
+                        </Text>
+                      ) : null}
                       <Text style={styles.itemTitle} numberOfLines={1}>
                         {m.titulo}
                       </Text>
@@ -241,6 +267,12 @@ const styles = StyleSheet.create({
   },
   itemText: {
     flex: 1,
+  },
+  itemPapel: {
+    fontFamily: fonts.labelForte,
+    fontSize: 9,
+    letterSpacing: 1.4,
+    marginBottom: 3,
   },
   itemTitle: {
     color: colors.ink,

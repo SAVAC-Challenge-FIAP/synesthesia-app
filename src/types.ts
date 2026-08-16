@@ -46,6 +46,19 @@ export interface Vibe {
   descricao: string;
 }
 
+/**
+ * Papel da faixa dentro do conjunto de quatro (T058). Existe para que uma
+ * sugestão fora do óbvio chegue como **proposta** e não como erro: sem rótulo,
+ * um artista desconhecido no meio de três hits parece defeito da curadoria.
+ *
+ * - `afinidade`  — casa com o histórico de escolhas **do próprio aparelho**;
+ *                  derivado localmente, nunca pedido ao Gemini (ver D7).
+ * - `certeira`   — combina com a cena, sem risco.
+ * - `descoberta` — artista pouco conhecido, conferido pelo `nb_fan` no T059.
+ * - `curinga`    — livre, pode ser inesperada.
+ */
+export type PapelFaixa = 'afinidade' | 'certeira' | 'descoberta' | 'curinga';
+
 export interface MusicSuggestion {
   id: string;
   titulo: string;
@@ -55,6 +68,8 @@ export interface MusicSuggestion {
   /** URL de preview (30s) — Deezer */
   previewUrl: string | null;
   origem: 'deezer' | 'gemini' | 'local';
+  /** Ausente nas faixas do catálogo local e do Deezer puro. */
+  papel?: PapelFaixa;
 }
 
 export interface Media {

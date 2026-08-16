@@ -784,7 +784,7 @@ contribuiu.
   Os logs já existentes ajudam: `[music] ORIGEM=...` diz de qual camada as faixas vieram, e
   `[music][tempo]` dá a latência. Leia com `adb logcat ReactNativeJS:V '*:S'`.
 
-- [ ] **T057** [P1] **Histórico de gosto no aparelho** — store novo `src/stores/useTasteStore.ts`.
+- [X] **T057** [P1] **Histórico de gosto no aparelho** — store novo `src/stores/useTasteStore.ts`.
 
   Guarda o que a pessoa **escolheu**, não o que apareceu para ela:
 

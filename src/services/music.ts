@@ -1,7 +1,8 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { VIBES } from '@/constants/vibes';
-import { MusicSuggestion, Vibe, VibeId } from '@/types';
+import { useTasteStore } from '@/stores/useTasteStore';
+import { MusicSuggestion, PapelFaixa, Vibe, VibeId } from '@/types';
 
 /**
  * Curadoria musical — até 4 sugestões por vibe (FR-005) — e análise de cena.
@@ -72,6 +73,51 @@ interface GeminiTrackIdea {
   titulo: string;
   artista: string;
   justificativa: string;
+  papel?: string;
+}
+
+/**
+ * Distribuição fixa de papéis nos quatro slots (T058).
+ *
+ * `afinidade` **não** está aqui de propósito: ela dependeria de mandar ao Gemini
+ * os artistas que a pessoa escolhe, e isso é divulgação de gosto pessoal que o
+ * opt-in da leitura de cena não cobre (D7). O rótulo é aplicado depois,
+ * localmente, por `rotularAfinidade` — o histórico não sai do aparelho.
+ *
+ * Duas `descoberta` em quatro, e não uma: com uma só, a medição do T056 mostra
+ * que os outros três slots bastam para o conjunto inteiro parecer o de sempre.
+ */
+const PAPEIS_PEDIDOS = ['certeira', 'descoberta', 'descoberta', 'curinga'] as const;
+
+const PAPEIS_VALIDOS: readonly string[] = ['certeira', 'descoberta', 'curinga'];
+
+/**
+ * Instrução comum aos dois prompts. Concentrada aqui porque a lição do T056 foi
+ * exatamente que uma palavra solta ("populares") num prompt duplicado governa o
+ * resultado inteiro — duplicar a regra é duplicar o risco de ela divergir.
+ */
+function instrucaoDeCuradoria(bloqueio: string[]): string {
+  const papeis =
+    `Devolva 4 faixas com estes papéis, nesta ordem, no campo "papel": ` +
+    `"certeira" (combina com a cena, sem risco), ` +
+    `"descoberta" (artista POUCO CONHECIDO, fora do mainstream, com uma faixa realmente boa), ` +
+    `"descoberta" (outro artista pouco conhecido, diferente do anterior), ` +
+    `"curinga" (livre, pode surpreender). `;
+  const variacao =
+    `Varie deliberadamente época, idioma e país de origem entre as quatro — ` +
+    `não devolva quatro faixas da mesma década nem todas em inglês. `;
+  const naoRepita = bloqueio.length
+    ? `NÃO sugira nenhuma destas, já usadas recentemente: ${bloqueio.join('; ')}. `
+    : '';
+  return papeis + variacao + naoRepita;
+}
+
+/** Aceita só os papéis que o modelo tinha permissão de usar. */
+function papelDe(idea: GeminiTrackIdea, i: number): PapelFaixa {
+  const bruto = idea.papel?.trim().toLowerCase();
+  if (bruto && PAPEIS_VALIDOS.includes(bruto)) return bruto as PapelFaixa;
+  // Sem papel utilizável, vale a posição pedida: o prompt fixa a ordem.
+  return PAPEIS_PEDIDOS[i] ?? 'curinga';
 }
 
 // Modelo com cota disponível no tier gratuito do AI Studio (gemini-3.5-flash e
@@ -102,10 +148,14 @@ async function callGemini(input: GeminiPart[]): Promise<string> {
 
 async function askGemini(vibe: Vibe): Promise<GeminiTrackIdea[]> {
   if (!GEMINI_KEY) return [];
+  // Aqui a vibe já é conhecida, então a lista de bloqueio pode ser a dela.
+  const bloqueio = useTasteStore.getState().faixasSugeridasRecentes(vibe.id, 20);
   const prompt =
     `Você é o curador musical do app Synesthesia. A foto tem a vibe "${vibe.nome}" (${vibe.descricao}). ` +
-    `Sugira 4 músicas reais e populares que combinem. Responda SOMENTE JSON: ` +
-    `[{"titulo":"...","artista":"...","justificativa":"até 12 palavras, em pt-BR"}]`;
+    `Sugira 4 músicas reais que combinem. ` +
+    instrucaoDeCuradoria(bloqueio) +
+    `Responda SOMENTE JSON: ` +
+    `[{"titulo":"...","artista":"...","papel":"...","justificativa":"até 12 palavras, em pt-BR"}]`;
   const text = await callGemini([{ type: 'text', text: prompt }]);
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) return [];
@@ -143,12 +193,16 @@ interface GeminiSceneResult {
 async function askGeminiWithPhoto(photoBase64: string): Promise<GeminiSceneResult | null> {
   if (!GEMINI_KEY) return null;
   const vibesDisponiveis = VIBES.map((v) => `"${v.id}" (${v.descricao})`).join(', ');
+  // A vibe ainda não existe neste ponto — é o próprio Gemini que a classifica —,
+  // então o bloqueio é o global: "não repita o que você acabou de sugerir".
+  const bloqueio = useTasteStore.getState().faixasSugeridasGlobais(20);
   const prompt =
     `Você é o motor sensorial do app Synesthesia. Analise a foto anexada e: ` +
     `1) classifique a atmosfera da cena em EXATAMENTE UMA destas vibes: ${vibesDisponiveis}; ` +
-    `2) sugira 4 músicas reais e populares que combinem com o que aparece na foto. ` +
+    `2) sugira 4 músicas reais que combinem com o que aparece na foto. ` +
+    instrucaoDeCuradoria(bloqueio) +
     `Responda SOMENTE JSON: {"vibe":"<id da vibe>","cena":"o que há na foto, até 10 palavras", ` +
-    `"musicas":[{"titulo":"...","artista":"...","justificativa":"até 12 palavras, em pt-BR, ligada à cena"}]}`;
+    `"musicas":[{"titulo":"...","artista":"...","papel":"...","justificativa":"até 12 palavras, em pt-BR, ligada à cena"}]}`;
   const text = await callGemini([
     { type: 'text', text: prompt },
     { type: 'image', data: photoBase64, mime_type: 'image/jpeg' },
@@ -225,6 +279,7 @@ async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<
           justificativa: idea.justificativa,
           previewUrl: track?.preview ?? null,
           origem: 'gemini',
+          papel: papelDe(idea, i),
         };
       } catch (e) {
         console.log(`[music] Deezer falhou ao resolver preview de "${idea.titulo}"`, e);
@@ -233,6 +288,31 @@ async function resolveWithDeezer(ideas: GeminiTrackIdea[], vibe: Vibe): Promise<
     }),
   );
   return resolved.filter((s): s is MusicSuggestion => s !== null);
+}
+
+/**
+ * Personalização que **não sai do aparelho** (D7, alternativa 1).
+ *
+ * O pedido do Sávio era "aprender de um cantor que a pessoa já escolheu". A via
+ * direta seria mandar esses nomes ao Gemini, e é justamente a que o consentimento
+ * atual não cobre. Então o histórico age depois: se uma das faixas devolvidas for
+ * de artista que a pessoa já escolheu, ela ganha o rótulo `afinidade` e vai para
+ * o topo da lista.
+ *
+ * No máximo **uma** — o T058 pede isso explicitamente, para o histórico
+ * personalizar sem fechar a pessoa na própria bolha.
+ */
+function rotularAfinidade(sugestoes: MusicSuggestion[]): MusicSuggestion[] {
+  const frequentes = useTasteStore.getState().artistasFrequentes(8);
+  if (frequentes.length === 0) return sugestoes;
+  const normalizados = frequentes.map((a) => a.trim().toLowerCase());
+  const alvo = sugestoes.findIndex((s) =>
+    normalizados.includes(s.artista.trim().toLowerCase()),
+  );
+  if (alvo < 0) return sugestoes;
+  const marcada: MusicSuggestion = { ...sugestoes[alvo], papel: 'afinidade' };
+  console.log(`[music] afinidade local: «${marcada.titulo} — ${marcada.artista}»`);
+  return [marcada, ...sugestoes.filter((_, i) => i !== alvo)];
 }
 
 /**
@@ -294,9 +374,14 @@ export async function analyzePhotoAndSuggest(
       const vibe = vibeReal ?? fallbackVibe;
       onEtapa?.('buscando');
       const marcoDeezer = Date.now();
-      const sugestoes = await resolveWithDeezer(scene.musicas ?? [], vibe);
+      const resolvidas = await resolveWithDeezer(scene.musicas ?? [], vibe);
       const tDeezer = Date.now() - marcoDeezer;
-      if (sugestoes.length > 0) {
+      if (resolvidas.length > 0) {
+        const sugestoes = rotularAfinidade(resolvidas);
+        // A lista de bloqueio da próxima curadoria é esta: o que acabou de ser
+        // oferecido. Guardar aqui, e não em quem consome, garante que vale para
+        // todo caminho que devolve faixas do Gemini.
+        useTasteStore.getState().registrarSugeridas(vibe.id, sugestoes);
         console.log(`[music] ORIGEM=gemini-foto — ${sugestoes.length} sugestão(ões) da cena real`);
         registrarFaixas('gemini-foto', sugestoes);
         registrar('gemini-foto', tDeezer);
@@ -341,8 +426,10 @@ export async function getSuggestions(
     console.log(`[music] Gemini retornou ${ideas.length} ideia(s)`, ideas);
     if (ideas.length > 0) {
       onEtapa?.('buscando');
-      const ok = await resolveWithDeezer(ideas, vibe);
-      if (ok.length > 0) {
+      const resolvidas = await resolveWithDeezer(ideas, vibe);
+      if (resolvidas.length > 0) {
+        const ok = rotularAfinidade(resolvidas);
+        useTasteStore.getState().registrarSugeridas(vibe.id, ok);
         console.log(`[music] ORIGEM=gemini — ${ok.length} sugestão(ões) usadas`);
         registrarFaixas('gemini', ok);
         return ok;

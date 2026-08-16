@@ -64,6 +64,12 @@ interface TasteState {
   artistasFrequentes: (n?: number) => string[];
   /** Chaves `titulo — artista` já sugeridas para a vibe, das mais recentes. */
   faixasSugeridasRecentes: (vibeId: VibeId, n?: number) => string[];
+  /**
+   * Últimas sugeridas de **todas** as vibes. É esta que a análise por foto usa:
+   * lá a vibe ainda não existe no momento do pedido — quem a classifica é o
+   * próprio Gemini —, então não há por qual lista filtrar.
+   */
+  faixasSugeridasGlobais: (n?: number) => string[];
   /** Chaves de tudo que a pessoa já escolheu, para não reoferecer o de sempre. */
   faixasEscolhidasRecentes: (n?: number) => string[];
 
@@ -151,6 +157,16 @@ export const useTasteStore = create<TasteState>()(
 
       faixasSugeridasRecentes: (vibeId, n = 20) =>
         (get().sugeridasPorVibe[vibeId] ?? []).slice(0, n).map((f) => f.chave),
+
+      faixasSugeridasGlobais: (n = 20) => {
+        const todas = Object.values(get().sugeridasPorVibe).flat();
+        const vistas = new Set<string>();
+        return todas
+          .sort((a, b) => b.em - a.em)
+          .filter((f) => (vistas.has(f.chave) ? false : (vistas.add(f.chave), true)))
+          .slice(0, n)
+          .map((f) => f.chave);
+      },
 
       faixasEscolhidasRecentes: (n = 20) =>
         get()
