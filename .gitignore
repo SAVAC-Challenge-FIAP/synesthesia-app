@@ -47,3 +47,8 @@ coverage/
 
 # Agent folders (may contain credentials)
 .claude/settings.local.json
+
+# Assinatura do APK de release (T098) — chave e senhas nunca vao para o git
+android/keystore.properties
+android/app/*.keystore
+!android/app/debug.keystore
