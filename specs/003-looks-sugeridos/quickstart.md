@@ -73,13 +73,17 @@ Os tempos de cada etapa da curadoria (imagem/Gemini/Deezer) aparecem no console 
 
 ## US3 — Tratamentos fiéis em qualquer aparelho e no arquivo final (P2)
 
-**Ainda não implementada nesta rodada** (Skia não instalado — ver `research.md` R3 e `ESTADO.md`). Os itens abaixo ficam registrados para quando a migração acontecer; até lá, esperar que:
+**Código completo, zero minutos rodado em device** (ver `ESTADO.md` — sessão sem device conectado). `@shopify/react-native-skia` já está no `package.json`; falta o `npm run android` que regera o dev build com o módulo nativo dentro (T033), e só depois disso dá para riscar os itens abaixo.
 
-- No Android, os três looks sejam visivelmente diferentes entre si na prévia (o `style.filter` do RN cobre `brightness`/`saturate`/`contrast`/`sepia` nesta plataforma).
-- Em iOS, os três looks tendem a parecer parecidos entre si — **falha conhecida**, é exatamente o que a US3 resolve (`style.filter` só aplica `brightness` fora do Android).
-- O arquivo salvo saia na resolução da tela do aparelho, não na resolução da foto capturada — também falha conhecida, herdada do export por `captureRef` (print de tela).
+0. **Antes de mais nada**: `npm run android` (rebuild — sem ele o app continua no render antigo, sem quebrar nada, mas sem testar US3 de verdade).
+1. Capturar uma foto e abrir o Modal de Captura: a prévia deve trocar do render antigo para o Skia sem flash perceptível (a troca acontece num `useEffect`, ver `FilteredImage.tsx`).
+2. No Android **e** em iOS, os três looks devem ser visivelmente diferentes entre si na prévia — agora por uma matriz de cor no Canvas (`matrizDeCor()` em `looks.ts`), não mais por `style.filter` do RN.
+3. Tocar em "Salvar" ou "Postar agora": o arquivo que sai (galeria do sistema, ou o `.png` em `cache/synesthesia-looks/` gerado por `renderLook.ts`) deve ter a resolução da **foto capturada**, não da tela do aparelho — conferir com `adb shell` ou o próprio app de galeria do sistema (Detalhes → resolução).
+4. Comparar lado a lado a prévia na tela com o arquivo exportado: as duas devem bater (mesma matriz de cor, mesmo overlay) — é o teste que garante que o `captureRef` (rede de segurança sem Skia) não ficou entalado em algum caminho.
 
-✅ **Aceite pendente** (SC-006, SC-007): arquivo exportado preserva a resolução da foto capturada; três looks distinguíveis em ambos os sistemas. Não fechar como concluído enquanto o render não migrar para Skia.
+⚠️ **Onde mais provavelmente algo vai estar errado, se estiver**: a matemática de `matrizDeCor()` (ordem de composição saturação→contraste→brilho→sepia, offset do contraste em escala 0–1) e o desenho do overlay em `renderLook.ts` (`Skia.Paint().setAlphaf()`) — nenhum dos dois foi visto renderizado antes desta verificação.
+
+✅ **Aceite** (SC-006, SC-007): arquivo exportado preserva a resolução da foto capturada; três looks distinguíveis em ambos os sistemas. Não marcar como fechado até isto rodar de verdade em device.
 
 ---
 

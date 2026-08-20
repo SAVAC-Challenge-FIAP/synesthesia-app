@@ -21,7 +21,7 @@ Este repositório é a evolução **mobile (Expo / React Native)** do MVP funcio
 
 ## ✨ Pilares
 
-1. **Inteligência Contextual e Adaptativa** — a "vibe" do visor é recalculada em tempo real (inclusive ao virar a câmera) e o filtro é aplicado ao vivo.
+1. **Inteligência Contextual e Adaptativa** — a "vibe" do visor é recalculada em tempo real (inclusive ao virar a câmera) e o filtro é aplicado ao vivo. Ao capturar, a cena real (lida pelo Gemini) substitui a tabela fixa `vibe → filtro` por **três looks sugeridos**, com o principal já aplicado sem toque — e o app aprende o gosto visual de quem usa, sem nada disso passar pela rede.
 2. **Fusão entre Atmosfera e Som** — imagem e música formam um único pacote sensorial no momento da captura.
 3. **Ciclo de Vida da Mídia** — galeria inteligente que preserva a intenção criativa: revisite, lapide e exporte.
 
@@ -74,7 +74,7 @@ O Expo Go não carrega módulos nativos fora do SDK. Para validação imediata n
 |---|---|
 | `react-native-vision-camera` | `expo-camera` |
 | ML Kit (rotulagem de cena on-device) | Vibe simulada on-device (`src/services/vibeEngine.ts`) — mesmo contrato `detectVibe() → Vibe` |
-| Skia (shaders GPU) | Overlays + style `filter` do RN (GPU) |
+| Skia (shaders GPU) | Carga opcional (`src/services/skiaBridge.ts`): usa `@shopify/react-native-skia` quando o dev build já foi regerado com o módulo nativo; sem isso, cai para overlays + style `filter` do RN |
 | `ffmpeg-kit` (vídeo .mp4 imagem+áudio) | No Expo Go: imagem renderizada + áudio + legenda. No **development build**: `.mp4` real (ver abaixo) |
 | `expo-av` | `expo-audio` (sucessor oficial) |
 
@@ -109,7 +109,7 @@ O APK sai em `android/app/build/outputs/apk/release/app-release.apk`. A keystore
 
 O que está de fato no `package.json`, não a arquitetura originalmente planejada — a tabela de adaptações acima documenta onde as duas divergem.
 
-`Expo 54` · `expo-router` · `TypeScript` · `expo-camera` (visor + captura) · `expo-image-manipulator` (giro/recorte da foto) · `expo-audio` · `expo-linear-gradient` · `zustand` (estado) · `@react-native-async-storage/async-storage` (persistência) · `react-native-view-shot` (renderizar foto + filtro) · `@react-native-community/slider` · `@expo-google-fonts/nunito` + `@expo-google-fonts/lato` · `androidx.media3-transformer` (módulo nativo, ver abaixo) · `expo-media-library` · `expo-sharing`
+`Expo 54` · `expo-router` · `TypeScript` · `expo-camera` (visor + captura) · `expo-image-manipulator` (giro/recorte da foto) · `expo-audio` · `expo-linear-gradient` · `zustand` (estado) · `@react-native-async-storage/async-storage` (persistência) · `@shopify/react-native-skia` (render fiel do filtro na foto final, carga opcional — ver tabela acima) · `react-native-view-shot` (rede de segurança enquanto o Skia nativo não está presente) · `@react-native-community/slider` · `@expo-google-fonts/nunito` + `@expo-google-fonts/lato` · `androidx.media3-transformer` (módulo nativo, ver abaixo) · `expo-media-library` · `expo-sharing`
 
 A curadoria musical chama a **Interactions API do Gemini** direto por `fetch` (sem SDK) e o **Deezer** (API pública, sem chave) para os previews de 30s — ver [`src/services/music.ts`](src/services/music.ts).
 
@@ -145,15 +145,18 @@ Tipografia: **Nunito** (display) + **Lato** (labels técnicas). Filtros: Vivid �
 │   ├── components/               # CaptureSheet, MusicSheet, PostSheet, FilterCarousel,
 │   │                              # AberturaMarca/LoaderMarca (marca animada), player...
 │   ├── constants/                # 8 filtros, 8 vibes, 3 enquadramentos (cada um com sua âncora)
-│   ├── services/                 # vibeEngine, music (Gemini/Deezer), enquadrar (giro/recorte),
-│   │                              # sharePackage, videoMuxer, systemGallery, mediaStorage
-│   ├── stores/                   # zustand: ajustes, galeria, sessão de captura, gosto musical
+│   ├── services/                 # vibeEngine, music (Gemini/Deezer), looks (3 looks + afinidade),
+│   │                              # renderLook (Skia offscreen), skiaBridge (carga opcional),
+│   │                              # enquadrar (giro/recorte), sharePackage, videoMuxer,
+│   │                              # systemGallery, mediaStorage
+│   ├── stores/                   # zustand: ajustes, galeria, sessão de captura, gosto musical e visual
 │   └── theme/                    # Design tokens (ruby/amber/ink/parchment, Nunito + Lato)
 ├── CLAUDE.md                     # Guia para agentes de código
 ├── docs/                         # Documentos-fonte (requisitos + arquitetura) + previews
 ├── specs/
 │   ├── 001-synesthesia-mvp/      # Especificação original (Spec Kit)
-│   └── 002-qa-lapidacao-v1/      # QA e lapidação pós-MVP — histórico de bugs e decisões
+│   ├── 002-qa-lapidacao-v1/      # QA e lapidação pós-MVP — histórico de bugs e decisões
+│   └── 003-looks-sugeridos/      # Três looks sugeridos com memória de gosto (ESTADO.md tem o progresso)
 └── .specify/                     # Constituição, templates e workflow do Spec Kit
 ```
 

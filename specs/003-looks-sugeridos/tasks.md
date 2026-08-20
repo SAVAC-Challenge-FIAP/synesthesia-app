@@ -100,7 +100,7 @@ Projeto **mobile Expo** com a estrutura já vigente (não se cria diretório de 
 - [X] T029 [US2] Registrar a escolha visual em `src/components/CaptureSheet.tsx` dentro de `salvar()` e do caminho de postagem, distinguindo escolha explícita de aceite passivo — sem rebaixar `manual` para `auto`, exatamente como `registrarEscolha` já faz para música em `useTasteStore.ts` (FR-010, FR-011)
 - [x] T030 [US2] Assegurar em `src/services/music.ts` que o histórico de gosto **visual** não entra no prompt: `preferenciasAprendidas()` segue lendo só o gosto musical, e nenhuma leitura de `useLookTasteStore` aparece em `instrucaoDeCuradoria` ou em `askGeminiWithPhoto` (FR-014, SC-008)
 - [x] T031 [US2] Adicionar em `app/settings.tsx` a ação de apagar o histórico de gosto visual, com confirmação explícita, chamando `useLookTasteStore.limpar()` (FR-016, cenário US2.6)
-- [ ] T032 [US2] Marcar o papel `afinidade` em `amber` (`colors.amber`) em `src/components/LookChips.tsx`, consistente com o uso de amber para música e foco na identidade visual (Princípio VI)
+- [x] T032 [US2] Marcar o papel `afinidade` em `amber` (`colors.amber`) em `src/components/LookChips.tsx`, consistente com o uso de amber para música e foco na identidade visual (Princípio VI) — já estava implementado desde a T019 (`papelAfinidade: { color: colors.amber }`), só faltava marcar aqui
 
 **Checkpoint**: US1 e US2 juntas entregam a tese completa da feature — sugestão contextual que aprende.
 
@@ -116,12 +116,12 @@ Projeto **mobile Expo** com a estrutura já vigente (não se cria diretório de 
 
 ### Implementation for User Story 3
 
-- [ ] T033 [US3] Adicionar `@shopify/react-native-skia` ao `package.json` e regerar o dev build Android (`npm run android`), confirmando que o app sobe com o módulo nativo presente
-- [ ] T034 [US3] Implementar em `src/services/looks.ts` a conversão de `LookRecipe` para matriz de cor do Skia (`ColorMatrix`), cobrindo `brightness`, `saturate`, `contrast` e `sepia` conforme R3 de T001
-- [ ] T035 [US3] Reescrever `src/components/FilteredImage.tsx` para renderizar por Skia com a matriz de T034, eliminando a dependência do `style.filter` do RN, que só aplica `brightness` em iOS — a limitação está documentada em `src/types.ts` (FR-025, SC-007)
-- [ ] T036 [US3] Criar `src/services/renderLook.ts` com o render offscreen que aplica a receita sobre a foto original em resolução cheia e devolve um arquivo, substituindo o print de tela (FR-024, SC-006)
-- [ ] T037 [US3] Trocar `renderizarComFiltro()` em `src/components/CaptureSheet.tsx` para usar `renderLook`, removendo o `captureRef` e o import de `react-native-view-shot` se ele não tiver outro uso
-- [ ] T038 [US3] Verificar a paridade visual conferindo, com a mesma foto, que os três looks são distinguíveis entre si e que o arquivo exportado tem a resolução da foto capturada, registrando o resultado em `specs/003-looks-sugeridos/quickstart.md`
+- [ ] T033 [US3] Adicionar `@shopify/react-native-skia` ao `package.json` e regerar o dev build Android (`npm run android`), confirmando que o app sobe com o módulo nativo presente — **parcial**: pacote já adicionado (`npx expo install`, está no `package.json`/`package-lock.json`) e o bundle Metro já foi verificado com `npx expo export --platform android` (resolve o módulo inteiro sem erro, inclusive a dependência opcional `react-native-reanimated` que o Skia isola no próprio `ReanimatedProxy` — não precisa instalar reanimated à parte). Falta só o `npm run android` de verdade, que exige device/emulador — é o primeiro passo da próxima sessão
+- [x] T034 [US3] Implementar em `src/services/looks.ts` a conversão de `LookRecipe` para matriz de cor do Skia (`ColorMatrix`), cobrindo `brightness`, `saturate`, `contrast` e `sepia` conforme R3 de T001 — `matrizDeCor()`, operando sobre o `FilterDef` já resolvido (denominador comum entre look e preset puro), ver nota de decisão no ESTADO.md
+- [x] T035 [US3] Reescrever `src/components/FilteredImage.tsx` para renderizar por Skia com a matriz de T034, eliminando a dependência do `style.filter` do RN, que só aplica `brightness` em iOS — a limitação está documentada em `src/types.ts` (FR-025, SC-007) — carga opcional via `skiaBridge.ts`: sem o nativo, cai para o render antigo automaticamente, **não verificado visualmente em device**
+- [x] T036 [US3] Criar `src/services/renderLook.ts` com o render offscreen que aplica a receita sobre a foto original em resolução cheia e devolve um arquivo, substituindo o print de tela (FR-024, SC-006)
+- [x] T037 [US3] Trocar `renderizarComFiltro()` em `src/components/CaptureSheet.tsx` para usar `renderLook`, removendo o `captureRef` e o import de `react-native-view-shot` se ele não tiver outro uso — **decisão registrada no ESTADO.md**: o `captureRef` foi mantido como rede de segurança para quando o Skia ainda não foi regerado, em vez de removido — sem ele, salvar antes do rebuild sairia sem filtro nenhum, contradizendo a carga opcional da R3
+- [ ] T038 [US3] Verificar a paridade visual conferindo, com a mesma foto, que os três looks são distinguíveis entre si e que o arquivo exportado tem a resolução da foto capturada, registrando o resultado em `specs/003-looks-sugeridos/quickstart.md` — **bloqueado por device**: exige o rebuild de T033 rodando de verdade
 
 **Checkpoint**: a feature fica honesta em iOS e o arquivo final deixa de ser uma captura de tela.
 
@@ -147,11 +147,11 @@ Projeto **mobile Expo** com a estrutura já vigente (não se cria diretório de 
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T044 Rodar `npm run typecheck` na raiz e zerar qualquer erro de tipo introduzido pela feature
-- [ ] T045 [P] Reavaliar `src/components/FilterLayer.tsx`: com o render por Skia (T035) os overlays viram parte da receita — atualizar o componente ou removê-lo se nenhum consumidor restar
-- [ ] T046 [P] Atualizar `CLAUDE.md` e `README.md` trocando a descrição da tabela fixa `vibe → filtro` pela de três looks sugeridos com memória de gosto
-- [ ] T047 Executar o roteiro de `specs/003-looks-sugeridos/quickstart.md` de ponta a ponta no dev build e registrar o resultado de cada cenário
-- [ ] T048 Conferir os critérios SC-001 a SC-009 de `specs/003-looks-sugeridos/spec.md` um a um, anotando no `quickstart.md` como cada um foi verificado
+- [x] T044 Rodar `npm run typecheck` na raiz e zerar qualquer erro de tipo introduzido pela feature — verde, inclusive depois de `@shopify/react-native-skia`
+- [x] T045 [P] Reavaliar `src/components/FilterLayer.tsx`: com o render por Skia (T035) os overlays viram parte da receita — atualizar o componente ou removê-lo se nenhum consumidor restar — **mantido**: ainda tem dois consumidores reais (`app/camera.tsx`, o visor ao vivo por FR-021, e `FilteredImageLegado`, a rede de segurança sem Skia); comentário do arquivo atualizado explicando os dois
+- [x] T046 [P] Atualizar `CLAUDE.md` e `README.md` trocando a descrição da tabela fixa `vibe → filtro` pela de três looks sugeridos com memória de gosto
+- [ ] T047 Executar o roteiro de `specs/003-looks-sugeridos/quickstart.md` de ponta a ponta no dev build e registrar o resultado de cada cenário — **bloqueado por device**, ver ESTADO.md
+- [ ] T048 Conferir os critérios SC-001 a SC-009 de `specs/003-looks-sugeridos/spec.md` um a um, anotando no `quickstart.md` como cada um foi verificado — SC-001 a SC-005, SC-008 e SC-009 já confirmados em sessão anterior (ver ESTADO.md); **SC-006 e SC-007 (resolução do arquivo exportado, paridade Android/iOS) dependem do Skia rodando de verdade em device — pendentes**
 
 ---
 
