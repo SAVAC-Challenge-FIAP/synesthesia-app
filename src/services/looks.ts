@@ -9,7 +9,7 @@ import {
 } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
 import { chaveDaEscolha, useLookTasteStore } from '@/stores/useLookTasteStore';
-import { AjustesLook, FilterId, LookRecipe, PapelLook, VibeId } from '@/types';
+import { AjustesLook, FilterDef, FilterId, LookRecipe, PapelLook, VibeId } from '@/types';
 
 /**
  * Montagem dos três looks sugeridos por foto (feature 003).
@@ -263,4 +263,118 @@ export function looksDeMidiaAntiga(
   };
   const resto = base.filter((l) => l.base !== filtroId);
   return { looks: [escolhido, ...resto].slice(0, TOTAL_LOOKS), escolhido };
+}
+
+/**
+ * Matriz de cor do Skia (feature 003, US3, research R3).
+ *
+ * Uma matriz de cor 4×5 (RGBA + offset) representa uma transformação afim:
+ * `saida = M · entrada`. Compor duas transformações em série — aplicar B e
+ * depois A — é multiplicar as matrizes: `M = A · B`. É isto que permite
+ * combinar saturação, contraste, brilho e sepia numa matriz só, em vez de
+ * quatro filtros encadeados no Canvas (um passe de GPU em vez de quatro).
+ *
+ * As linhas ficam concatenadas: índices `[0..4]` = R, `[5..9]` = G,
+ * `[10..14]` = B, `[15..19]` = A. Skia opera em ponto flutuante 0–1, não em
+ * 0–255 — por isso o offset do contraste é `0.5`, não `127.5`.
+ */
+type MatrizCor = number[];
+
+function identidadeCor(): MatrizCor {
+  // prettier-ignore
+  return [
+    1, 0, 0, 0, 0,
+    0, 1, 0, 0, 0,
+    0, 0, 1, 0, 0,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+/** `M = a · b`, ou seja: aplica `b` e depois `a`. */
+function multiplicarMatrizesCor(a: MatrizCor, b: MatrizCor): MatrizCor {
+  const linha = (m: MatrizCor, i: number) => m.slice(i * 5, i * 5 + 5);
+  const resultado: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const la = linha(a, i);
+    for (let j = 0; j < 4; j++) {
+      let soma = 0;
+      for (let k = 0; k < 4; k++) soma += la[k] * b[k * 5 + j];
+      resultado.push(soma);
+    }
+    let offset = la[4];
+    for (let k = 0; k < 4; k++) offset += la[k] * b[k * 5 + 4];
+    resultado.push(offset);
+  }
+  return resultado;
+}
+
+/** Pesos de luminância padrão (Rec. 601), a mesma base de todo filtro CSS/SVG de saturação. */
+function matrizSaturacao(s: number): MatrizCor {
+  const [lr, lg, lb] = [0.213, 0.715, 0.072];
+  // prettier-ignore
+  return [
+    lr + (1 - lr) * s, lg - lg * s,       lb - lb * s,       0, 0,
+    lr - lr * s,        lg + (1 - lg) * s, lb - lb * s,       0, 0,
+    lr - lr * s,        lg - lg * s,       lb + (1 - lb) * s, 0, 0,
+    0,                   0,                 0,                 1, 0,
+  ];
+}
+
+/** Escala em torno do cinza médio (research R3): `c` na diagonal, offset `0.5·(1-c)`. */
+function matrizContraste(c: number): MatrizCor {
+  const t = 0.5 * (1 - c);
+  // prettier-ignore
+  return [
+    c, 0, 0, 0, t,
+    0, c, 0, 0, t,
+    0, 0, c, 0, t,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+/** Escala uniforme na diagonal — sem offset, então preto continua preto. */
+function matrizBrilho(b: number): MatrizCor {
+  // prettier-ignore
+  return [
+    b, 0, 0, 0, 0,
+    0, b, 0, 0, 0,
+    0, 0, b, 0, 0,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+// prettier-ignore
+const SEPIA_CLASSICA: MatrizCor = [
+  0.393, 0.769, 0.189, 0, 0,
+  0.349, 0.686, 0.168, 0, 0,
+  0.272, 0.534, 0.131, 0, 0,
+  0,     0,     0,     1, 0,
+];
+
+/** Interpola entre identidade e a matriz sepia clássica pelo fator (research R3). */
+function matrizSepia(f: number): MatrizCor {
+  if (f <= 0) return identidadeCor();
+  const id = identidadeCor();
+  return id.map((v, i) => v * (1 - f) + SEPIA_CLASSICA[i] * f);
+}
+
+/**
+ * Converte um `FilterDef` já resolvido (`resolverReceita()` ou `filterById()`)
+ * na matriz de cor 20 floats que o `Skia.ColorFilter.MakeMatrix` espera.
+ *
+ * Opera sobre o `FilterDef` resolvido, não sobre o `LookRecipe` cru: é o
+ * denominador comum entre um look com receita e um dos 8 presets escolhido
+ * puro, e os dois já passam pela mesma barreira de clamp antes de chegar aqui.
+ *
+ * Ordem de composição (research R3): saturação → contraste → brilho → sepia.
+ * O overlay de cor do preset **não** entra na matriz — vira um `Skia.Paint`
+ * desenhado por cima, por quem chama (`renderLook.ts`, `FilteredImage.tsx`).
+ */
+export function matrizDeCor(filtro: FilterDef): number[] {
+  const f = filtro.imageFilter ?? {};
+  let m = matrizSaturacao(f.saturate ?? 1);
+  m = multiplicarMatrizesCor(matrizContraste(f.contrast ?? 1), m);
+  m = multiplicarMatrizesCor(matrizBrilho(f.brightness ?? 1), m);
+  m = multiplicarMatrizesCor(matrizSepia(f.sepia ?? 0), m);
+  return m;
 }

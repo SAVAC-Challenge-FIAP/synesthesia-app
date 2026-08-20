@@ -27,12 +27,13 @@ import { LookChips } from '@/components/LookChips';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicSheet } from '@/components/MusicSheet';
 import { PostSheet } from '@/components/PostSheet';
-import { filterById } from '@/constants/filters';
+import { filterById, resolverReceita } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
 import { identidadeDoLook, montarLooks } from '@/services/looks';
 import { analyzePhotoAndSuggest, EtapaCuradoria, getSuggestions } from '@/services/music';
 import { persistPhoto } from '@/services/mediaStorage';
 import * as preExport from '@/services/preExport';
+import { renderizarLook } from '@/services/renderLook';
 import { exportPackage, SharePackage } from '@/services/sharePackage';
 import { saveToSystemGallery } from '@/services/systemGallery';
 import { useCaptureStore } from '@/stores/useCaptureStore';
@@ -331,11 +332,27 @@ export function CaptureSheet() {
       });
   }, [photoUri, sugestaoAutomatica, deteccaoTempoReal, patch]);
 
+  /**
+   * Exporta a foto com o tratamento aplicado, na resolução do arquivo
+   * original (T037, FR-024) — não mais um print da prévia na resolução da
+   * tela, que é o que `captureRef` sempre fez.
+   *
+   * `renderizarLook` (Skia) é o caminho de primeira classe; o `captureRef`
+   * continua como rede de segurança para quando o nativo ainda não foi
+   * regerado no dev build (research R3, carga opcional) — sem ele, salvar ou
+   * postar antes do rebuild sairia sem filtro nenhum, enquanto a prévia na
+   * tela (que já cai para o render legado nesse caso) mostraria um. Manter
+   * os dois em série é o que garante que o arquivo exportado sempre bate com
+   * o que a pessoa viu na prévia, com ou sem o rebuild.
+   */
   const renderizarComFiltro = useCallback(async (): Promise<string> => {
     const s = useCaptureStore.getState().session;
     if (!s) return '';
     // Sem filtro, a imagem sai exatamente como capturada (T-0B)
     if (!s.filtroId) return s.photoUri;
+    const filtro = s.lookEscolhido ? resolverReceita(s.lookEscolhido) : filterById(s.filtroId);
+    const viaSkia = await renderizarLook(s.photoUri, filtro);
+    if (viaSkia) return viaSkia;
     try {
       return await captureRef(previewRef, { format: 'jpg', quality: 0.92 });
     } catch {
