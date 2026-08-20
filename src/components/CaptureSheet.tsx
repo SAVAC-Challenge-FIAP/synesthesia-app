@@ -472,6 +472,8 @@ export function CaptureSheet() {
           trechoFim: session.trechoFim,
           aspecto: session.aspecto,
           sugestoes: session.sugestoes,
+          looks: session.looks,
+          lookEscolhido: session.lookEscolhido ?? undefined,
           criadaEm: 0,
           atualizadaEm: Date.now(),
         };
@@ -484,6 +486,10 @@ export function CaptureSheet() {
           // Reabrir e trocar de música atualiza o leque salvo junto com a
           // escolha — senão a mídia guardaria a faixa nova e as opções velhas.
           sugestoes: session.sugestoes,
+          // Mesma lógica para o look (T039): sem isto, trocar de look numa
+          // mídia reaberta nunca sobrevivia ao Salvar (FR-022).
+          looks: session.looks,
+          lookEscolhido: session.lookEscolhido ?? undefined,
         });
       } else {
         const id = `${Date.now()}`;
@@ -507,6 +513,10 @@ export function CaptureSheet() {
           // As quatro opções vão junto: reabrir esta foto não precisa mais
           // consultar o Gemini para mostrar de onde a escolha saiu (T083).
           sugestoes: session.sugestoes,
+          // Mesma ideia para os looks (T039): sem isto a US4 só funcionava
+          // pela reconstrução de mídia antiga, e a decisão real nunca persistia.
+          looks: session.looks,
+          lookEscolhido: session.lookEscolhido ?? undefined,
           criadaEm: Date.now(),
           atualizadaEm: Date.now(),
         };

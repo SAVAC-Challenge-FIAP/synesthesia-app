@@ -55,7 +55,7 @@ Projeto **mobile Expo** com a estrutura já vigente (não se cria diretório de 
 - [X] T010 Implementar em `src/services/looks.ts` a geração de looks base a partir da vibe — o degrau intermediário da cadeia de degradação looks da IA → presets derivados da vibe → foto sem tratamento (FR-019)
 - [X] T011 Implementar `montarLooks()` em `src/services/looks.ts`, orquestrando os três slots (clamp → dedupe → completar com base) e garantindo **exatamente três** looks em qualquer cenário, inclusive sem rede e sem chave (FR-001, SC-004)
 - [X] T012 Alterar `src/components/FilteredImage.tsx` para aceitar `look?: LookRecipe` além do `filtroId` atual, renderizando pela receita resolvida em T007 quando presente e mantendo o caminho antigo quando ausente (compatibilidade com `FilterThumbs`, `gallery.tsx` e `camera.tsx`)
-- [ ] T013 Criar `specs/003-looks-sugeridos/quickstart.md` com o roteiro manual em dev build Android que cobre os cenários de aceitação das quatro user stories e os critérios SC-001 a SC-009
+- [x] T013 Criar `specs/003-looks-sugeridos/quickstart.md` com o roteiro manual em dev build Android que cobre os cenários de aceitação das quatro user stories e os critérios SC-001 a SC-009
 
 **Checkpoint**: fundação pronta — as user stories podem começar, e US3 pode correr em paralelo às demais.
 
@@ -78,9 +78,9 @@ Projeto **mobile Expo** com a estrutura já vigente (não se cria diretório de 
 - [X] T020 [US1] Integrar `LookChips` em `src/components/CaptureSheet.tsx` acima do bloco de filtros e aplicar a sugestão principal automaticamente quando a curadoria chega, sem exigir toque (FR-004)
 - [X] T021 [US1] Implementar a troca entre os três looks em `src/components/CaptureSheet.tsx` via `patch({ lookEscolhido })`, sem nova consulta externa e sem sair da tela, marcando a seleção visualmente (FR-005, SC-003)
 - [X] T022 [US1] Alterar `src/components/FilterThumbs.tsx` para que os 8 tratamentos base mais o "Original" continuem acessíveis **depois** das sugestões, e não no lugar delas (FR-006) — nota: o plano cita `FilterCarousel.tsx`, mas esse componente é o do visor ao vivo e deve permanecer intocado por FR-021; o carrossel do modal é o `FilterThumbs`
-- [ ] T023 [US1] Garantir em `src/components/CaptureSheet.tsx` que escolher "Original" mantém a foto exatamente como saiu da câmera e limpa o look aplicado, permanecendo uma escolha de primeira classe (cenário de aceitação US1.5)
+- [x] T023 [US1] Garantir em `src/components/CaptureSheet.tsx` que escolher "Original" mantém a foto exatamente como saiu da câmera e limpa o look aplicado, permanecendo uma escolha de primeira classe (cenário de aceitação US1.5)
 - [X] T024 [US1] Incluir a identidade do look em `chavePacote()` em `src/services/preExport.ts`, para que o vídeo pré-gerado de um look não seja servido para outro (D7)
-- [ ] T025 [US1] Verificar a cadeia de degradação em `src/components/CaptureSheet.tsx` e `src/services/music.ts` nos três cenários — sem chave, sem rede e estouro do `LIMITE_GEMINI_MS` de 22s: três looks base sempre aparecem, o botão Salvar nunca é bloqueado e a interface não anuncia falha de curadoria como se a foto tivesse falhado (FR-019, FR-020, SC-005)
+- [x] T025 [US1] Verificar a cadeia de degradação em `src/components/CaptureSheet.tsx` e `src/services/music.ts` nos três cenários — sem chave, sem rede e estouro do `LIMITE_GEMINI_MS` de 22s: três looks base sempre aparecem, o botão Salvar nunca é bloqueado e a interface não anuncia falha de curadoria como se a foto tivesse falhado (FR-019, FR-020, SC-005)
 
 **Checkpoint**: US1 completa — a tabela fixa `vibe → filtro` já foi substituída e o produto é demonstrável sozinho.
 
@@ -98,8 +98,8 @@ Projeto **mobile Expo** com a estrutura já vigente (não se cria diretório de 
 - [X] T027 [US2] Implementar `lookDeAfinidade(vibeId)` em `src/services/looks.ts`, consultando **apenas** `useLookTasteStore` e aplicando o limiar de sinal suficiente: sem histórico bastante, retorna nulo em vez de um rótulo mentindo (FR-013, FR-015)
 - [X] T028 [US2] Integrar o slot de afinidade em `montarLooks()` em `src/services/looks.ts`: quando `lookDeAfinidade` responde, ele é a sugestão principal e as outras duas seguem vindo da cena; quando não responde, o slot vira uma terceira sugestão de cena e nenhum look é rotulado afinidade (FR-017, cenário US2.1)
 - [X] T029 [US2] Registrar a escolha visual em `src/components/CaptureSheet.tsx` dentro de `salvar()` e do caminho de postagem, distinguindo escolha explícita de aceite passivo — sem rebaixar `manual` para `auto`, exatamente como `registrarEscolha` já faz para música em `useTasteStore.ts` (FR-010, FR-011)
-- [ ] T030 [US2] Assegurar em `src/services/music.ts` que o histórico de gosto **visual** não entra no prompt: `preferenciasAprendidas()` segue lendo só o gosto musical, e nenhuma leitura de `useLookTasteStore` aparece em `instrucaoDeCuradoria` ou em `askGeminiWithPhoto` (FR-014, SC-008)
-- [ ] T031 [US2] Adicionar em `app/settings.tsx` a ação de apagar o histórico de gosto visual, com confirmação explícita, chamando `useLookTasteStore.limpar()` (FR-016, cenário US2.6)
+- [x] T030 [US2] Assegurar em `src/services/music.ts` que o histórico de gosto **visual** não entra no prompt: `preferenciasAprendidas()` segue lendo só o gosto musical, e nenhuma leitura de `useLookTasteStore` aparece em `instrucaoDeCuradoria` ou em `askGeminiWithPhoto` (FR-014, SC-008)
+- [x] T031 [US2] Adicionar em `app/settings.tsx` a ação de apagar o histórico de gosto visual, com confirmação explícita, chamando `useLookTasteStore.limpar()` (FR-016, cenário US2.6)
 - [ ] T032 [US2] Marcar o papel `afinidade` em `amber` (`colors.amber`) em `src/components/LookChips.tsx`, consistente com o uso de amber para música e foco na identidade visual (Princípio VI)
 
 **Checkpoint**: US1 e US2 juntas entregam a tese completa da feature — sugestão contextual que aprende.
@@ -135,11 +135,11 @@ Projeto **mobile Expo** com a estrutura já vigente (não se cria diretório de 
 
 ### Implementation for User Story 4
 
-- [ ] T039 [US4] Persistir `looks` e `lookEscolhido` no registro salvo em `src/components/CaptureSheet.tsx` (`salvar()`), pelo mesmo caminho por onde `sugestoes` já é gravado (FR-022)
+- [x] T039 [US4] Persistir `looks` e `lookEscolhido` no registro salvo em `src/components/CaptureSheet.tsx` (`salvar()`), pelo mesmo caminho por onde `sugestoes` já é gravado (FR-022)
 - [X] T040 [US4] Passar `looks` e `lookEscolhido` para `start()` em `app/gallery.tsx`, como já é feito com `sugestoes: m.sugestoes ?? []`
 - [X] T041 [US4] Garantir a compatibilidade das mídias gravadas antes desta feature em `app/gallery.tsx` e `src/services/looks.ts`: `looks` ausente cai para os looks base derivados de `filtroId`/`vibeId`, sem erro e sem sugestões inventadas (FR-023, SC-009)
-- [ ] T042 [US4] Fazer a troca de look numa mídia reaberta atualizar o registro salvo e contar para o histórico de gosto em `src/components/CaptureSheet.tsx` (cenário US4.3)
-- [ ] T043 [US4] Impedir que reabrir uma mídia que já traz `looks` redispare a curadoria no `useEffect` de análise em `src/components/CaptureSheet.tsx`, pelo mesmo motivo que motivou o T083 no lado musical
+- [x] T042 [US4] Fazer a troca de look numa mídia reaberta atualizar o registro salvo e contar para o histórico de gosto em `src/components/CaptureSheet.tsx` (cenário US4.3)
+- [x] T043 [US4] Impedir que reabrir uma mídia que já traz `looks` redispare a curadoria no `useEffect` de análise em `src/components/CaptureSheet.tsx`, pelo mesmo motivo que motivou o T083 no lado musical
 
 **Checkpoint**: as quatro user stories completas.
 

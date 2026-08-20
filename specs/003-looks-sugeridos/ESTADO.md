@@ -1,10 +1,39 @@
 # ESTADO — onde parei e o que falta (feature 003)
 
-**Atualizado**: 2026-08-19 · **Branch**: `claude/current-filter-system-6gpmbh`
+**Atualizado**: 2026-08-20 · **Branch**: `claude/current-filter-system-6gpmbh`
 
 Sessão interrompida a pedido (máquina descartável). Este arquivo existe para a
 próxima máquina saber exatamente onde a implementação parou, o que testar e o
 que ainda falta. O detalhamento por tarefa está em [tasks.md](./tasks.md).
+
+## Atualização 2026-08-20
+
+Fechadas nesta rodada: **T013, T023, T025, T030, T031, T039, T042, T043**.
+`npm run typecheck` segue verde.
+
+- **T039/T042** — `CaptureSheet.salvar()` agora grava `looks`/`lookEscolhido`
+  no registro, nos dois caminhos (criação e edição/`update()`). Antes disso a
+  US4 só funcionava pela reconstrução de mídia antiga; a decisão real nunca
+  persistia.
+- **T043** — verificado por leitura: o guard `mediaId !== null` no `useEffect`
+  de análise já retorna antes de qualquer chamada de rede, então reabrir uma
+  mídia com `looks` nunca redisparava curadoria. Não precisou de código novo.
+- **T023/T025/T030** — verificados por leitura, não por execução (ver abaixo).
+  `analyzePhotoAndSuggest` nunca rejeita: toda saída (cena lida, pipeline por
+  vibe, catch interno) passa por `montarLooks()`, sempre três looks. "Original"
+  já limpava a receita (`escolherFiltro(null)` já zerava `lookEscolhido`).
+  `useLookTasteStore` não é importado em `music.ts` — confirmado por grep.
+- **T031** — Ajustes ganhou "Histórico de gosto visual" na seção Privacidade,
+  com confirmação explícita antes de `useLookTasteStore.limpar()`.
+- **T013** — `quickstart.md` escrito, no molde do da feature 002.
+
+**Bloqueio de device**: a instalação via `adb install` falhou com
+`INSTALL_FAILED_USER_RESTRICTED` — a MIUI deste Redmi Note 8 Pro exige ligar
+manualmente "Depuração USB (Configurações de segurança)" nas Opções do
+desenvolvedor. É toque físico na tela; nenhum agente resolve isso por adb.
+**Nada do que está listado acima foi confirmado rodando no aparelho** — só por
+leitura de código. Depois de destravar a instalação, rodar o roteiro completo
+do `quickstart.md`, US1 a US4, antes de considerar isto fechado de verdade.
 
 ---
 

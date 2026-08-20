@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useLookTasteStore } from '@/stores/useLookTasteStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { colors, fonts, radii } from '@/theme/tokens';
 
@@ -14,6 +15,18 @@ import { colors, fonts, radii } from '@/theme/tokens';
 export default function SettingsScreen() {
   const router = useRouter();
   const s = useSettingsStore();
+  const limparGostoVisual = useLookTasteStore((st) => st.limpar);
+
+  const apagarHistoricoVisual = () => {
+    Alert.alert(
+      'Apagar histórico de gosto visual?',
+      'As sugestões de look voltam a vir só da cena, sem levar em conta o que você costuma escolher. Suas fotos e filtros salvos não são afetados.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Apagar', style: 'destructive', onPress: limparGostoVisual },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.root}>
@@ -72,6 +85,22 @@ export default function SettingsScreen() {
           capturada é enviada ao Gemini apenas para inferir a vibe e sugerir a trilha — desative
           para que nenhuma imagem saia do aparelho.
         </Text>
+
+        <Pressable
+          style={styles.rowStatic}
+          onPress={apagarHistoricoVisual}
+          accessibilityRole="button"
+          accessibilityLabel="Apagar histórico de gosto visual"
+        >
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Histórico de gosto visual</Text>
+            <Text style={styles.rowDesc}>
+              Guardado só no aparelho — nunca sai daqui, nunca é enviado ao Gemini. Apagar volta
+              as sugestões de look ao ponto de partida, sem histórico.
+            </Text>
+          </View>
+          <Ionicons name="trash-outline" size={20} color={colors.ruby} />
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
