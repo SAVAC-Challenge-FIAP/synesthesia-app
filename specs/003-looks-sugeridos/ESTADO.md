@@ -27,13 +27,47 @@ Fechadas nesta rodada: **T013, T023, T025, T030, T031, T039, T042, T043**.
   com confirmação explícita antes de `useLookTasteStore.limpar()`.
 - **T013** — `quickstart.md` escrito, no molde do da feature 002.
 
-**Bloqueio de device**: a instalação via `adb install` falhou com
-`INSTALL_FAILED_USER_RESTRICTED` — a MIUI deste Redmi Note 8 Pro exige ligar
-manualmente "Depuração USB (Configurações de segurança)" nas Opções do
-desenvolvedor. É toque físico na tela; nenhum agente resolve isso por adb.
-**Nada do que está listado acima foi confirmado rodando no aparelho** — só por
-leitura de código. Depois de destravar a instalação, rodar o roteiro completo
-do `quickstart.md`, US1 a US4, antes de considerar isto fechado de verdade.
+## Validação real no device (2026-08-20, mesma rodada)
+
+O bloqueio inicial de instalação (`INSTALL_FAILED_USER_RESTRICTED`, MIUI) era
+um falso alarme: **o app já estava instalado** (`pm list packages` confirmou),
+e as mudanças desta rodada são só JS/TSX — bastava subir o Metro
+(`docs/TESTE-NO-DEVICE.md`), sem rebuild nativo nenhum. Rodado no Redmi Note 8
+Pro real, por Wi-Fi, com captura de tela a cada passo:
+
+- **US1 confirmada de ponta a ponta.** Capturei uma foto de mesa com LED
+  vermelho; voltaram três looks — "Deep Dark" (papel DA CENA, "Aprofunda as
+  sombras, realçando o brilho dos LEDs"), "Red Glitch" (MAIS OUSADA) e um
+  terceiro cortado na tela. O primeiro veio aplicado sozinho, sem toque
+  (FR-004). A justificativa citou os LEDs de verdade da cena — a leitura do
+  Gemini é real, não genérica.
+- **FR-005 confirmada**: trocar de chip muda a prévia em bem menos de meio
+  segundo, sem qualquer chamada nova (conferido no logcat).
+- **T023 confirmada**: tocar em "Original" limpa a receita, a prévia volta às
+  cores cruas, nenhum chip fica marcado.
+- **FR-006 confirmada**: os 8 presets aparecem no mesmo carrossel, depois das
+  sugestões.
+- **T039 confirmada de verdade**: salvei com "Deep Dark" escolhido, fechei a
+  tela (voltou pro visor, miniatura da galeria atualizou), abri a galeria — o
+  card já mostrava o tratamento certo.
+- **T043 confirmada por log, não só por leitura**: reabri a mídia salva pela
+  galeria (entra como "Lapidar.", `editando` correto) com o look certo
+  restaurado — e `adb logcat` limpo antes e lido depois **não mostrou nenhuma
+  chamada de rede**. Reabrir não redispara curadoria.
+- Música também validada de quebra: a trilha vinda do Gemini ("Nightcall",
+  Kavinsky) tinha justificativa coerente com a cena real.
+
+**Ainda não testado nesta rodada**: US2 (repetir 5-6 capturas da mesma vibe
+pra ver a afinidade aparecer — é um roteiro longo, não coube aqui), T031 na
+prática (o botão existe e o código está certo, mas ninguém tocou nele no
+aparelho), e US3 inteira (Skia nem começou).
+
+**Nota para a próxima sessão**: toques por `adb shell input tap` neste device
+só acertam de forma confiável usando a calibração já registrada em
+`docs/TESTE-NO-DEVICE.md`/`specs/002-qa-lapidacao-v1/quickstart.md`
+(`y=2180` acerta o botão de ação primária do rodapé; `y=2213` erra). Estimar
+coordenada a partir do screenshot redimensionado por conta própria errou o
+alvo várias vezes nesta sessão antes de eu achar essa referência.
 
 ---
 
