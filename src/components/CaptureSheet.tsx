@@ -23,11 +23,13 @@ import { FilteredImage } from '@/components/FilteredImage';
 import { FundoBase } from '@/components/FundoBase';
 import { LoaderMarca } from '@/components/LoaderMarca';
 import { FilterThumbs } from '@/components/FilterThumbs';
+import { LookChips } from '@/components/LookChips';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicSheet } from '@/components/MusicSheet';
 import { PostSheet } from '@/components/PostSheet';
 import { filterById } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
+import { identidadeDoLook, montarLooks } from '@/services/looks';
 import { analyzePhotoAndSuggest, EtapaCuradoria, getSuggestions } from '@/services/music';
 import { persistPhoto } from '@/services/mediaStorage';
 import * as preExport from '@/services/preExport';
@@ -36,9 +38,10 @@ import { saveToSystemGallery } from '@/services/systemGallery';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useLookTasteStore } from '@/stores/useLookTasteStore';
 import { useTasteStore } from '@/stores/useTasteStore';
 import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
-import { FilterId, Media } from '@/types';
+import { FilterId, LookRecipe, Media } from '@/types';
 
 /**
  * Tempo máximo em `carregando` antes de liberar a postagem com confirmação.
@@ -101,6 +104,7 @@ export function CaptureSheet() {
   const add = useGalleryStore((s) => s.add);
   const update = useGalleryStore((s) => s.update);
   const registrarEscolha = useTasteStore((s) => s.registrarEscolha);
+  const registrarEscolhaVisual = useLookTasteStore((s) => s.registrarEscolha);
   const sugestaoAutomatica = useSettingsStore((s) => s.sugestaoAutomatica);
   const deteccaoTempoReal = useSettingsStore((s) => s.deteccaoTempoReal);
 
@@ -135,7 +139,26 @@ export function CaptureSheet() {
 
   // Estável pelo mesmo motivo do visor: mantém a memoização dos chips de pé
   const escolherFiltro = useCallback(
-    (id: FilterId | null) => patch({ filtroId: id, filtroAuto: false }),
+    // Escolher um dos 8 presets zera a receita: o que ela pediu foi o preset
+    // puro, não o look ajustado. `lookAuto: false` porque houve toque — e é o
+    // toque, não o resultado, que distingue escolha de aceite passivo (FR-011).
+    (id: FilterId | null) =>
+      patch({ filtroId: id, filtroAuto: false, lookEscolhido: null, lookAuto: false }),
+    [patch],
+  );
+
+  /**
+   * Troca entre as três sugestões (FR-005). Só mexe no estado da sessão — nada
+   * de rede, nada de recarregar a tela: as três receitas já estão na memória
+   * desde que a curadoria voltou, e é isso que faz a troca ser instantânea
+   * (SC-003).
+   *
+   * `filtroId` acompanha a âncora do look para que tudo que ainda raciocina por
+   * filtro (miniaturas, rótulo "FILTRO", galeria, mídias antigas) continue certo.
+   */
+  const escolherLook = useCallback(
+    (look: LookRecipe) =>
+      patch({ lookEscolhido: look, filtroId: look.base, filtroAuto: false, lookAuto: false }),
     [patch],
   );
 
@@ -258,12 +281,16 @@ export function CaptureSheet() {
 
     const analise = deteccaoTempoReal
       ? analyzePhotoAndSuggest(s.photoUri, vibeById(s.vibeId), setEtapa)
-      : getSuggestions(vibeById(s.vibeId), setEtapa).then((sugestoes) => ({
+      : // Curadoria por vibe: não há cena lida, mas os três looks saem do mesmo
+        // jeito, derivados da vibe heurística. Um caminho que devolvesse zero
+        // looks quebraria FR-001 justamente para quem desligou o Gemini.
+        getSuggestions(vibeById(s.vibeId), setEtapa).then((sugestoes) => ({
           vibeId: null,
           sugestoes,
+          looks: montarLooks(undefined, s.vibeId),
         }));
     analise
-      .then(({ vibeId: vibeReal, sugestoes }) => {
+      .then(({ vibeId: vibeReal, sugestoes, looks }) => {
         clearTimeout(limite);
         const atual = useCaptureStore.getState().session;
         if (!atual || atual.photoUri !== photoUri) return;
@@ -273,15 +300,28 @@ export function CaptureSheet() {
         const escolheSozinho =
           sugestaoAutomatica && atual.musica === null && atual.mediaId === null;
         const musicaFinal = escolheSozinho ? primeira : atual.musica;
+        // A sugestão principal já vem aplicada, sem exigir toque (FR-004) — mas
+        // só se ninguém tiver tocado em nada enquanto a curadoria rodava.
+        // Sobrescrever uma escolha feita durante a espera seria desfazer a
+        // decisão da pessoa por causa de uma resposta que chegou atrasada.
+        const lookPrincipal = looks[0] ?? null;
+        const aplicaLook = atual.lookAuto && lookPrincipal !== null;
         patch({
           sugestoes,
+          looks,
+          ...(aplicaLook ? { lookEscolhido: lookPrincipal, filtroId: lookPrincipal.base } : {}),
           // `pronta` só quando existe trilha de fato; caso contrário a
           // postagem passa a exigir confirmação em vez de sair calada (RV-01)
           curadoria: musicaFinal ? 'pronta' : 'indisponivel',
           // A vibe real da foto substitui a prévia do visor (T-0A)
           ...(vibeReal ? { vibeId: vibeReal } : {}),
-          // Filtro acompanha a vibe real enquanto o usuário não escolher um
-          ...(vibeReal && atual.filtroAuto ? { filtroId: vibeById(vibeReal).filtro } : {}),
+          // Filtro acompanha a vibe real enquanto o usuário não escolher um.
+          // Só vale quando não houve look para aplicar: a partir da feature 003
+          // quem manda no tratamento é a sugestão principal, e a tabela fixa
+          // `vibe → filtro` fica sendo apenas o piso da degradação.
+          ...(vibeReal && atual.filtroAuto && !aplicaLook
+            ? { filtroId: vibeById(vibeReal).filtro }
+            : {}),
           ...(escolheSozinho ? { musica: primeira } : {}),
         });
       })
@@ -311,7 +351,12 @@ export function CaptureSheet() {
   const chave = session
     ? preExport.chavePacote({
         photoUri: session.photoUri,
-        filtroId: session.filtroId,
+        // A âncora não basta: dois looks podem partir do mesmo preset e sair
+        // diferentes. Sem a receita na chave, o vídeo pré-gerado de um look
+        // seria servido para outro (D7).
+        filtroId: session.lookEscolhido
+          ? identidadeDoLook(session.lookEscolhido)
+          : session.filtroId,
         // Arquivada entra como "sem música" na chave: o pacote resultante é
         // outro, e servir o vídeo com trilha aqui seria entregar o que o
         // usuário acabou de tirar.
@@ -403,6 +448,18 @@ export function CaptureSheet() {
       if (musicaDoPacote) {
         registrarEscolha(musicaDoPacote, session.vibeId, 'auto');
       }
+      // Gosto visual (US2): registra o tratamento que de fato foi ao ar, sob a
+      // vibe daquela foto. `lookAuto` é o que separa os dois pesos — quem tocou
+      // num chip recusou o que estava aplicado, e isso diz muito mais do que
+      // aceitar em silêncio o que o sistema propôs (FR-010, FR-011).
+      //
+      // "Sem tratamento" também é registrado, como escolha e não como vazio: a
+      // spec trata a foto original como opção de primeira classe.
+      registrarEscolhaVisual(
+        session.lookEscolhido,
+        session.vibeId,
+        session.lookAuto ? 'auto' : 'manual',
+      );
       let media: Media;
       if (session.mediaId) {
         media = {
@@ -580,9 +637,28 @@ export function CaptureSheet() {
               <FilteredImage
                 uri={session.photoUri}
                 filtroId={session.filtroId}
+                look={session.lookEscolhido}
                 style={[styles.preview, { aspectRatio: aspectoReal ?? session.aspecto }]}
               />
             </View>
+
+            {/* As três sugestões vêm ANTES dos 8 presets: elas são a resposta do
+                sistema para esta foto, e os presets são a saída para quem quer
+                algo fora delas (FR-006). */}
+            {session.looks.length > 0 ? (
+              <>
+                <Text style={[styles.sectionLabel, { paddingHorizontal: 20, marginTop: 4 }]}>
+                  LOOKS SUGERIDOS
+                </Text>
+                <View style={styles.carouselWrap}>
+                  <LookChips
+                    looks={session.looks}
+                    escolhido={session.lookEscolhido}
+                    onSelect={escolherLook}
+                  />
+                </View>
+              </>
+            ) : null}
 
             <View style={styles.filtroRow}>
               <Text style={styles.sectionLabel}>FILTRO</Text>

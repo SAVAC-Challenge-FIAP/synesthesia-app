@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FilteredImage } from '@/components/FilteredImage';
 import { FundoBase } from '@/components/FundoBase';
 import { vibeById } from '@/constants/vibes';
+import { looksDeMidiaAntiga } from '@/services/looks';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
@@ -23,6 +24,12 @@ export default function GalleryScreen() {
   const start = useCaptureStore((s) => s.start);
 
   const lapidar = (m: Media) => {
+    // Mídias gravadas antes da feature 003 não têm `looks` — e ausência aqui
+    // significa "não sei", nunca "não há" (a mesma convenção de `aspecto` e
+    // `sugestoes`). Em vez de abrir sem sugestão nenhuma ou inventar sugestões
+    // que nunca existiram, reconstrói-se o conjunto base da vibe com o
+    // tratamento que a mídia de fato tinha na frente (FR-023, SC-009).
+    const antiga = m.looks?.length ? null : looksDeMidiaAntiga(m.filtroId, m.vibeId);
     start({
       mediaId: m.id,
       photoUri: m.photoUri,
@@ -30,6 +37,10 @@ export default function GalleryScreen() {
       filtroAuto: false, // edição preserva o filtro salvo; só o usuário troca
       vibeId: m.vibeId,
       musica: m.musica,
+      // Os três looks voltam com o pacote: reabrir não consulta rede nenhuma
+      // (US4), pelo mesmo motivo que fez as faixas passarem a viajar junto.
+      looks: antiga ? antiga.looks : (m.looks ?? []),
+      lookEscolhido: antiga ? antiga.escolhido : (m.lookEscolhido ?? null),
       // O leque de opções volta com o pacote (T083): reabrir não dispara
       // curadoria nenhuma, e "Trocar música" já abre com as quatro faixas.
       sugestoes: m.sugestoes ?? [],

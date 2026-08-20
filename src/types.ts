@@ -35,6 +35,56 @@ export interface FilterDef {
   imageFilter?: { brightness?: number; saturate?: number; contrast?: number; sepia?: number };
 }
 
+/**
+ * Papel do look dentro do conjunto de três (feature 003). Mesma razão de ser do
+ * `PapelFaixa`: sem rótulo, uma sugestão fora do óbvio chega como defeito em vez
+ * de proposta — e a que vem do histórico não teria como se apresentar.
+ *
+ * - `afinidade` — casa com o histórico visual **deste aparelho**; derivado
+ *                 localmente em `looks.ts`, nunca pedido ao Gemini (D3/FR-013).
+ * - `certeira`  — realça o que a cena já tem, sem risco.
+ * - `ousada`    — interpretação mais forte, ainda plausível.
+ *
+ * São três, contra os quatro da música: a spec dispensa os equivalentes visuais
+ * de `descoberta` e `curinga`.
+ */
+export type PapelLook = 'afinidade' | 'certeira' | 'ousada';
+
+/**
+ * Desvios em relação ao preset base. **Deltas, nunca valores absolutos** — é o
+ * que faz toda sugestão pousar num lugar são: o pior caso vira o preset puro,
+ * jamais uma imagem quebrada (D2).
+ *
+ * Ausente = 0 = "não desvia neste eixo". Faixas seguras em `looks.ts`.
+ */
+export interface AjustesLook {
+  brilho?: number;
+  saturacao?: number;
+  contraste?: number;
+  sepia?: number;
+  /** Desvio da opacidade do overlay de cor do preset. */
+  veu?: number;
+}
+
+/**
+ * Um tratamento visual proposto para uma foto específica: **receita ancorada**,
+ * não conjunto de números soltos.
+ *
+ * `base` é obrigatório de propósito. Um look sem âncora reconhecível é
+ * descartado, não corrigido — é o que dá explicabilidade de graça ("é o Honey,
+ * um pouco mais quente") e o que garante que a degradação sempre tem para onde
+ * cair (FR-008).
+ */
+export interface LookRecipe {
+  base: FilterId;
+  ajustes: AjustesLook;
+  /** Curto — cabe no chip. */
+  nome: string;
+  /** Uma linha, como as faixas já têm. */
+  justificativa: string;
+  papel: PapelLook;
+}
+
 export interface Vibe {
   id: VibeId;
   nome: string;
@@ -115,6 +165,20 @@ export interface Media {
    * têm o campo, e a ausência significa "não sei", nunca "não há".
    */
   sugestoes?: MusicSuggestion[];
+  /**
+   * As três sugestões de look produzidas para esta foto (feature 003), e qual
+   * delas foi ao ar.
+   *
+   * Opcionais pelo mesmo motivo de `aspecto` e `sugestoes`: mídias gravadas
+   * antes desta feature não têm o campo, e ausência significa "não sei", nunca
+   * "não há" — quem lê reconstrói três looks base a partir de `filtroId` e
+   * `vibeId` (FR-023).
+   *
+   * `filtroId` continua existindo e continua sendo a âncora: escolher um look
+   * move os dois juntos, e é ele que o visor ao vivo usa (FR-021).
+   */
+  looks?: LookRecipe[];
+  lookEscolhido?: LookRecipe;
   criadaEm: number;
   atualizadaEm: number;
 }
