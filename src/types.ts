@@ -179,6 +179,19 @@ export interface Media {
    */
   looks?: LookRecipe[];
   lookEscolhido?: LookRecipe;
+  /**
+   * Cópia local do .mp3 da prévia, em `documentDirectory/galeria/` (T102).
+   *
+   * `musica.previewUrl` é um link do Deezer: expira e exige rede a cada
+   * reabertura. Guardar só ele fazia o player de uma mídia reaberta ficar
+   * carregando para sempre — metade do momento sumia com o tempo, contra o
+   * Pilar 3. O arquivo local é o que faz a trilha voltar, inclusive offline.
+   *
+   * Opcional pelo mesmo motivo de `aspecto`, `sugestoes` e `looks`: mídias
+   * gravadas antes disto não têm o campo, e ausência significa "não sei" —
+   * quem lê cai de volta na URL remota (ver `fonteDeAudio`).
+   */
+  audioUri?: string;
   criadaEm: number;
   atualizadaEm: number;
 }

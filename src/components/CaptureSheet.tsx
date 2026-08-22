@@ -32,7 +32,7 @@ import { filterById, resolverReceita } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
 import { identidadeDoLook, montarLooks } from '@/services/looks';
 import { analyzePhotoAndSuggest, EtapaCuradoria, getSuggestions } from '@/services/music';
-import { persistPhoto } from '@/services/mediaStorage';
+import { persistAudioPreview, persistPhoto } from '@/services/mediaStorage';
 import * as preExport from '@/services/preExport';
 import { renderizarLook } from '@/services/renderLook';
 import { exportPackage, SharePackage } from '@/services/sharePackage';
@@ -340,7 +340,9 @@ export function CaptureSheet() {
           ...(vibeReal && atual.filtroAuto && !aplicaLook
             ? { filtroId: vibeById(vibeReal).filtro }
             : {}),
-          ...(escolheSozinho ? { musica: primeira } : {}),
+          // Mesma invalidação da troca manual (T102): faixa nova, arquivo
+          // local antigo não vale mais.
+          ...(escolheSozinho ? { musica: primeira, audioUri: null } : {}),
         });
       })
       .catch(() => {
@@ -475,6 +477,9 @@ export function CaptureSheet() {
       // A mídia gravada reflete o pacote: com a trilha arquivada, o registro
       // sai sem música, igual ao que foi exportado.
       const musicaDoPacote = session.trilhaArquivada ? null : session.musica;
+      // O id sobe para antes do download da trilha: o .mp3 é nomeado por ele, e
+      // no ramo de captura nova ele só existia lá embaixo.
+      const idNovo = session.mediaId ?? `${Date.now()}`;
       // Histórico de gosto (T057): vale a faixa que de fato foi no pacote, e só
       // ela. Trilha arquivada é rejeição — não registra. O peso é `auto`, bem
       // menor que o da troca no MusicSheet, porque aceitar passivamente o que o
@@ -494,6 +499,34 @@ export function CaptureSheet() {
         session.vibeId,
         session.lookAuto ? 'auto' : 'manual',
       );
+      /**
+       * Trilha em disco (T102). A prévia do Deezer é um link que expira; sem
+       * uma cópia local, reabrir o momento pela galeria deixava o player
+       * girando para sempre. Baixa uma vez por faixa e reaproveita: trocar de
+       * música invalida, salvar de novo a mesma não rebaixa nada.
+       *
+       * Best-effort de ponta a ponta — falhar aqui devolve `null` e a mídia é
+       * salva com a URL remota, como antes. Salvar a foto nunca depende de rede.
+       */
+      /**
+       * O que vai para o registro é SEMPRE a cópia permanente.
+       *
+       * O cache de candidatas (T106) serve para tocar a prévia na hora, não
+       * para ser guardado: `Paths.cache` é apagável pelo sistema, e um
+       * `audioUri` apontando para lá traria de volta o T102 — player travado —
+       * só que com um caminho local morto em vez de uma URL expirada. Por isso
+       * `persistAudioPreview` roda de qualquer forma; o cache economiza a
+       * *reprodução*, nunca a persistência.
+       */
+      const audioUri =
+        musicaDoPacote === null
+          ? null
+          : (session.audioUri ??
+            (await persistAudioPreview(
+              musicaDoPacote.previewUrl,
+              session.mediaId ?? idNovo,
+            )));
+
       let media: Media;
       if (session.mediaId) {
         media = {
@@ -508,6 +541,7 @@ export function CaptureSheet() {
           sugestoes: session.sugestoes,
           looks: session.looks,
           lookEscolhido: session.lookEscolhido ?? undefined,
+          audioUri: audioUri ?? undefined,
           criadaEm: 0,
           atualizadaEm: Date.now(),
         };
@@ -524,9 +558,12 @@ export function CaptureSheet() {
           // mídia reaberta nunca sobrevivia ao Salvar (FR-022).
           looks: session.looks,
           lookEscolhido: session.lookEscolhido ?? undefined,
+          // Trocar de música numa mídia reaberta troca o arquivo local junto —
+          // senão o registro guardaria a faixa nova e o .mp3 da antiga.
+          audioUri: audioUri ?? undefined,
         });
       } else {
-        const id = `${Date.now()}`;
+        const id = idNovo;
         // Nunca perder a foto: se a cópia permanente falhar, o registro
         // entra na galeria apontando para o arquivo original do cache.
         let uriPersistente: string;
@@ -551,6 +588,7 @@ export function CaptureSheet() {
           // pela reconstrução de mídia antiga, e a decisão real nunca persistia.
           looks: session.looks,
           lookEscolhido: session.lookEscolhido ?? undefined,
+          audioUri: audioUri ?? undefined,
           criadaEm: Date.now(),
           atualizadaEm: Date.now(),
         };
@@ -560,6 +598,10 @@ export function CaptureSheet() {
         // sem permissão ou no Expo Go retorna false e a mídia segue no app)
         await saveToSystemGallery(await renderizarComFiltro());
       }
+      // A sessão passa a conhecer o arquivo: quem salvou e continuou editando
+      // (o caminho do `salvar(false)` dentro de `exportar`) já toca do disco, e
+      // um segundo Salvar não baixa de novo.
+      if (audioUri && audioUri !== session.audioUri) patch({ audioUri });
       if (fechar) clear();
       return media;
     } finally {
@@ -777,8 +819,13 @@ export function CaptureSheet() {
                     <>
                       <Text style={styles.musicReason}>{session.musica.justificativa}</Text>
                       <MusicPlayer
-                        key={session.musica.id}
+                        // A chave inclui a fonte: quando o .mp3 local aparece
+                        // (logo depois do Salvar), o player precisa nascer de
+                        // novo apontando para o disco — `useAudioPlayer` fixa a
+                        // origem na criação.
+                        key={`${session.musica.id}:${session.audioUri ?? 'remoto'}`}
                         musica={session.musica}
+                        audioUri={session.audioUri}
                         // Com o modal de música aberto, o dono da saída de áudio
                         // é ele — este player fica montado por baixo, mas calado
                         ativo={!showMusic}

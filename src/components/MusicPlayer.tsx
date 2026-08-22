@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { RangeSlider } from '@/components/RangeSlider';
@@ -12,6 +12,15 @@ export const TRECHO_MAX_S = 30;
 
 /** Piso do recorte: abaixo disso o vídeo não dá tempo de ser visto. */
 export const TRECHO_MIN_S = 5;
+
+/**
+ * Espera máxima por uma prévia remota antes de declará-la expirada (T102).
+ *
+ * Generoso de propósito: 10s cobre 3G ruim sem nunca chegar ao "para sempre"
+ * que o QA viu. Passando disso, a tela diz o que houve e oferece recarregar,
+ * em vez de girar calada.
+ */
+const TIMEOUT_PREVIA_MS = 10_000;
 
 /** `0:07`, `1:05` — o formato das marcas no Figma (nó 462-926). */
 export function mmss(s: number): string {
@@ -32,6 +41,14 @@ interface Props {
    * as duas faixas soarem juntas. Quem monta decide quem é o dono da vez.
    */
   ativo?: boolean;
+  /**
+   * Caminho local do .mp3 já baixado, quando existe (T102). Tem precedência
+   * sobre `musica.previewUrl`: o link do Deezer expira e depende de rede a cada
+   * reabertura, e era isso que deixava a trilha de uma mídia reaberta pela
+   * galeria carregando para sempre. Ausente = mídia antiga ou trilha ainda não
+   * salva; aí a URL remota segue valendo, agora com falha visível.
+   */
+  audioUri?: string | null;
 }
 
 /**
@@ -51,9 +68,38 @@ export function MusicPlayer({
   trechoFim,
   onTrecho,
   ativo = true,
+  audioUri,
 }: Props) {
-  const player = useAudioPlayer(musica.previewUrl);
+  /**
+   * Arquivo local primeiro, link do Deezer como reserva (T102). A ordem é o
+   * conserto: `previewUrl` é uma URL assinada e temporária — mídia recente
+   * ainda tocava, mídia de dias atrás não, e o player não tinha como distinguir
+   * "carregando" de "nunca vai carregar".
+   */
+  const fonte = audioUri ?? musica.previewUrl;
+  const player = useAudioPlayer(fonte);
   const status = useAudioPlayerStatus(player);
+
+  /**
+   * Prévia que não carrega em tempo hábil (T102).
+   *
+   * Sem isto, uma fonte morta deixava o botão de play mudo e o trilho parado,
+   * sem nada na tela dizendo o que houve — o sintoma de "carregando para
+   * sempre" que o QA relatou. Só vale para a fonte remota: um arquivo local
+   * ou carrega ou estoura na hora.
+   */
+  const [expirada, setExpirada] = useState(false);
+  const remota = !audioUri;
+
+  useEffect(() => {
+    setExpirada(false);
+  }, [fonte]);
+
+  useEffect(() => {
+    if (!remota || status.isLoaded || expirada) return;
+    const t = setTimeout(() => setExpirada(true), TIMEOUT_PREVIA_MS);
+    return () => clearTimeout(t);
+  }, [remota, status.isLoaded, expirada, fonte]);
 
   // A reprodução respeita o FIM ESCOLHIDO, não os 30s da prévia: era isso que
   // fazia a música seguir tocando para além do recorte e parar sozinha no fim
@@ -79,10 +125,34 @@ export function MusicPlayer({
     [onTrecho, player],
   );
 
-  if (!musica.previewUrl) {
+  if (!fonte) {
     return (
       <View style={styles.wrap}>
         <Text style={styles.offline}>PRÉVIA INDISPONÍVEL OFFLINE — o trecho será definido ao reconectar</Text>
+      </View>
+    );
+  }
+
+  // A prévia remota morreu (T102). O momento não se perde — imagem, look e
+  // trecho continuam de pé; só a metade sonora precisa de rede para voltar.
+  if (expirada && !status.isLoaded) {
+    return (
+      <View style={styles.wrap}>
+        <View style={styles.linha}>
+          <Pressable
+            onPress={() => {
+              setExpirada(false);
+              player.replace(fonte);
+            }}
+            hitSlop={hitSlops.botao}
+            style={styles.playBtn}
+          >
+            <Ionicons name="refresh" size={20} color={colors.ruby} />
+          </Pressable>
+          <Text style={[styles.offline, { flex: 1 }]}>
+            A PRÉVIA DESTA FAIXA EXPIROU — TOQUE PARA TENTAR DE NOVO
+          </Text>
+        </View>
       </View>
     );
   }

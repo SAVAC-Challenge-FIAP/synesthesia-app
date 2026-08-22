@@ -8,6 +8,7 @@ import { FilteredImage } from '@/components/FilteredImage';
 import { FundoBase } from '@/components/FundoBase';
 import { vibeById } from '@/constants/vibes';
 import { looksDeMidiaAntiga } from '@/services/looks';
+import { cacheAudioPreview } from '@/services/mediaStorage';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
@@ -37,6 +38,10 @@ export default function GalleryScreen() {
       filtroAuto: false, // edição preserva o filtro salvo; só o usuário troca
       vibeId: m.vibeId,
       musica: m.musica,
+      // A trilha já está no disco (T102): reabrir toca o arquivo, não o link
+      // do Deezer, que expira. Mídia gravada antes disto vem sem o campo e o
+      // player cai de volta na URL remota.
+      audioUri: m.audioUri ?? null,
       // Os três looks voltam com o pacote: reabrir não consulta rede nenhuma
       // (US4), pelo mesmo motivo que fez as faixas passarem a viajar junto.
       looks: antiga ? antiga.looks : (m.looks ?? []),
@@ -50,6 +55,24 @@ export default function GalleryScreen() {
       // proporção com que elas foram criadas, então reabrir não as deforma.
       aspecto: m.aspecto ?? sizes.photoAspect,
     });
+    /**
+     * Pré-carrega as outras sugestões em segundo plano (T106).
+     *
+     * A trilha escolhida já toca do disco (T102), mas as outras três só tinham
+     * a URL do Deezer — que expira. Quem reabre um momento e vai em "Trocar
+     * música" costuma fazê-lo logo em seguida, então baixar agora é a diferença
+     * entre a prévia tocar na hora e não tocar nunca.
+     *
+     * Deliberadamente sem `await`: é adiantamento, não etapa do fluxo. Reabrir
+     * a mídia não espera por rede nenhuma, e cada falha morre em silêncio no
+     * `catch` — a faixa simplesmente segue dependendo da URL, como antes.
+     */
+    for (const s of m.sugestoes ?? []) {
+      if (s.id !== m.musica?.id) {
+        cacheAudioPreview(s.previewUrl, s.id).catch(() => {});
+      }
+    }
+
     // Empurra para a tela de captura. Enquanto o `CaptureSheet` era `<Modal>`,
     // bastava a galeria renderizá-lo quando houvesse sessão: o Modal desenhava
     // na própria janela, por cima. Virando corpo de tela (T063), o mesmo JSX

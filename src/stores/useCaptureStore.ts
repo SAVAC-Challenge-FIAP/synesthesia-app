@@ -58,6 +58,13 @@ export interface CaptureSession {
    */
   lookAuto: boolean;
   musica: MusicSuggestion | null;
+  /**
+   * Caminho local do .mp3 da trilha, quando já existe (T102). Chega preenchido
+   * nas mídias reabertas da galeria e passa a existir na captura nova assim que
+   * o `salvar()` baixa a prévia. É o que o player prefere tocar: a
+   * `previewUrl` do Deezer expira, o arquivo não.
+   */
+  audioUri: string | null;
   sugestoes: MusicSuggestion[];
   curadoria: EstadoCuradoria;
   trechoInicio: number;
@@ -83,9 +90,17 @@ interface CaptureState {
   start: (
     s: Omit<
       CaptureSession,
-      'sugestoes' | 'curadoria' | 'trilhaArquivada' | 'looks' | 'lookEscolhido' | 'lookAuto'
+      | 'sugestoes'
+      | 'curadoria'
+      | 'trilhaArquivada'
+      | 'looks'
+      | 'lookEscolhido'
+      | 'lookAuto'
+      | 'audioUri'
     > & {
       sugestoes?: MusicSuggestion[];
+      /** Só as mídias reabertas da galeria já têm o .mp3 no disco. */
+      audioUri?: string | null;
       /** Presentes só nas mídias reabertas da galeria, que já as trazem salvas. */
       looks?: LookRecipe[];
       lookEscolhido?: LookRecipe | null;
@@ -102,6 +117,7 @@ export const useCaptureStore = create<CaptureState>()((set) => ({
       session: {
         ...s,
         sugestoes: s.sugestoes ?? [],
+        audioUri: s.audioUri ?? null,
         looks: s.looks ?? [],
         lookEscolhido: s.lookEscolhido ?? null,
         // Nasce `true`: até alguém tocar, o que estiver aplicado é aceite

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { vibeById } from '@/constants/vibes';
 import { LoaderMarca } from '@/components/LoaderMarca';
 import { getSuggestions } from '@/services/music';
+import { audioEmCache } from '@/services/mediaStorage';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useTasteStore } from '@/stores/useTasteStore';
 import { colors, fonts, hitSlops, radii } from '@/theme/tokens';
@@ -92,13 +93,18 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
   const vibe = vibeById(session.vibeId);
 
   const tocar = (m: MusicSuggestion) => {
-    if (!m.previewUrl) return;
+    // Arquivo em cache primeiro, URL do Deezer como reserva (T106): quem
+    // reabriu a mídia pela galeria já teve as candidatas baixadas em segundo
+    // plano, então aqui a prévia toca do disco — inclusive sem rede. Sem cache
+    // (captura nova, download que falhou), segue pela URL, como antes.
+    const fonte = audioEmCache(m.id) ?? m.previewUrl;
+    if (!fonte) return;
     if (tocandoId === m.id && status.playing) {
       player.pause();
       setTocandoId(null);
       return;
     }
-    player.replace(m.previewUrl);
+    player.replace(fonte);
     player.play();
     setTocandoId(m.id);
   };
@@ -109,7 +115,10 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
     // tem os mesmos 30s, então "quero 10 segundos de vídeo" continua valendo com
     // a música nova. Antes isto resetava para 0–30 e jogava a escolha fora.
     if (escolhida) {
-      patch({ musica: escolhida, curadoria: 'pronta' });
+      // `audioUri: null` é obrigatório aqui (T102): o .mp3 em disco é da faixa
+      // anterior, e sem zerar o campo o player tocaria a música velha com o
+      // nome da nova. O próximo Salvar baixa a prévia certa.
+      patch({ musica: escolhida, curadoria: 'pronta', audioUri: null });
       // Sinal forte de gosto (T057): ela abriu a lista e trocou. Fica no
       // aparelho — ver a nota de LGPD em `useTasteStore`.
       registrarEscolha(escolhida, session.vibeId, 'manual');
