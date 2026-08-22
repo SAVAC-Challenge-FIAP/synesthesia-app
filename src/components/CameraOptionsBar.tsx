@@ -111,10 +111,12 @@ export function opcoesDeResolucao(tamanhos: string[], razaoAlvo: number): string
     .filter((x) => Number.isFinite(x.px) && x.px > 0)
     // A mesma tolerância que `escolherTamanhoNativo` usa para casar proporção.
     .filter((x) => Math.abs(x.razao - razaoAlvo) < 0.06 || Math.abs(1 / x.razao - razaoAlvo) < 0.06)
-    // Piso de 2 MP. Sem ele o menor modo deste sensor é 320×240 — resolução de
-    // miniatura, que não serve para foto nenhuma e só existe na lista porque o
-    // hardware a expõe. Oferecer isso como opção seria oferecer uma armadilha.
-    .filter((x) => x.px >= 2_000_000)
+    // Piso de 8 MP (decisão do Sávio, 2026-08-22). O primeiro corte foi em
+    // 2 MP, só para tirar da lista os modos-miniatura que o sensor expõe
+    // (320×240 e afins); 8 MP sobe a régua para o que ainda rende uma foto
+    // boa em tela cheia e impressão pequena — abaixo disso a economia de
+    // memória não paga a perda visível.
+    .filter((x) => x.px >= 8_000_000)
     .sort((a, b) => b.px - a.px);
 
   if (compativeis.length === 0) return [];
@@ -148,16 +150,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /**
+   * Mesma tipografia dos chips de enquadramento (4:3 · 1:1 · 16:9), a pedido
+   * do Sávio: são controles do mesmo tipo — escolhas discretas de captura — e
+   * ler os dois no mesmo registro faz a barra parecer uma coisa só, em vez de
+   * quatro elementos com pesos diferentes disputando a atenção.
+   */
   resolucao: {
-    color: '#E3E3E3',
+    color: colors.parchment50,
     fontFamily: fonts.label,
-    fontSize: 15,
-    letterSpacing: 0.5,
+    fontSize: 12,
+    letterSpacing: 1,
   },
-  /** Sublinhado discreto: diz "isto se toca" sem virar botão desenhado. */
+  /** Tocável: um passo de contraste acima do informativo, sem virar botão. */
   resolucaoToc: {
     color: colors.parchment,
-    textDecorationLine: 'underline',
-    textDecorationColor: colors.parchment25,
   },
 });
