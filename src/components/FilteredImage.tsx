@@ -13,6 +13,7 @@ import {
 import { FilterLayer } from '@/components/FilterLayer';
 import { filterById, resolverReceita } from '@/constants/filters';
 import { matrizDeCor } from '@/services/looks';
+import { previaParaSkia } from '@/services/previaFoto';
 import { carregarSkia, SkiaMod } from '@/services/skiaBridge';
 import { FilterDef, FilterId, LookRecipe } from '@/types';
 
@@ -31,6 +32,22 @@ interface Props {
   look?: LookRecipe | null;
   style?: StyleProp<ViewStyle>;
   imageStyle?: StyleProp<ImageStyle>;
+  /**
+   * Habilita o render por Skia. **Desligado por padrão, de propósito.**
+   *
+   * `useImage()` do Skia carrega a imagem inteira, sem downsampling — não há
+   * API para pedir resolução reduzida. Com as fotos de 64 MP desta câmera, um
+   * único card custa ~256 MB de bitmap descomprimido; a galeria, com seis
+   * cards, tentava ~1,5 GB e derrubava o app (SIGSEGV em `mqt_v_js`, medido
+   * em 2026-08-21). O `<Image>` do RN, por outro lado, faz downsampling
+   * sozinho para o tamanho de exibição.
+   *
+   * Por isso o Skia vale só onde a fidelidade se paga e há **uma** imagem na
+   * tela: a prévia grande do modal de Captura, onde a pessoa compara os três
+   * looks de perto. Galeria e miniaturas usam o render leve — a diferença de
+   * cor é imperceptível num card pequeno, o custo não.
+   */
+  usarSkia?: boolean;
 }
 
 /**
@@ -54,13 +71,16 @@ export function FilteredImage(props: Props) {
 
   useEffect(() => {
     let vivo = true;
+    // Sem `usarSkia` não há motivo nem para carregar o módulo: quem não vai
+    // renderizar por Canvas não deve pagar o `import()` nem o re-render.
+    if (!props.usarSkia) return;
     carregarSkia().then((mod) => {
       if (vivo) setSkia(mod);
     });
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [props.usarSkia]);
 
   const filtro = props.look
     ? resolverReceita(props.look)
@@ -68,7 +88,7 @@ export function FilteredImage(props: Props) {
       ? filterById(props.filtroId)
       : null;
 
-  if (skia) {
+  if (props.usarSkia && skia) {
     return <FilteredImageSkia uri={props.uri} filtro={filtro} mod={skia} style={props.style} />;
   }
   return (
@@ -144,7 +164,22 @@ function FilteredImageSkia({
   style?: StyleProp<ViewStyle>;
 }) {
   const { Canvas, Image: SkiaImageNode, ColorMatrix, Fill, useImage } = mod;
-  const imagem = useImage(uri);
+  // A prévia lê a cópia reduzida, nunca a foto de 64 MP: `useImage` não faz
+  // downsampling, e é isso que travava o modal de Captura. Enquanto o resize
+  // não termina, `uriLeve` é null e o Canvas não monta — o mesmo estado por
+  // que ele já passava esperando o `useImage` resolver.
+  const [uriLeve, setUriLeve] = useState<string | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    previaParaSkia(uri).then((u) => {
+      if (vivo) setUriLeve(u);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [uri]);
+
+  const imagem = useImage(uriLeve ?? undefined);
   const [tamanho, setTamanho] = useState<{ largura: number; altura: number } | null>(null);
 
   const aoMedir = (e: LayoutChangeEvent) => {

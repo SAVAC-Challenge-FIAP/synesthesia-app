@@ -661,10 +661,15 @@ export function CaptureSheet() {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
             {/* Foto com o filtro aplicado (frame ~735/913 do Figma) */}
             <View ref={previewRef} collapsable={false} style={styles.previewShot}>
+              {/* Único lugar do app com `usarSkia`: aqui a pessoa compara os
+                  três looks de perto, então a fidelidade da matriz de cor se
+                  paga, e há uma imagem só na tela. Galeria e miniaturas usam o
+                  render leve — ver a nota em `FilteredImage`. */}
               <FilteredImage
                 uri={session.photoUri}
                 filtroId={session.filtroId}
                 look={session.lookEscolhido}
+                usarSkia
                 style={[styles.preview, { aspectRatio: aspectoReal ?? session.aspecto }]}
               />
             </View>
