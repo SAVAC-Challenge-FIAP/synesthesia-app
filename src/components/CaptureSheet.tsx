@@ -909,10 +909,18 @@ export function CaptureSheet() {
       {sharePkg ? (
         <PostSheet
           pacote={sharePkg}
-          onClose={() => {
-            setSharePkg(null);
-            clear();
-          }}
+          /**
+           * Fechar a folha fecha **só a folha** (T101).
+           *
+           * Aqui havia um `clear()` junto. Fechar depois de postar é o gesto de
+           * quem mudou de ideia e quer lapidar de novo — e zerar a sessão nesse
+           * momento desmontava o `CaptureSheet` inteiro: quem publicou a partir
+           * da captura caía no visor com a foto, o look e a trilha perdidos, e
+           * quem veio da galeria voltava para a lista em vez da mídia aberta.
+           * A conclusão do fluxo tem donos próprios — o X (`descartar`) e o
+           * `salvar(true)` —, e é lá que a sessão termina.
+           */
+          onClose={() => setSharePkg(null)}
         />
       ) : null}
     </View>
