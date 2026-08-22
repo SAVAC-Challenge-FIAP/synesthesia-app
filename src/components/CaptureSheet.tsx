@@ -756,7 +756,11 @@ export function CaptureSheet() {
             </View>
 
             <View style={styles.filtroRow}>
-              <Text style={styles.sectionLabel}>TRATAMENTO</Text>
+              {/* "VIBE", não "TRATAMENTO" (decisão do Sávio, 1.2.1): o rótulo
+                  longo dominava a linha e competia com o nome do look à
+                  direita, que é a informação que importa ali. "Vibe" é curto e
+                  é a palavra que o produto já usa com o usuário. */}
+              <Text style={styles.sectionLabel}>VIBE</Text>
               <Text style={styles.filtroAtual}>
                 {session.lookEscolhido
                   ? session.lookEscolhido.nome.toUpperCase()
