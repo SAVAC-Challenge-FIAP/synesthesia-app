@@ -41,6 +41,18 @@ Capturas reais do app rodando em release build (Redmi Note 8 Pro, Android 10):
 <sub><b>Abertura</b> — a marca em movimento, sem piscada entre splash e app · <b>Visor</b> — largura cheia em qualquer enquadramento, cada um com sua âncora na tela · <b>Galeria</b> — miniaturas uniformes, reabrir não refaz a curadoria · <b>Postar</b> — um botão só, pela folha de compartilhamento do sistema</sub>
 </div>
 
+### Novidades da 1.2.1
+
+<div align="center">
+<img src="docs/preview/v1.2.1/espera-dourada.png" width="220" alt="Os tres lugares reservados em ouro, com reflexos atravessando, enquanto a curadoria corre" />
+<img src="docs/preview/v1.2.1/looks-autorais.png" width="220" alt="Tres looks com nomes autorais lidos da cena, ao lado dos presets" />
+<img src="docs/preview/v1.2.1/galeria-com-trilha.png" width="220" alt="Galeria com os momentos e suas trilhas preservadas" />
+</div>
+
+<div align="center">
+<sub><b>Espera</b> — o lugar do look é ouro em movimento, não caixa vazia · <b>Looks</b> — nomes lidos da própria cena, nunca o nome de um preset repetido · <b>Galeria</b> — a trilha volta com o momento, agora do disco e sem rede</sub>
+</div>
+
 Mais capturas (por fase de trabalho) em [`docs/preview/`](docs/preview/).
 
 ## 📦 Baixar o APK
