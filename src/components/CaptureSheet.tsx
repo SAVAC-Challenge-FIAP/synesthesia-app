@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   UIManager,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import type { LayoutAnimationConfig } from 'react-native';
@@ -22,8 +23,7 @@ import { captureRef } from 'react-native-view-shot';
 import { FilteredImage } from '@/components/FilteredImage';
 import { FundoBase } from '@/components/FundoBase';
 import { LoaderMarca } from '@/components/LoaderMarca';
-import { FilterThumbs } from '@/components/FilterThumbs';
-import { LookChips } from '@/components/LookChips';
+import { TratamentoCarrossel } from '@/components/TratamentoCarrossel';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicSheet } from '@/components/MusicSheet';
 import { PostSheet } from '@/components/PostSheet';
@@ -114,6 +114,18 @@ export function CaptureSheet() {
   // come a metade de baixo de "Salvar" e "Postar agora" (medido: 130px em
   // navegação por botões, 44px em gestos — ver baseline.md T004).
   const insets = useSafeAreaInsets();
+  /**
+   * Teto de altura da prévia, em pixels reais.
+   *
+   * `maxHeight` percentual não serve aqui: dentro de um ScrollView a
+   * porcentagem se mede contra a altura do *conteúdo*, não da tela. Sem o
+   * teto, uma foto retrato (3:4) em `width: 100%` rende ~1400px e empurra o
+   * carrossel de tratamentos para fora da dobra — a pessoa teria de rolar
+   * para ver as opções que o app acabou de sugerir. 58% deixa a foto
+   * claramente dominante e ainda cabe a fileira de escolhas.
+   */
+  const { height: alturaJanela } = useWindowDimensions();
+  const alturaMaxPreview = Math.round(alturaJanela * 0.58);
   const previewRef = useRef<View>(null);
   const [showMusic, setShowMusic] = useState(false);
   const [sharePkg, setSharePkg] = useState<SharePackage | null>(null);
@@ -670,42 +682,37 @@ export function CaptureSheet() {
                 filtroId={session.filtroId}
                 look={session.lookEscolhido}
                 usarSkia
-                style={[styles.preview, { aspectRatio: aspectoReal ?? session.aspecto }]}
+                style={[
+                  styles.preview,
+                  { aspectRatio: aspectoReal ?? session.aspecto, maxHeight: alturaMaxPreview },
+                ]}
               />
             </View>
 
-            {/* As três sugestões vêm ANTES dos 8 presets: elas são a resposta do
-                sistema para esta foto, e os presets são a saída para quem quer
-                algo fora delas (FR-006). */}
-            {session.looks.length > 0 ? (
-              <>
-                <Text style={[styles.sectionLabel, { paddingHorizontal: 20, marginTop: 4 }]}>
-                  LOOKS SUGERIDOS
-                </Text>
-                <View style={styles.carouselWrap}>
-                  <LookChips
-                    looks={session.looks}
-                    escolhido={session.lookEscolhido}
-                    onSelect={escolherLook}
-                  />
-                </View>
-              </>
-            ) : null}
-
             <View style={styles.filtroRow}>
-              <Text style={styles.sectionLabel}>FILTRO</Text>
+              <Text style={styles.sectionLabel}>TRATAMENTO</Text>
               <Text style={styles.filtroAtual}>
-                {filtro ? `${filtro.emoji} ${filtro.nome.toUpperCase()}` : '📷 ORIGINAL'} · VIBE{' '}
-                {vibe.nome.toUpperCase()}
+                {session.lookEscolhido
+                  ? session.lookEscolhido.nome.toUpperCase()
+                  : filtro
+                    ? `${filtro.emoji} ${filtro.nome.toUpperCase()}`
+                    : '📷 ORIGINAL'}{' '}
+                · VIBE {vibe.nome.toUpperCase()}
               </Text>
             </View>
-            {/* Aqui existe foto: cada filtro se mostra aplicado nela, em vez
-                de se anunciar por um emoji (T054). */}
+            {/* Uma fileira só: os três looks (ou seus lugares reservados) e os
+                nove presets. Antes eram duas seções que somadas passavam de
+                300px — mais espaço que a própria foto. Ver
+                `TratamentoCarrossel`. */}
             <View style={styles.carouselWrap}>
-              <FilterThumbs
+              <TratamentoCarrossel
                 photoUri={session.photoUri}
-                ativo={session.filtroId}
-                onSelect={escolherFiltro}
+                looks={session.looks}
+                carregando={session.curadoria === 'carregando'}
+                lookEscolhido={session.lookEscolhido}
+                filtroAtivo={session.filtroId}
+                onSelectLook={escolherLook}
+                onSelectFiltro={escolherFiltro}
               />
             </View>
 
@@ -929,7 +936,10 @@ const styles = StyleSheet.create({
     fontSize: 26,
   },
   scroll: {
-    paddingBottom: 16,
+    // Folga para o rodapé fixo (Salvar/Postar), que desenha por cima do fim
+    // da rolagem. Com 16 a última fileira de miniaturas aparecia cortada ao
+    // meio e os nomes dos tratamentos ficavam escondidos atrás dos botões.
+    paddingBottom: 28,
   },
   previewShot: {
     marginHorizontal: 20,
