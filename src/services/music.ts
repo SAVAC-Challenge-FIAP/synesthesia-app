@@ -372,11 +372,26 @@ interface GeminiSceneResult {
 function instrucaoDeLook(): string {
   const presets = FILTERS.map((f) => f.id).join(', ');
   return (
-    `Proponha também 2 tratamentos visuais (looks) para esta foto. Cada look PARTE ` +
+    `Proponha também 3 tratamentos visuais (looks) para esta foto. Cada look PARTE ` +
     `de um destes presets e informa apenas o DESVIO em relação a ele: ${presets}. ` +
     `Papéis, nesta ordem: 1x "certeira" (realça o que a cena já tem), ` +
-    `1x "ousada" (interpretação mais forte, ainda plausível). ` +
-    `Os ajustes são deltas pequenos entre -0.5 e 0.5 e todos são opcionais. `
+    `1x "ousada" (interpretação mais forte, ainda plausível), ` +
+    `1x "ousada" LIVRE (a leitura mais autoral que a cena permitir — escolha o ` +
+    `preset de partida que quiser e desvie dele com liberdade). ` +
+    `Os ajustes são deltas entre -0.5 e 0.5. ` +
+    // O que dá sentido à sugestão é ela ser DIFERENTE do que a pessoa já tem
+    // no carrossel (T105, pedido do Sávio). Um look devolvido com todos os
+    // ajustes em zero é o preset puro repetido com outro nome: ocupa um dos
+    // três lugares sem oferecer nada. A regra é dita aqui e **imposta** em
+    // `receitaDeIdeia`, porque instrução em prompt é pedido, não garantia.
+    `REGRA: nenhum look pode ser igual ao preset de partida. Todo look precisa ` +
+    `de pelo menos um ajuste diferente de zero. ` +
+    // O nome é o que a pessoa lê na miniatura — é identidade, não etiqueta.
+    // Sem esta régua o modelo devolve "Neon Variação", "Vivid Forte" e afins,
+    // que leem como rótulo de sistema (T107).
+    `O "nome" tem NO MÁXIMO 2 palavras, em pt-BR, e evoca a SENSAÇÃO da imagem ` +
+    `tratada ("Hora Dourada", "Luz Urbana", "Fita Velha"). Nunca use o nome do ` +
+    `preset, nem palavras genéricas como "livre", "suave", "forte" ou "variação". `
   );
 }
 

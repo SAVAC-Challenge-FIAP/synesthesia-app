@@ -28,7 +28,60 @@ import { AjustesLook, FilterDef, FilterId, LookRecipe, PapelLook, VibeId } from 
 const PAPEIS_DO_MODELO: readonly string[] = ['certeira', 'ousada'];
 
 /** Ordem dos papéis pedidos ao Gemini; vale quando o campo `papel` não presta. */
-const PAPEIS_PEDIDOS: PapelLook[] = ['certeira', 'ousada'];
+const PAPEIS_PEDIDOS: PapelLook[] = ['certeira', 'ousada', 'ousada'];
+
+/**
+ * Desvio mínimo que separa um look do preset de onde ele parte (T105).
+ *
+ * O Gemini às vezes devolve `ajustes` todos em zero — e um look sem desvio é o
+ * preset puro com outro nome: ele ocupa um dos três lugares do carrossel
+ * repetindo uma miniatura que já está ali ao lado, e a sugestão perde o
+ * sentido. Como pedir de novo custaria outra ida à rede (e a pessoa não pode
+ * esperar), o desvio é aplicado **aqui**, localmente e de graça.
+ *
+ * Os valores são pequenos de propósito: o suficiente para a miniatura ler como
+ * tratamento próprio, longe de desfigurar a foto. `certeira` recebe menos que
+ * `ousada` — é o papel que promete "realça o que a cena já tem".
+ */
+const DESVIO_MINIMO: Record<PapelLook, Partial<Record<'brilho' | 'saturacao' | 'contraste', number>>> =
+  {
+    certeira: { saturacao: 0.08, contraste: 0.06 },
+    ousada: { saturacao: 0.18, contraste: 0.12, brilho: -0.06 },
+    // Nunca chega do modelo (é rótulo local), mas o tipo exige — e se um dia
+    // chegar, trata-se como certeira.
+    afinidade: { saturacao: 0.08, contraste: 0.06 },
+  };
+
+/**
+ * Nome autoral de cada preset, por papel (T107).
+ *
+ * Existe porque a alternativa era pior: sufixar o preset ("Neon Livre", "Vivid
+ * Suave") produz rótulo de sistema, e o público deste app lê nome de filtro
+ * como identidade — "Neon Livre" não é nome que ninguém escolhe, é nome que
+ * alguém gerou. Como estes rótulos só aparecem quando o Gemini **não** deu
+ * nome (falha de rede, chave ausente, resposta sem `nome`), eles precisam
+ * segurar a tela sozinhos.
+ *
+ * Duas palavras no máximo, sempre evocando o que o tratamento faz com a foto —
+ * a mesma régua que o prompt pede ao modelo.
+ */
+const NOME_AUTORAL: Record<string, { certeira: string; ousada: string }> = {
+  vivid: { certeira: 'Verão Claro', ousada: 'Sol Alto' },
+  neon: { certeira: 'Luz Urbana', ousada: 'Madrugada Neon' },
+  love: { certeira: 'Rubor', ousada: 'Coração Quente' },
+  eclipse: { certeira: 'Meia-Luz', ousada: 'Eclipse Total' },
+  retro: { certeira: 'Fita Velha', ousada: 'Anos Dourados' },
+  vintage: { certeira: 'Papel Antigo', ousada: 'Memória Rara' },
+  arctic: { certeira: 'Ar Frio', ousada: 'Gelo Puro' },
+  honey: { certeira: 'Mel Suave', ousada: 'Hora Dourada' },
+};
+
+/** Nome autoral do preset para aquele papel; cai no nome do preset se faltar. */
+function nomeAutoral(base: FilterId, papel: PapelLook): string {
+  const par = NOME_AUTORAL[base];
+  if (!par) return filterById(base).nome;
+  return papel === 'certeira' ? par.certeira : par.ousada;
+}
 
 /**
  * Abaixo desta distância dois looks são a mesma imagem com nomes diferentes.
@@ -151,12 +204,34 @@ export function receitaDeIdeia(bruto: unknown, posicao: number): LookRecipe | nu
     ? (papelBruto as PapelLook)
     : (PAPEIS_PEDIDOS[posicao] ?? 'ousada');
 
-  const nome = typeof o.nome === 'string' && o.nome.trim() ? o.nome.trim() : filterById(o.base).nome;
+  const nomePreset = filterById(o.base).nome;
+  const nomeBruto = typeof o.nome === 'string' ? o.nome.trim() : '';
+  const nome = nomeBruto || nomePreset;
+
+  /**
+   * Um look tem de ser diferente do preset de que parte (T105).
+   *
+   * `clampAjustes` já devolve `{}` quando o modelo manda ajustes inválidos ou
+   * todos em zero — e nesse caso a receita renderiza **idêntica** ao preset,
+   * que na prática é o preset repetido no carrossel com outro rótulo. Em vez de
+   * pedir de novo ao Gemini (outra ida à rede, com a pessoa esperando), aplica-
+   * se aqui o desvio mínimo do papel: sai de graça, na hora, e o look passa a
+   * valer o lugar que ocupa.
+   */
+  const ajustes = clampAjustes(o.ajustes);
+  const semDesvio = Object.values(ajustes).every((v) => !v);
+  const ajustesFinais = semDesvio ? { ...DESVIO_MINIMO[papel] } : ajustes;
 
   return {
     base: o.base,
-    ajustes: clampAjustes(o.ajustes),
-    nome,
+    ajustes: ajustesFinais,
+    // Nome igual ao do preset apagaria a diferença que o desvio acabou de
+    // criar: a miniatura diria "Neon" ao lado do Neon de verdade. O sufixo é
+    // discreto e mantém a leitura de "variação disto aqui".
+    // Nome igual ao do preset apagaria a diferença que o desvio acabou de criar
+    // — a miniatura diria "Neon" ao lado do Neon de verdade. Cai no nome
+    // autoral do par (base, papel), nunca num sufixo genérico.
+    nome: nome.toLowerCase() === nomePreset.toLowerCase() ? nomeAutoral(o.base, papel) : nome,
     justificativa: typeof o.justificativa === 'string' ? o.justificativa.trim() : '',
     papel,
   };
@@ -179,8 +254,14 @@ export function looksBase(vibeId: VibeId): LookRecipe[] {
   );
   return ordem.map((base, i) => ({
     base,
-    ajustes: {},
-    nome: filterById(base).nome,
+    // Mesmo desvio mínimo dos looks do modelo (T105): a reserva também entra no
+    // carrossel ao lado dos oito presets, e sem desvio ela seria a miniatura do
+    // preset repetida — foi assim que um chip "NEON" apareceu entre as
+    // sugestões, do lado do NEON de verdade.
+    ajustes: { ...DESVIO_MINIMO[(i === 0 ? 'certeira' : 'ousada') as PapelLook] },
+    // Pelo mesmo motivo, o rótulo é o nome autoral do par (base, papel): tem de
+    // dizer que aquilo é uma leitura do preset, sem virar "Neon Livre".
+    nome: nomeAutoral(base, (i === 0 ? 'certeira' : 'ousada') as PapelLook),
     justificativa:
       i === 0
         ? `combina com a atmosfera ${vibe.nome.toLowerCase()}`
