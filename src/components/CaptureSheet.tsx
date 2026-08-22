@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -108,6 +109,7 @@ export function CaptureSheet() {
   const registrarEscolhaVisual = useLookTasteStore((s) => s.registrarEscolha);
   const sugestaoAutomatica = useSettingsStore((s) => s.sugestaoAutomatica);
   const deteccaoTempoReal = useSettingsStore((s) => s.deteccaoTempoReal);
+  const filtroAutomatico = useSettingsStore((s) => s.filtroAutomatico);
 
   // Um <Modal> desenha na própria janela, sem o SafeAreaView da tela por baixo:
   // o espaçamento inferior tem de vir do inset real, senão a barra de navegação
@@ -318,7 +320,10 @@ export function CaptureSheet() {
         // Sobrescrever uma escolha feita durante a espera seria desfazer a
         // decisão da pessoa por causa de uma resposta que chegou atrasada.
         const lookPrincipal = looks[0] ?? null;
-        const aplicaLook = atual.lookAuto && lookPrincipal !== null;
+        // `filtroAutomatico` (Ajustes → "Tratamento automático") é o que
+        // autoriza a aplicação sem toque. Desligado, as três sugestões
+        // aparecem e esperam a escolha.
+        const aplicaLook = filtroAutomatico && atual.lookAuto && lookPrincipal !== null;
         patch({
           sugestoes,
           looks,
@@ -342,7 +347,7 @@ export function CaptureSheet() {
         clearTimeout(limite);
         patch({ curadoria: 'indisponivel' });
       });
-  }, [photoUri, sugestaoAutomatica, deteccaoTempoReal, patch]);
+  }, [photoUri, sugestaoAutomatica, deteccaoTempoReal, filtroAutomatico, patch]);
 
   /**
    * Exporta a foto com o tratamento aplicado, na resolução do arquivo
@@ -866,7 +871,16 @@ export function CaptureSheet() {
               <Pressable
                 style={[styles.action, styles.actionSalvar, postando && styles.actionDesabilitada]}
                 disabled={salvando || postando}
-                onPress={() => salvar(true)}
+                onPress={async () => {
+                  const m = await salvar(true);
+                  // Salvar leva à galeria: o momento acabou de virar registro,
+                  // e é lá que ele existe. Antes o modal apenas fechava e a
+                  // pessoa caía de volta no visor, sem confirmação visível de
+                  // que a mídia tinha sido guardada. `replace` para que o
+                  // "voltar" da galeria vá para a câmera, e não reabra a
+                  // captura que acabou de ser salva.
+                  if (m) router.replace('/gallery');
+                }}
               >
                 <Text style={styles.actionText}>{salvando ? 'Salvando...' : 'Salvar'}</Text>
               </Pressable>

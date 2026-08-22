@@ -40,8 +40,8 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.section}>CÂMERA</Text>
         <Row
-          titulo="Filtro automático"
-          desc="Aplica o filtro da vibe detectada, ao vivo no visor"
+          titulo="Tratamento automático"
+          desc="Aplica sozinho o look sugerido para a foto. Desligado: as três sugestões aparecem, mas nenhuma entra sem o seu toque"
           value={s.filtroAutomatico}
           onToggle={() => s.toggle('filtroAutomatico')}
         />

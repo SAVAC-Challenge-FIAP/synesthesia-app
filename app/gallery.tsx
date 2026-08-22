@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
+import { Alert, BackHandler, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FilteredImage } from '@/components/FilteredImage';
@@ -58,6 +58,26 @@ export default function GalleryScreen() {
     router.push('/capture');
   };
 
+  /**
+   * Voltar — do gesto/botão do sistema e do chevron do cabeçalho.
+   *
+   * Chegando aqui por `replace` (o caminho de "salvei agora"), não existe
+   * entrada anterior na pilha: `back()` falha com "GO_BACK was not handled" e
+   * o toque não faz nada. A câmera é o destino certo nos dois casos.
+   */
+  const voltar = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/camera');
+    return true;
+  }, [router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', voltar);
+      return () => sub.remove();
+    }, [voltar]),
+  );
+
   const excluir = (m: Media) => {
     Alert.alert(
       'Excluir mídia?',
@@ -73,7 +93,15 @@ export default function GalleryScreen() {
     <SafeAreaView style={styles.root}>
       <FundoBase />
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        {/* `back()` sozinho não serve: quando a galeria é aberta logo depois
+            de salvar, ela chega por `replace` da captura e não há entrada
+            anterior para onde voltar — o expo-router respondia com "GO_BACK was
+            not handled" e o toque não fazia nada. A câmera é o destino certo
+            nos dois caminhos (veio do visor ou veio de salvar). */}
+        <Pressable
+          onPress={voltar}
+          hitSlop={12}
+        >
           <Ionicons name="chevron-back" size={30} color={colors.parchment} />
         </Pressable>
         <Text style={styles.title}>Galeria.</Text>

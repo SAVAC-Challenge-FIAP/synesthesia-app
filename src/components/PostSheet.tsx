@@ -64,25 +64,39 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
         }
       : {
           icone: 'image-outline' as const,
-          corIlustracao: colors.ruby,
-          titulo: 'Momento só com a imagem.',
-          conteudo: 'SEM TRILHA — A METADE SONORA NÃO ENTROU',
+          corIlustracao: colors.amber,
+          titulo: 'Imagem pronta!',
+          /**
+           * A copy anterior — "SEM TRILHA — A METADE SONORA NÃO ENTROU" —
+           * descrevia como perda o que na maioria das vezes é escolha: quem
+           * arquivou a trilha **quis** postar só a imagem, e era recebido com
+           * uma tela que parecia relatar um defeito. O ícone em `ruby` (a cor
+           * de alerta/CTA) reforçava a leitura de erro; em `amber` ele lê como
+           * conclusão bem-sucedida, igual à do vídeo.
+           */
+          conteudo: 'SÓ A IMAGEM, COMO VOCÊ ESCOLHEU',
           detalhe:
-            'Você pode fechar, escolher uma música e postar de novo para levar o momento completo.',
+            'A trilha está desativada neste momento. Quer som? Feche, escolha uma música e poste de novo.',
         };
   const [baixando, setBaixando] = useState(false);
   const [baixado, setBaixado] = useState(false);
   /** Falhou e o usuário precisa saber — antes o `false` sumia sem rastro. */
   const [falhouBaixar, setFalhouBaixar] = useState(false);
 
-  const baixarVideo = async () => {
-    if (!pacote.videoUri || baixando) return;
+  /**
+   * Baixa o que o pacote de fato tem: o .mp4 quando existe, a imagem quando
+   * não. Antes o botão só aparecia com vídeo, então quem postava só a imagem
+   * — por escolha, tendo arquivado a trilha — não tinha como salvá-la no
+   * aparelho a partir daqui.
+   */
+  const baixarArquivo = async () => {
+    if (!arquivo || baixando) return;
     setBaixando(true);
     setFalhouBaixar(false);
     try {
-      // 'video' é o que corrige o T089: a permissão pedida tem de ser a do que
-      // se está gravando, senão a chamada é negada e o botão mente.
-      const ok = await saveToSystemGallery(pacote.videoUri, 'video');
+      // 'video'/'photo' é o que corrige o T089: a permissão pedida tem de ser a
+      // do que se está gravando, senão a chamada é negada e o botão mente.
+      const ok = await saveToSystemGallery(arquivo, temVideo ? 'video' : 'photo');
       setBaixado(ok);
       setFalhouBaixar(!ok);
     } finally {
@@ -141,7 +155,11 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
           <Text style={styles.title}>{resultado.titulo}</Text>
           {/* FR-Q07: o que o pacote contém fica ao lado do "pronto", não
               escondido num parágrafo — inclusive quando falta a trilha */}
-          <Text style={[styles.conteudo, !temTrilha && styles.conteudoSemTrilha]}>
+          {/* A moldura de alerta vale para o pacote que saiu **partido** — a
+              trilha existe e não coube no arquivo. Postar só a imagem por
+              escolha não é alerta nenhum, e emoldurar em vermelho era o que
+              fazia a tela parecer relato de erro. */}
+          <Text style={[styles.conteudo, temTrilha && !temVideo && styles.conteudoSemTrilha]}>
             {resultado.conteudo}
           </Text>
           <Text style={styles.subtitle}>{resultado.detalhe}</Text>
@@ -151,13 +169,13 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
               da captura). Antes ele vinha depois do Postar, com moldura
               vermelha e texto em caixa alta — o único botão da tela nesse
               registro, e por isso o que parecia fora do lugar (T095). */}
-          {temVideo ? (
+          {arquivo ? (
             <Pressable
               style={[styles.baixar, baixado && styles.baixarFeito]}
               hitSlop={hitSlops.botao}
               disabled={baixando}
               accessibilityRole="button"
-              onPress={baixarVideo}
+              onPress={baixarArquivo}
             >
               <Ionicons
                 name={
@@ -173,7 +191,9 @@ export function PostSheet({ pacote, onClose }: { pacote: SharePackage; onClose: 
                     ? 'Salvo na galeria'
                     : falhouBaixar
                       ? 'Não deu — tocar de novo'
-                      : 'Baixar vídeo'}
+                      : temVideo
+                        ? 'Baixar vídeo'
+                        : 'Baixar imagem'}
               </Text>
             </Pressable>
           ) : null}
@@ -263,6 +283,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
   },
+  /** Moldura de atenção: o pacote saiu em duas partes (imagem + áudio). */
   conteudoSemTrilha: {
     borderWidth: 1,
     borderColor: colors.ruby,

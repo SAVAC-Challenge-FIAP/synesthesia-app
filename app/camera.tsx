@@ -17,7 +17,12 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CameraOptionsBar, rotuloDeResolucao } from '@/components/CameraOptionsBar';
+import {
+  CameraOptionsBar,
+  megapixels,
+  opcoesDeResolucao,
+  rotuloDeResolucao,
+} from '@/components/CameraOptionsBar';
 import { FilterCarousel } from '@/components/FilterCarousel';
 import { FundoBase } from '@/components/FundoBase';
 import { FilterLayer } from '@/components/FilterLayer';
@@ -51,7 +56,6 @@ export default function CameraScreen() {
   // - `s.session` inteiro reagia a **cada** `patch()` da curadoria, que são
   //   vários por captura — e aqui só interessa se existe sessão ou não;
   // - `s.medias` inteiro reagia a qualquer mídia, quando só a capa é usada.
-  const filtroAutomatico = useSettingsStore((s) => s.filtroAutomatico);
   const gradeComposicao = useSettingsStore((s) => s.gradeComposicao);
   const ultimaMedia = useGalleryStore((s) => s.medias[0]);
   const startSession = useCaptureStore((s) => s.start);
@@ -94,9 +98,6 @@ export default function CameraScreen() {
   }, [focada]);
 
   const [facing, setFacing] = useState<CameraType>('back');
-  // Painel "+ Opções" (T065): o chip deixou de empurrar para os Ajustes e passou
-  // a abrir a barra do Figma; quem leva aos Ajustes agora é a engrenagem dela.
-  const [opcoesAbertas, setOpcoesAbertas] = useState(false);
   const [tamanhos, setTamanhos] = useState<string[]>([]);
   const [enquadramentoId, setEnquadramentoId] = useState<EnquadramentoId>(ENQUADRAMENTO_PADRAO);
   const [flash, setFlash] = useState<FlashMode>('off');
@@ -201,9 +202,23 @@ export default function CameraScreen() {
   const [capturando, setCapturando] = useState(false);
 
   const vibe = useMemo(() => detectVibe({ facing }), [facing]);
-  const filtroAuto = manualFiltro === null && filtroAutomatico;
-  const filtroAtivo: FilterId | null =
-    manualFiltro === 'original' ? null : (manualFiltro ?? (filtroAutomatico ? vibe.filtro : null));
+  /**
+   * O visor abre **sem filtro**, e a sugestão automática deixa de existir aqui.
+   *
+   * Antes, com `filtroAutomatico` ligado, o visor já aplicava `vibe.filtro` e
+   * o chip aparecia marcado "· AUTO". Isso prometia curadoria onde ela ainda
+   * não existe: a vibe do visor é uma **prévia determinística** (hora do dia +
+   * câmera frontal/traseira), não uma leitura da cena. A leitura de verdade só
+   * acontece depois do disparo, quando o Gemini vê a foto — e é lá, no modal
+   * de Captura, que os três looks sugeridos aparecem.
+   *
+   * Começar em Original também deixa a pessoa ver a cena como ela é antes de
+   * decidir tratá-la, e os oito presets seguem a um toque no carrossel.
+   *
+   * `filtroAutomatico` (Ajustes) continua valendo para a sugestão pós-captura;
+   * só não manda mais no visor.
+   */
+  const filtroAtivo: FilterId | null = manualFiltro === 'original' ? null : manualFiltro;
   const filtro = filtroAtivo ? filterById(filtroAtivo) : null;
 
   // Callback estável: recriado a cada render, ele invalidaria a memoização dos
@@ -230,7 +245,53 @@ export default function CameraScreen() {
       .then(setTamanhos)
       .catch(() => {});
   }, []);
-  const resolucao = tamanhos.length > 0 ? rotuloDeResolucao(tamanhos) : null;
+  /**
+   * Resolução escolhida pela pessoa (item 4 do QA do Sávio).
+   *
+   * Antes o "64M" era só um rótulo do maior tamanho do sensor, e dava a
+   * entender que se podia trocar. Agora troca de verdade: `opcoesDeResolucao`
+   * devolve até três degraus na proporção do enquadramento atual, e tocar no
+   * rótulo cicla entre eles. Menos megapixels = disparo mais rápido, menos
+   * memória e arquivo menor — o oposto dos 64 MP que pesavam o app.
+   *
+   * `null` = ainda não escolheu; vale o que `escolherTamanhoNativo` decidir,
+   * que é o comportamento de sempre.
+   */
+  const [resolucaoEscolhida, setResolucaoEscolhida] = useState<string | null>(null);
+  const opcoesResolucao = useMemo(
+    () => opcoesDeResolucao(tamanhos, razaoAlvo),
+    [tamanhos, razaoAlvo],
+  );
+  // Trocar de enquadramento muda as proporções disponíveis: a escolha antiga
+  // pode não existir mais na nova lista, e insistir nela daria uma foto na
+  // proporção errada.
+  useEffect(() => {
+    if (resolucaoEscolhida && !opcoesResolucao.includes(resolucaoEscolhida)) {
+      setResolucaoEscolhida(null);
+    }
+  }, [opcoesResolucao, resolucaoEscolhida]);
+
+  /**
+   * O que de fato vai para a `CameraView`: a escolha da pessoa quando existe,
+   * senão o tamanho que já nasce no enquadramento certo (T086).
+   */
+  const pictureSize = resolucaoEscolhida ?? tamanhoNativo;
+
+  const proximaResolucao = useCallback(() => {
+    if (opcoesResolucao.length === 0) return;
+    const atual = resolucaoEscolhida ?? opcoesResolucao[0];
+    const i = opcoesResolucao.indexOf(atual);
+    setResolucaoEscolhida(opcoesResolucao[(i + 1) % opcoesResolucao.length]);
+  }, [opcoesResolucao, resolucaoEscolhida]);
+
+  const resolucao =
+    resolucaoEscolhida !== null
+      ? megapixels(resolucaoEscolhida)
+      : opcoesResolucao.length > 0
+        ? megapixels(opcoesResolucao[0])
+        : tamanhos.length > 0
+          ? rotuloDeResolucao(tamanhos)
+          : null;
 
   /**
    * Flash (T067) — três estados **visíveis**, não um toggle cego: a pessoa
@@ -239,44 +300,6 @@ export default function CameraScreen() {
   const proximoFlash = () =>
     setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'));
 
-  /**
-   * Abertura do painel "+ Opções" (T079). Ele trocava de conteúdo num frame —
-   * o chip sumia e a barra aparecia no lugar, seca. Agora o badge de vibe e o
-   * chip saem esmaecendo enquanto a barra entra deslizando de cima, e o inverso
-   * ao fechar. É a mesma troca, com o tempo que ela precisava para ser lida.
-   *
-   * `useNativeDriver` liga porque só opacidade e `translateY` estão em jogo.
-   */
-  const abertura = useRef(new Animated.Value(0)).current;
-
-  /**
-   * A entrada roda num efeito, **depois** da montagem — e não junto com o
-   * comando. Com `useNativeDriver`, uma animação disparada antes de o nó nativo
-   * existir termina no vazio: o driver não tem o que atualizar e a barra
-   * aparecia com opacidade 0, invisível. Visto no aparelho.
-   */
-  useEffect(() => {
-    if (!opcoesAbertas) return;
-    abertura.setValue(0);
-    Animated.timing(abertura, {
-      toValue: 1,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [opcoesAbertas, abertura]);
-
-  const fecharOpcoes = useCallback(() => {
-    Animated.timing(abertura, {
-      toValue: 0,
-      duration: 180,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      // Só desmonta no fim: desmontar junto com o toque cortaria a saída.
-      if (finished) setOpcoesAbertas(false);
-    });
-  }, [abertura]);
 
   /**
    * Câmera frontal deste tipo de aparelho não tem flash. Em vez de mostrar um
@@ -323,7 +346,11 @@ export default function CameraScreen() {
           photoUri,
           aspecto,
           filtroId: filtroAtivo,
-          filtroAuto,
+          // Sem toque no carrossel do visor, o tratamento continua "em
+          // aberto": é isso que autoriza o look sugerido a se aplicar sozinho
+          // no modal (FR-004). Tocar em qualquer chip — Original inclusive —
+          // é escolha, e a sugestão passa a respeitá-la.
+          filtroAuto: manualFiltro === null,
           vibeId: vibe.id,
           musica: null,
           trechoInicio: 0,
@@ -333,7 +360,7 @@ export default function CameraScreen() {
     } finally {
       setCapturando(false);
     }
-  }, [capturando, facing, razaoAlvo, filtroAtivo, filtroAuto, router, startSession, vibe.id]);
+  }, [capturando, facing, razaoAlvo, filtroAtivo, manualFiltro, router, startSession, vibe.id]);
 
   // Guards DEPOIS de todos os hooks (Rules of Hooks): um return antecipado
   // entre hooks muda a ordem entre renders e derruba a tela
@@ -380,7 +407,7 @@ export default function CameraScreen() {
                 flash={flash}
                 // Pede ao sensor o modo que já tem a proporção escolhida; sem
                 // um que sirva (1:1), fica no padrão e o recorte resolve.
-                {...(tamanhoNativo ? { pictureSize: tamanhoNativo } : {})}
+                {...(pictureSize ? { pictureSize } : {})}
                 onCameraReady={lerTamanhos}
               />
             ) : null}
@@ -398,100 +425,58 @@ export default function CameraScreen() {
             setFaixas((f) => ({ ...f, topo: h }));
           }}
         >
-          {/* O painel aberto toma a linha inteira. O Figma desenhou 4 slots numa
-              barra de 382; com flash, três enquadramentos, resolução e ajustes
-              são seis, e dividir a linha com o badge fazia "16:9" e "64M" se
-              encostarem. A vibe volta assim que o painel fecha.
+          {/* A barra de opções é **fixa**, não mais escondida atrás de um
+              "+ OPÇÕES" que abria um painel sobreposto.
 
-              Os dois estados ficam **sobrepostos** e trocam por opacidade: era a
-              troca instantânea de um pelo outro que fazia o painel "abrir seco"
-              (T079). Desmontar um para montar o outro não deixa nada para
-              animar. */}
-          <Animated.View
-            style={[
-              styles.linhaPadrao,
-              { opacity: abertura.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) },
-            ]}
-            pointerEvents={opcoesAbertas ? 'none' : 'box-none'}
-          >
-            <View style={styles.vibeBadge}>
-              <Text style={styles.vibeEmoji}>{vibe.emoji}</Text>
-              <View>
-                <Text style={styles.vibeLabel}>VIBE · PRÉVIA</Text>
-                <Text style={styles.vibeNome}>{vibe.nome.toUpperCase()}</Text>
-              </View>
-            </View>
-            <Pressable
-              style={styles.opcoes}
-              hitSlop={hitSlops.chip}
-              onPress={() => setOpcoesAbertas(true)}
-            >
-              <Text style={styles.opcoesText}>+ OPÇÕES</Text>
-            </Pressable>
-          </Animated.View>
-
-          {opcoesAbertas ? (
-            <Animated.View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  justifyContent: 'center',
-                  opacity: abertura,
-                  transform: [
-                    {
-                      translateY: abertura.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-14, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-            <CameraOptionsBar
-              resolucao={resolucao}
-              onFechar={fecharOpcoes}
-              onAjustes={() => router.push('/settings')}
-              slotFlash={
-                <Pressable
-                  hitSlop={hitSlops.chip}
-                  disabled={!flashDisponivel}
-                  onPress={proximoFlash}
-                  style={!flashDisponivel && { opacity: 0.3 }}
-                >
-                  <View style={styles.flashSlot}>
-                    <Ionicons
-                      name={flash === 'off' ? 'flash-off-outline' : 'flash'}
-                      size={20}
-                      color={flash === 'off' ? colors.parchment : colors.amber}
-                    />
-                    {flash === 'auto' ? <Text style={styles.flashAuto}>A</Text> : null}
-                  </View>
-                </Pressable>
-              }
-              slotEnquadramento={
-                <View style={styles.enquadramentos}>
-                  {ENQUADRAMENTOS.map((e) => (
-                    <Pressable
-                      key={e.id}
-                      hitSlop={hitSlops.chip}
-                      onPress={() => setEnquadramentoId(e.id)}
-                    >
-                      <Text
-                        style={[
-                          styles.enquadramentoChip,
-                          e.id === enquadramentoId && styles.enquadramentoAtivo,
-                        ]}
-                      >
-                        {e.rotulo}
-                      </Text>
-                    </Pressable>
-                  ))}
+              Duas coisas saíram daqui, a pedido do Sávio: a badge "VIBE ·
+              PRÉVIA", que anunciava uma leitura que o visor não faz (a vibe do
+              visor é determinística — hora do dia + câmera; a leitura real da
+              cena só acontece depois do disparo), e o próprio botão, que
+              gastava a barra inteira para dar acesso ao que agora está a um
+              toque. O espaço que os dois ocupavam virou opção de verdade:
+              flash, enquadramento, resolução e ajustes, todos diretos. */}
+          <CameraOptionsBar
+            resolucao={resolucao}
+            onTrocarResolucao={opcoesResolucao.length > 1 ? proximaResolucao : undefined}
+            onAjustes={() => router.push('/settings')}
+            slotFlash={
+              <Pressable
+                hitSlop={hitSlops.chip}
+                disabled={!flashDisponivel}
+                onPress={proximoFlash}
+                style={!flashDisponivel && { opacity: 0.3 }}
+              >
+                <View style={styles.flashSlot}>
+                  <Ionicons
+                    name={flash === 'off' ? 'flash-off-outline' : 'flash'}
+                    size={20}
+                    color={flash === 'off' ? colors.parchment : colors.amber}
+                  />
+                  {flash === 'auto' ? <Text style={styles.flashAuto}>A</Text> : null}
                 </View>
-              }
-            />
-            </Animated.View>
-          ) : null}
+              </Pressable>
+            }
+            slotEnquadramento={
+              <View style={styles.enquadramentos}>
+                {ENQUADRAMENTOS.map((e) => (
+                  <Pressable
+                    key={e.id}
+                    hitSlop={hitSlops.chip}
+                    onPress={() => setEnquadramentoId(e.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.enquadramentoChip,
+                        e.id === enquadramentoId && styles.enquadramentoAtivo,
+                      ]}
+                    >
+                      {e.rotulo}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            }
+          />
         </View>
 
         {/* O visor mora fora da interface; aqui só sobra o espaço que empurra a
@@ -515,18 +500,7 @@ export default function CameraScreen() {
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
           />
-          {manualFiltro ? (
-            <Pressable
-              style={styles.autoBtn}
-              hitSlop={hitSlops.chip}
-              onPress={() => setManualFiltro(null)}
-            >
-              <Ionicons name="refresh" size={12} color={colors.amber} />
-              <Text style={styles.autoBtnText}>VOLTAR AO AUTOMÁTICO</Text>
-            </Pressable>
-          ) : null}
-
-          <FilterCarousel ativo={filtroAtivo} autoAtivo={filtroAuto} onSelect={escolherFiltro} />
+          <FilterCarousel ativo={filtroAtivo} onSelect={escolherFiltro} />
 
           {/* Home bar: galeria / captura / flip. A medida daqui é o piso do
               visor — por isso ela é lida no layout (T091). */}
@@ -635,70 +609,9 @@ const styles = StyleSheet.create({
     height: 60,
     justifyContent: 'center',
   },
-  linhaPadrao: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  vibeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(9,5,6,0.55)',
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: colors.parchment25,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  vibeEmoji: {
-    fontSize: 18,
-  },
-  vibeLabel: {
-    color: colors.amber,
-    fontFamily: fonts.labelLight,
-    fontSize: 8,
-    letterSpacing: 1.5,
-  },
-  vibeNome: {
-    color: colors.parchment,
-    fontFamily: fonts.labelForte,
-    fontSize: 12,
-    letterSpacing: 1,
-  },
-  opcoes: {
-    backgroundColor: 'rgba(9,5,6,0.55)',
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: colors.parchment25,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  opcoesText: {
-    color: colors.parchment,
-    fontFamily: fonts.labelForte,
-    fontSize: 11,
-    letterSpacing: 1,
-  },
   bottom: {
     gap: 14,
     paddingBottom: 18,
-  },
-  autoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(9,5,6,0.55)',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  autoBtnText: {
-    color: colors.amber,
-    fontFamily: fonts.labelLight,
-    fontSize: 10,
-    letterSpacing: 1,
   },
   controls: {
     flexDirection: 'row',
