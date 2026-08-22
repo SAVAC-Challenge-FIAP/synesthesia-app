@@ -192,7 +192,26 @@ export function CaptureSheet() {
    */
   const alternarArquivo = useCallback(
     (arquivar: boolean) => {
-      LayoutAnimation.configureNext(TRANSICAO_TRILHA);
+      /**
+       * A animação só é agendada quando o carrossel **não** está prestes a
+       * trocar de filhos (T103).
+       *
+       * `LayoutAnimation.configureNext` vale para a próxima atualização da
+       * árvore inteira, não só para este card. Se a curadoria voltar dentro dos
+       * 260ms da transição, a `FlatList` de tratamentos troca os três
+       * esqueletos (`esq-*`) pelos três looks (`look-*`) — chaves diferentes,
+       * três filhos desmontados e três montados — e o
+       * `ReactClippingViewManager` tenta reinserir uma view que a animação
+       * ainda segura: `addViewAt: failed to insert view ... already has a
+       * parent`, que derruba o app com uma exceção nativa.
+       *
+       * Enquanto a curadoria corre, arquivar/reativar faz o corte seco. É a
+       * troca certa: perder 260ms de suavidade num caso de borda vale menos que
+       * um crash que leva o momento junto.
+       */
+      if (useCaptureStore.getState().session?.curadoria !== 'carregando') {
+        LayoutAnimation.configureNext(TRANSICAO_TRILHA);
+      }
       patch({ trilhaArquivada: arquivar });
     },
     [patch],

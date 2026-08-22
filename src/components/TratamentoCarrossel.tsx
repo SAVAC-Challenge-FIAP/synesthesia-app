@@ -88,6 +88,15 @@ const Esqueleto = React.memo(function Esqueleto({ atraso = 0 }: { atraso?: numbe
    * continua fluida mesmo enquanto a curadoria ocupa o JS.
    */
   const brilho = useRef(new Animated.Value(0)).current;
+  /**
+   * Respiração do dourado (T104): a opacidade do lugar reservado sobe e desce
+   * devagar, fora de fase com o reflexo.
+   *
+   * É o que dá o ar de "algo raro sendo lapidado" em vez de "campo vazio". O
+   * reflexo sozinho é vocabulário de placeholder — comum, neutro; a pulsação
+   * lenta por baixo é o que faz a pessoa esperar algo bom em vez de só esperar.
+   */
+  const pulso = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const laco = Animated.loop(
@@ -113,14 +122,47 @@ const Esqueleto = React.memo(function Esqueleto({ atraso = 0 }: { atraso?: numbe
     return () => laco.stop();
   }, [brilho, atraso]);
 
+  useEffect(() => {
+    const laco = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulso, {
+          toValue: 1,
+          duration: 1300,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulso, {
+          toValue: 0,
+          duration: 1300,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    laco.start();
+    return () => laco.stop();
+  }, [pulso]);
+
   const deslocamento = brilho.interpolate({
     inputRange: [0, 1],
     outputRange: [-LARGURA, LARGURA],
   });
 
+  // O reflexo fino corre à frente do largo: o atraso entre os dois é o que faz
+  // a luz parecer atravessar um material, não uma barra só passando.
+  const deslocamentoFino = brilho.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-LARGURA * 1.5, LARGURA * 1.4],
+  });
+
+  const respiracao = pulso.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.55, 1],
+  });
+
   return (
-    <View
-      style={[styles.thumb, styles.esqueleto]}
+    <Animated.View
+      style={[styles.thumb, styles.esqueleto, { opacity: respiracao }]}
       accessibilityRole="progressbar"
       accessibilityLabel="Procurando um tratamento para esta foto"
     >
@@ -128,7 +170,14 @@ const Esqueleto = React.memo(function Esqueleto({ atraso = 0 }: { atraso?: numbe
         pointerEvents="none"
         style={[styles.brilho, { transform: [{ translateX: deslocamento }, { rotate: '18deg' }] }]}
       />
-    </View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.brilhoFino,
+          { transform: [{ translateX: deslocamentoFino }, { rotate: '18deg' }] },
+        ]}
+      />
+    </Animated.View>
   );
 });
 
@@ -240,16 +289,23 @@ export function TratamentoCarrossel({
   const uri = uriLeve ?? photoUri;
 
   const itens: Item[] = [
+    // A chave é o **slot**, não o conteúdo (T103). Enquanto a curadoria corre,
+    // o slot 0 é um esqueleto; quando ela volta, o mesmo slot 0 vira um look —
+    // e a `FlatList` atualiza o filho no lugar em vez de desmontar três e
+    // montar outros três. Com as chaves antigas (`esq-i` → `look-<id>-i`) essa
+    // troca acontecia no meio da `LayoutAnimation` de arquivar a trilha, e o
+    // `ReactClippingViewManager` derrubava o app com `addViewAt: ... already
+    // has a parent`.
     ...(looks.length > 0
       ? looks.map((look, i) => ({
           tipo: 'look' as const,
-          chave: `look-${identidadeDoLook(look)}-${i}`,
+          chave: `slot-${i}`,
           look,
         }))
       : carregando
         ? Array.from({ length: QUANTOS_LOOKS }, (_, i) => ({
             tipo: 'esqueleto' as const,
-            chave: `esq-${i}`,
+            chave: `slot-${i}`,
             atraso: i * 260,
           }))
         : []),
@@ -385,12 +441,30 @@ const styles = StyleSheet.create({
     left: 0,
     width: LARGURA * 0.55,
     height: ALTURA * 2,
-    backgroundColor: 'rgba(245,238,222,0.16)',
+    // Ouro, não pergaminho (T104): o reflexo que cruza a espera é o mesmo
+    // âmbar que marca os looks quando eles chegam. A promessa e a entrega
+    // falam a mesma língua.
+    backgroundColor: 'rgba(248,162,13,0.30)',
+  },
+  /**
+   * Segundo reflexo, mais estreito e mais claro, correndo logo atrás do
+   * primeiro: é o que separa "carregando" de "vem coisa boa aí". Um brilho só
+   * lê como placeholder; dois, desencontrados, leem como algo sendo lapidado.
+   */
+  brilhoFino: {
+    position: 'absolute',
+    top: -ALTURA / 2,
+    left: 0,
+    width: LARGURA * 0.18,
+    height: ALTURA * 2,
+    backgroundColor: 'rgba(255,224,150,0.45)',
   },
   esqueleto: {
-    backgroundColor: 'rgba(245,238,222,0.06)',
-    borderColor: colors.parchment25,
-    borderStyle: 'dashed',
+    // Fundo levemente dourado e borda âmbar contínua — o lugar reservado já
+    // pertence à família dos looks (borda âmbar), em vez de parecer uma caixa
+    // vazia tracejada de sistema.
+    backgroundColor: 'rgba(248,162,13,0.07)',
+    borderColor: 'rgba(248,162,13,0.40)',
   },
   /** Look não selecionado: âmbar discreto, só para dizer "estes são especiais". */
   thumbLook: {
