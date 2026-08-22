@@ -71,6 +71,14 @@ Duas coisas que dava para fazer sem device, e que valeram a pena:
    encontrei na pesquisa da R3, e valeu a pena confirmar antes de codar às
    cegas.
 
+   > ⚠️ **A conclusão do item 2 foi REFUTADA no device em 2026-08-21.** O
+   > bundle limpo provou apenas que o `ReanimatedProxy` evita quebrar o
+   > *bundle*; ele adia a falha para o *runtime*. Com o app rodando, a
+   > primeira tela com Skia lançou `react-native-reanimated is not
+   > installed!`. Foi preciso instalar `react-native-reanimated` **e**
+   > `react-native-worklets`. Ver a entrada corrigida em "Decisões" no fim
+   > deste arquivo. Lição que fica: `expo export` não substitui rodar.
+
 O que **não** deu para fazer, e por quê:
 - `npm run android` (T033, o rebuild nativo em si) exige um device ou
   emulador conectado — não existe nesta máquina.
@@ -196,13 +204,126 @@ funcionando exatamente como na sessão anterior — nada regrediu:
 
 ---
 
+## Sessão 2026-08-21 (com device) — Skia roda, mas Salvar mata o app
+
+**T033 fechada.** Dev build regerado com o Skia nativo dentro; app sobe, visor
+funciona, `FilteredImage` migra de `LEGADO` para `SKIA` ~2s depois do boot
+(medido por log instrumentado: o `import()` dinâmico resolve e o componente
+troca sozinho, sem flash perceptível).
+
+**T038 — metade confirmada, metade bloqueada.**
+- ✅ **Looks distinguíveis entre si**: comparação pixel a pixel de duas
+  capturas do mesmo enquadramento, com looks diferentes aplicados, deu
+  ΔRGB = [24.4, 0.2, 15.1] na área da foto. Não é sutil, é visível. **É a
+  primeira prova de que a `matrizDeCor` funciona renderizada** — até aqui ela
+  só tinha sido conferida por leitura da matemática.
+- ✅ **Resolução do arquivo**: 6936×9248 (64 MP) reescalado para 3000×4000 —
+  bem acima da resolução de tela que o `captureRef` dava (~1080×1920), que é
+  o ponto do FR-024.
+- ❌ **Não dá para fechar a T038** enquanto Salvar derrubar o app.
+
+### O bug aberto: SIGSEGV ao salvar
+
+Reprodutível em 100% das tentativas (5+). `Fatal signal 11 (SIGSEGV)` na
+thread `mqt_v_js`, backtrace inteiro dentro de `libhermes.so`. O app morre e
+volta para a home; a foto **não** chega na galeria do sistema.
+
+Duas correções reais saíram da investigação, ambas necessárias e ambas
+insuficientes sozinhas:
+
+1. **Teto de área na surface offscreen** (`AREA_MAXIMA = 12 MP`). Sem ele,
+   `MakeOffscreen(6936, 9248)` pedia ~256 MB de uma vez. Corrigido junto um
+   bug latente: `drawImageRect` usava o mesmo retângulo como origem e destino
+   — só não aparecia porque antes não havia reescala.
+2. **JPEG em vez de PNG** no `encodeToBytes(3, 92)`. O PNG de 3000×4000 saía
+   com **10,2 MB**; em JPEG são **1,1 MB** (9× menor), e o arquivo passou a
+   ser gravado com sucesso no cache — o que **refuta** a hipótese de que a
+   ponte do Hermes quebrava no `write()`.
+
+**Por que ainda não está resolvido**: o ponto do crash **varia entre
+execuções**. Numa rodada o `renderLook` completa duas vezes (logs
+`snapshot ok`) e o app morre depois; noutra o app morre antes de o
+`renderLook` sequer logar. Ponto móvel + backtrace só em `libhermes.so` =
+corrupção de memória, não uma linha específica de código. Descartado por
+evidência: `MediaLibrary.saveToLibraryAsync` (instrumentado, o app morre
+**antes** de chegar lá).
+
+**Nota de método**: o `try/catch` de `renderLook` e o guard `if (!surface)`
+dão **zero** proteção aqui. Ambos só pegam falha educada do JS; SIGSEGV
+nativo mata o processo sem passar por nenhum dos dois.
+
+### ✅ RESOLVIDO — era vazamento de memória nativa do Skia
+
+A causa não era a concorrência entre os dois renders (hipótese anterior, que
+estava errada): **objetos do Skia alocam memória nativa e exigem `dispose()`
+explícito**. `renderLook` criava sete objetos por chamada — Data, Image,
+Surface, três Paints, ImageSnapshot — e não liberava nenhum. O GC do JS não
+alcança memória nativa.
+
+Medido no Redmi Note 8 Pro:
+
+| Estado | TOTAL | Native Heap |
+|---|---|---|
+| Câmera recém-aberta | 389 MB | 147 MB |
+| Depois de 2 capturas (**antes** do fix) | 875 MB | 513 MB |
+| Depois de 3 capturas (**com** o fix) | 664 MB | **281 MB, estável** |
+
+Eram ~180 MB perdidos por captura, até o app morrer. Com `dispose()` em
+`finally`, três ciclos completos de captura+salvar mantiveram o Native Heap
+**parado em 281 MB**, mesmo PID, zero SIGSEGV — e o Salvar passou a
+completar, o que nunca tinha acontecido nesta sessão.
+
+Correções que entraram (todas medidas no device, nenhuma por dedução):
+
+1. **`dispose()` em `finally`** (`renderLook.ts`) — a correção que resolveu.
+2. **`usarSkia` desligado por padrão** (`FilteredImage.tsx`) — `useImage()` do
+   Skia **não faz downsampling** (confirmado na doc oficial): cada card da
+   galeria carregava a foto de 64 MP inteira, ~256 MB. Seis cards pediam
+   ~1,5 GB. Agora só a prévia grande da Captura usa Skia; galeria e
+   miniaturas voltaram ao `<Image>` do RN, que reduz sozinho. **Decisão do
+   Sávio**, 2026-08-21.
+3. **`previaFoto.ts`** (novo) — cópia de 1440px via `expo-image-manipulator`
+   (o mesmo que `music.ts` e `enquadrar.ts` já usavam), memoizada por `uri`.
+   A prévia por Skia e as nove miniaturas compartilham esse arquivo de
+   ~435 KB em vez de decodificarem 5,7 MB cada.
+4. **Teto de 12 MP na surface** e **JPEG no lugar de PNG** — ver acima.
+
+**Fluidez medida na galeria** (a tela que fechava sozinho), com 7 momentos e
+20 varreduras — 899 frames, amostra grande como o `TESTE-NO-DEVICE.md` exige:
+
+| Métrica | Valor |
+|---|---|
+| Janky frames | **3,67%** (33 de 899) |
+| 90º percentil | 15ms |
+| 95º percentil | 16ms |
+| 99º percentil | 21ms |
+
+Abaixo dos 16,7ms do orçamento de 60fps no p90/p95. A galeria está fluida.
+
+**Ainda alto, e assumido**: o pico com o modal aberto é ~1,2 GB, e o app
+estabiliza em ~665 MB depois de fechar. Não cresce mais e não derruba, mas
+está longe de enxuto. O Native Heap parte de 147 MB só com a câmera aberta —
+`react-native-vision-camera` tem participação nisso. Fica como QA de
+performance futuro, junto do QA visual: não é mais bloqueio de uso.
+
 ## Decisões tomadas nesta sessão que não estavam no plano
 
-- **`react-native-reanimated` não precisa ser instalado.** O `research.md`
-  (R3) não menciona essa dependência transitiva do Skia. Confirmado por
-  bundle real (`npx expo export`) que o próprio pacote isola o uso de
-  reanimated atrás de um proxy interno — ver seção acima. Registrado aqui
-  para que ninguém perca tempo reinvestigando o mesmo medo.
+- ~~**`react-native-reanimated` não precisa ser instalado.**~~ **REFUTADO em
+  device (2026-08-21).** A conclusão anterior — tirada de `npx expo export`
+  bundlar limpo — estava errada, e o erro vale ser lembrado: **bundlar não é
+  executar**. O `ReanimatedProxy` do Skia adia a falha para o runtime em vez
+  de quebrar o bundle, então o export passa e o app quebra na primeira tela
+  que renderiza Skia. No aparelho, o `FilteredImageSkia` derrubou com
+  `[Error: react-native-reanimated is not installed!]` seguido de
+  `useImage is not a function (it is undefined)`.
+  `react-native-reanimated` é peerDependency real do Skia 2.x
+  (`>=3.19.1`, marcada `optional: true` no manifesto — foi isso que enganou).
+  Instalados `react-native-reanimated@~4.1.1` **e `react-native-worklets@0.5.1`**:
+  o reanimated 4 move os worklets para esse pacote separado, e o
+  `babel-preset-expo` só injeta o plugin de Babel quando ele está presente —
+  sem ele o app bundla e quebra igual. Ambos são nativos: exigem `npm run
+  android` de novo. Nenhum dos dois é desvio de arquitetura — `reanimated` já
+  constava da stack oficial no `CLAUDE.md`.
 - **`captureRef`/`react-native-view-shot` foi mantido**, não removido, ao
   contrário do que a T037 sugeria literalmente ("removendo... se não tiver
   outro uso"). Motivo: a carga opcional da R3 existe justamente para que
