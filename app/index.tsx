@@ -9,14 +9,23 @@ import {
   requestSystemGalleryPermission,
   SystemGalleryPermission,
 } from '@/services/systemGallery';
+import { pedirLocalizacao } from '@/services/contexto';
 import { colors, fonts, radii } from '@/theme/tokens';
 
 /**
  * Onboarding de permissões (US01/FR-009): justificativa clara + ênfase no
- * processamento local (LGPD) antes de pedir câmera e galeria.
+ * processamento local (LGPD) antes de pedir câmera, galeria e localização.
  *
- * A galeria do sistema é best-effort: no Expo Go o expo-media-library rejeita
- * toda chamada ('unavailable') e a exportação degrada — só a câmera bloqueia.
+ * Duas classes de permissão, de propósito:
+ *
+ * - **Bloqueantes** — câmera. Sem ela o visor não abre, e o gate segura aqui.
+ * - **Best-effort** — galeria (no Expo Go o expo-media-library rejeita toda
+ *   chamada com 'unavailable') e **localização** (feature 005).
+ *
+ * A localização é pedida junto das outras (decisão do Sávio, 2026-08-22) mas
+ * **nunca entra no gate**: recusar o lugar não pode impedir alguém de usar o
+ * app. Sem ela, a vibe é lida só da imagem e da hora — que é exatamente o
+ * comportamento que FR-034 descreve para o caso de permissão negada.
  */
 export default function PermissionsScreen() {
   const router = useRouter();
@@ -45,6 +54,11 @@ export default function PermissionsScreen() {
     const cam = cameraPerm?.granted ? cameraPerm : await requestCamera();
     const med = mediaOk(mediaStatus) ? mediaStatus : await requestSystemGalleryPermission();
     setMediaStatus(med);
+    // Localização por último e **fora do gate** (feature 005): pedir depois das
+    // duas essenciais evita empilhar três diálogos do sistema antes de a pessoa
+    // ver o app, e o resultado não influencia a decisão de entrar. Recusou? A
+    // vibe segue saindo da imagem e da hora (FR-034).
+    await pedirLocalizacao();
     if (cam?.granted && mediaOk(med)) {
       router.replace('/camera');
     } else {
@@ -59,7 +73,7 @@ export default function PermissionsScreen() {
         <Text style={styles.title}>Sinta a cena.{'\n'}Ouça a imagem.</Text>
         <Text style={styles.subtitle}>
           Para traduzir a vibe do momento em filtro e trilha sonora, o Synesthesia precisa de dois
-          acessos:
+          acessos — e usa um terceiro, se você deixar:
         </Text>
 
         <View style={styles.card}>
@@ -78,6 +92,21 @@ export default function PermissionsScreen() {
             <Text style={styles.cardTitle}>GALERIA</Text>
             <Text style={styles.cardDesc}>
               Para salvar suas capturas com filtro e música, prontas para compartilhar.
+            </Text>
+          </View>
+        </View>
+
+        {/* Card próprio, e não uma linha na letra miúda: é aqui que o
+            consentimento de localização de fato acontece (feature 005). O texto
+            diz o que sai — cidade, não posição exata — e que dá para recusar,
+            porque um opt-in que esconde o custo não é informado. */}
+        <View style={styles.card}>
+          <Text style={styles.cardEmoji}>📍</Text>
+          <View style={styles.cardText}>
+            <Text style={styles.cardTitle}>LOCALIZAÇÃO · OPCIONAL</Text>
+            <Text style={styles.cardDesc}>
+              Para a vibe combinar com o lugar — praia, cidade, estrada. Só a cidade é enviada,
+              nunca sua posição exata, e nada fica guardado. Pode recusar: o app funciona igual.
             </Text>
           </View>
         </View>

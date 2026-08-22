@@ -104,3 +104,23 @@ Ao implementar uma feature, siga a spec e o plano correspondentes; a constitutio
 - Estado global em `zustand` stores (`src/stores/`); nada de estado sensorial (vibe/mídia em edição) espalhado em componentes.
 - Textos de UI em **pt-BR** (o produto é pt-BR).
 - Commits em pt-BR, no imperativo. Não commitar `.env`, chaves, nem `node_modules`.
+
+<!-- SPECKIT START -->
+## Feature ativa
+
+**005 — Vibe definida pela IA** (`feature/005-vibe-pela-ia`)
+
+- Spec: `specs/005-vibe-pela-ia/spec.md`
+- Plano: `specs/005-vibe-pela-ia/plan.md`
+- Artefatos: `research.md`, `data-model.md`, `contracts/gemini-cena.md`, `quickstart.md`
+
+A vibe deixa de ser um id fixo escolhido localmente e passa a ser **texto livre
+de até duas palavras produzido pelo Gemini**, lido da imagem com hora e lugar.
+`VibeId` **não morre**: continua como piso local do visor ao vivo, dos looks
+base, do catálogo offline e das mídias já gravadas — a vibe livre entra como
+campo aditivo (`Media.vibe?`), no mesmo padrão de `aspecto`/`sugestoes`/`looks`.
+As duas stores de gosto trocam índice por vibe por **lista das 20 últimas
+escolhas**, que passam a ir no prompt (reverte FR-014 da feature 003, por
+decisão do Sávio). Localização é opt-in desligado por padrão, enviada como
+cidade em texto, nunca coordenada.
+<!-- SPECKIT END -->

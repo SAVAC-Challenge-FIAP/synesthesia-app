@@ -2,14 +2,20 @@ import { VIBES } from '@/constants/vibes';
 import { Vibe } from '@/types';
 
 /**
- * Prévia de vibe do visor — versão Expo Go.
+ * Prévia de vibe do visor — **piso local, sem rede**.
  *
- * A vibe REAL agora é inferida da própria foto pelo Gemini multimodal na
- * captura (`analyzePhotoAndSuggest` em src/services/music.ts) — T-0A. Este
- * módulo fornece apenas a prévia exibida no visor antes de existir foto, de
- * forma determinística: mesma hora + mesma câmera → mesma vibe, sem timer e
- * sem sorteio. Em dev build, a prévia pode ser trocada pela rotulagem de
- * frames do ML Kit mantendo o contrato `detectVibe(contexto) → Vibe`.
+ * A vibe que a pessoa lê depois de capturar é texto livre, lido da cena pelo
+ * Gemini (`analyzePhotoAndSuggest` em src/services/music.ts) — T-0A, revisto na
+ * feature 005. Este módulo é outra coisa: a prévia exibida no visor **antes de
+ * existir foto**, de forma determinística — mesma hora + mesma câmera → mesma
+ * vibe, sem timer e sem sorteio.
+ *
+ * ⚠️ **Este módulo não pode passar a esperar rede** (FR-021). É o que garante
+ * que o visor continue trocando de preset ao vivo sem chave, sem internet e com
+ * o Gemini fora do ar. A feature 005 deliberadamente não o tocou.
+ *
+ * Em dev build, a prévia pode ser trocada pela rotulagem de frames do ML Kit
+ * mantendo o contrato `detectVibe(contexto) → Vibe`.
  */
 
 export interface VibeContext {

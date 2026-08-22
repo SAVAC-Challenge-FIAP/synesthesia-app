@@ -21,6 +21,7 @@ import type { LayoutAnimationConfig } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
+import { EsqueletoTexto } from '@/components/EsqueletoTexto';
 import { FilteredImage } from '@/components/FilteredImage';
 import { FundoBase } from '@/components/FundoBase';
 import { LoaderMarca } from '@/components/LoaderMarca';
@@ -320,11 +321,15 @@ export function CaptureSheet() {
         // looks quebraria FR-001 justamente para quem desligou o Gemini.
         getSuggestions(vibeById(s.vibeId), setEtapa).then((sugestoes) => ({
           vibeId: null,
+          // Sem foto no prompt não há leitura de cena, logo não há vibe livre:
+          // a interface mostra o piso local desde o início, sem esqueleto preso
+          // (contrato §6).
+          vibe: undefined,
           sugestoes,
           looks: montarLooks(undefined, s.vibeId),
         }));
     analise
-      .then(({ vibeId: vibeReal, sugestoes, looks }) => {
+      .then(({ vibeId: vibeReal, vibe: vibeLivre, sugestoes, looks }) => {
         clearTimeout(limite);
         const atual = useCaptureStore.getState().session;
         if (!atual || atual.photoUri !== photoUri) return;
@@ -350,7 +355,11 @@ export function CaptureSheet() {
           // `pronta` só quando existe trilha de fato; caso contrário a
           // postagem passa a exigir confirmação em vez de sair calada (RV-01)
           curadoria: musicaFinal ? 'pronta' : 'indisponivel',
-          // A vibe real da foto substitui a prévia do visor (T-0A)
+          // A leitura livre da cena é o que a interface passa a exibir
+          // (FR-030). Ausente, a UI cai no nome do piso — nunca fica esperando.
+          vibe: vibeLivre,
+          // O piso local acompanha quando o casamento reconheceu uma das oito
+          // (T-0A). `vibeId` continua sendo a âncora dos sistemas sem rede.
           ...(vibeReal ? { vibeId: vibeReal } : {}),
           // Filtro acompanha a vibe real enquanto o usuário não escolher um.
           // Só vale quando não houve look para aplicar: a partir da feature 003
@@ -483,6 +492,14 @@ export function CaptureSheet() {
 
   // Enquanto a curadoria corre, ninguém consegue postar um pacote pela metade
   const curando = session.curadoria === 'carregando';
+  /**
+   * A vibe só é "esperada" enquanto a curadoria de fato corre. Terminada sem
+   * leitura, o esqueleto **sai** e o piso local entra (FR-036) — esqueleto
+   * preso na tela é o defeito que a spec nomeia explicitamente.
+   */
+  const esperandoVibe = curando && !session.vibe;
+  /** Texto livre quando existe; nome do piso quando não (FR-030/FR-035). */
+  const vibeExibida = session.vibe ?? vibeById(session.vibeId).nome;
   // Trilha escolhida mas fora do pacote: exporta só imagem + filtro
   const arquivada = session.trilhaArquivada;
   const filtro = session.filtroId ? filterById(session.filtroId) : null;
@@ -506,8 +523,9 @@ export function CaptureSheet() {
       if (musicaDoPacote) {
         registrarEscolha(musicaDoPacote, session.vibeId, 'auto');
       }
-      // Gosto visual (US2): registra o tratamento que de fato foi ao ar, sob a
-      // vibe daquela foto. `lookAuto` é o que separa os dois pesos — quem tocou
+      // Gosto visual (US2): registra o tratamento que de fato foi ao ar. A vibe
+      // ainda viaja junto, mas só como legado gravado — desde a feature 005 o
+      // histórico é lista, não índice (D3). `lookAuto` separa os dois pesos — quem tocou
       // num chip recusou o que estava aplicado, e isso diz muito mais do que
       // aceitar em silêncio o que o sistema propôs (FR-010, FR-011).
       //
@@ -553,6 +571,7 @@ export function CaptureSheet() {
           photoUri: session.photoUri,
           filtroId: session.filtroId,
           vibeId: session.vibeId,
+          vibe: session.vibe,
           musica: musicaDoPacote,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
@@ -567,6 +586,7 @@ export function CaptureSheet() {
         update(session.mediaId, {
           filtroId: session.filtroId,
           vibeId: session.vibeId,
+          vibe: session.vibe,
           musica: musicaDoPacote,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
@@ -596,6 +616,7 @@ export function CaptureSheet() {
           photoUri: uriPersistente,
           filtroId: session.filtroId,
           vibeId: session.vibeId,
+          vibe: session.vibe,
           musica: musicaDoPacote,
           trechoInicio: session.trechoInicio,
           trechoFim: session.trechoFim,
@@ -761,14 +782,32 @@ export function CaptureSheet() {
                   direita, que é a informação que importa ali. "Vibe" é curto e
                   é a palavra que o produto já usa com o usuário. */}
               <Text style={styles.sectionLabel}>VIBE</Text>
-              <Text style={styles.filtroAtual}>
-                {session.lookEscolhido
-                  ? session.lookEscolhido.nome.toUpperCase()
-                  : filtro
-                    ? `${filtro.emoji} ${filtro.nome.toUpperCase()}`
-                    : '📷 ORIGINAL'}{' '}
-                · VIBE {vibe.nome.toUpperCase()}
-              </Text>
+              <View style={styles.tratamentoEVibe}>
+                <Text style={styles.filtroAtual}>
+                  {session.lookEscolhido
+                    ? session.lookEscolhido.nome.toUpperCase()
+                    : filtro
+                      ? `${filtro.emoji} ${filtro.nome.toUpperCase()}`
+                      : '📷 ORIGINAL'}{' '}
+                  ·{' '}
+                </Text>
+                {/* Três estados, e a diferença entre eles é o ponto da feature
+                    005 (FR-031/FR-036):
+                      • esperando  → esqueleto, NUNCA um palpite;
+                      • lida       → o texto livre que o Gemini leu da cena;
+                      • não veio   → o nome do piso local, e o esqueleto sai.
+                    Render condicional simples, sem `LayoutAnimation`: animar o
+                    layout na troca já derrubou FlatList neste app antes. */}
+                {esperandoVibe ? (
+                  <EsqueletoTexto
+                    largura={92}
+                    altura={13}
+                    rotuloAcessivel="Lendo a vibe desta foto"
+                  />
+                ) : (
+                  <Text style={styles.filtroAtual}>{vibeExibida.toUpperCase()}</Text>
+                )}
+              </View>
             </View>
             {/* Uma fileira só: os três looks (ou seus lugares reservados) e os
                 nove presets. Antes eram duas seções que somadas passavam de
@@ -1055,6 +1094,15 @@ const styles = StyleSheet.create({
     fontFamily: fonts.labelLight,
     fontSize: 10,
     letterSpacing: 2,
+  },
+  /**
+   * Tratamento e vibe na mesma linha, à direita. Viraram dois nós na feature
+   * 005 porque o esqueleto precisa ocupar **só** o lugar da vibe — o nome do
+   * tratamento já está resolvido e não tem por que piscar junto.
+   */
+  tratamentoEVibe: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   filtroAtual: {
     color: colors.amber,

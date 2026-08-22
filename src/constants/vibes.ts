@@ -1,8 +1,21 @@
 import { Vibe, VibeId } from '@/types';
 
 /**
- * Vibes / atmosferas detectáveis. Cada vibe direciona filtro e curadoria musical
- * (evolução dos moods do MVP terminal em Python — filtros.json/musicas.json).
+ * Vibes / atmosferas do catálogo local (evolução dos moods do MVP terminal em
+ * Python — filtros.json/musicas.json).
+ *
+ * ⚠️ **Mudou de papel na feature 005.** Esta tabela não *dirige* mais nada: a
+ * vibe que a pessoa lê é texto livre que o Gemini extrai da própria cena
+ * (FR-030), e `musicaKeywords` saiu do prompt da curadoria com foto — era ela
+ * que empurrava "funk brasileiro" para uma foto sem nada brasileiro (FR-032).
+ *
+ * O que a tabela é hoje: **piso local**, para os quatro consumidores que
+ * precisam de um valor garantido e determinístico, sem rede —
+ *   1. o visor ao vivo (`detectVibe`, FR-021);
+ *   2. `looksBase()`, via `filtro`;
+ *   3. a busca por keyword de `getSuggestions()`, que só roda quando o Gemini
+ *      não serviu — lá o rótulo é a única informação que sobrou;
+ *   4. as mídias gravadas antes da 005, que só têm o id.
  */
 export const VIBES: Vibe[] = [
   {
