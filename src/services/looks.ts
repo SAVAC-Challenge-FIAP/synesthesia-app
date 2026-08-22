@@ -139,6 +139,17 @@ export function identidadeDoLook(look: LookRecipe | null | undefined): string {
  * caso normal de aparelho novo, e o slot vira mais uma sugestão de cena em vez
  * de exibir um rótulo que mente sobre a própria origem (FR-015).
  */
+function nomeDeAfinidade(nomeSalvo: string | undefined, base: FilterId): string {
+  const nome = (nomeSalvo ?? '').trim();
+  if (!nome) return nomeAutoral(base, 'certeira');
+  const preset = filterById(base).nome.toLowerCase();
+  const cru = nome.toLowerCase();
+  // "Neon", "Neon Livre", "Neon Suave" — todos são o preset com etiqueta.
+  const etiquetado =
+    cru === preset || cru === `${preset} livre` || cru === `${preset} suave`;
+  return etiquetado ? nomeAutoral(base, 'certeira') : nome;
+}
+
 export function lookDeAfinidade(vibeId: VibeId): LookRecipe | null {
   const preferido = useLookTasteStore.getState().preferidoDaVibe(vibeId);
   // "Sem tratamento" é uma preferência legítima, mas não vira sugestão de look:
@@ -150,7 +161,13 @@ export function lookDeAfinidade(vibeId: VibeId): LookRecipe | null {
   return {
     base: preferido.base,
     ajustes: preferido.ajustes ?? {},
-    nome: preferido.nome || filterById(preferido.base).nome,
+    // O histórico guarda o nome com que o look foi escolhido — inclusive os
+    // rótulos antigos, no formato "<Preset> Livre"/"<Preset> Suave", que esta
+    // feature aposentou (T107). Deixá-los passar traria "Love Livre" de volta à
+    // tela por um caminho lateral, meses depois. Nome que ainda carrega o
+    // padrão velho é reescrito no autoral do preset; nome do próprio Gemini
+    // ("Ciber Samurai") passa intacto, que é o caso comum.
+    nome: nomeDeAfinidade(preferido.nome, preferido.base),
     justificativa: 'você costuma escolher este aqui',
     papel: 'afinidade',
   };
