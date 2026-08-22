@@ -74,6 +74,16 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={styles.section}>PRIVACIDADE</Text>
+        {/* O consentimento acontece no onboarding, num card próprio (decisão do
+            Sávio, 2026-08-22). Este toggle é a via de **revogação** que o
+            Princípio IV exige: desligar corta o envio na hora, sem precisar
+            mexer nas configurações do sistema. */}
+        <Row
+          titulo="Usar localização"
+          desc="Envia só a sua cidade (nunca a posição exata) junto da foto, para a vibe combinar com o lugar. Nada é guardado. Desligue para parar de enviar."
+          value={s.usarLocalizacao}
+          onToggle={() => s.toggle('usarLocalizacao')}
+        />
         <Row
           titulo="Metadados anônimos"
           desc="Opt-in: compartilhar estatísticas anônimas de uso. Revogável a qualquer momento."

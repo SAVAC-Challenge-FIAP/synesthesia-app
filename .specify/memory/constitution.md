@@ -14,7 +14,7 @@ O sistema decide por padrão, o usuário refina por escolha. Filtros e músicas 
 A "vibe" do visor é recalculada continuamente e ao alternar câmera frontal/traseira, refletindo na estética ao vivo. A percepção de latência é um bug: preferir processamento **on-device** (ML Kit, Skia/GPU) e nunca bloquear o visor esperando rede. Chamadas externas (curadoria musical) acontecem fora do caminho crítico do frame.
 
 ### IV. Privacidade e Transparência (LGPD)
-Processamento de imagem é local por padrão; o texto de UI deve deixar isso explícito ("tudo processado no seu celular"). Permissões (câmera, galeria) são pedidas com justificativa clara antes do uso. Compartilhamento de metadados anônimos é **opt-in**, persistido e revogável. Nenhuma chave de API ou dado pessoal é commitado no repositório.
+Processamento de imagem é local por padrão; o texto de UI deve deixar isso explícito ("tudo processado no seu celular"). Permissões (câmera, galeria, localização) são pedidas com justificativa clara antes do uso, cada uma com sua própria justificativa visível. Todo envio de dado pessoal a terceiro é **consentido, persistido e revogável**: o consentimento pode ser colhido no onboarding, desde que apresentado com justificativa própria e recusável sem perda de função; a revogação vive nos Ajustes. Compartilhamento de metadados anônimos é opt-in. Nenhuma chave de API ou dado pessoal é commitado no repositório.
 
 ### V. Persistência da Intenção Criativa
 Cada mídia é uma unidade editável e permanente. Edições nunca se perdem: a galeria persiste localmente e alterações são salvas automaticamente. Exclusão é permanente mas exige confirmação explícita. O usuário pode sempre retomar e finalizar uma edição depois.
@@ -51,4 +51,18 @@ identidade nova de desvio. As cores e o restante do princípio não mudam.
 *Efeito colateral aceito*: Lato não é monoespaçada; as labels perdem o caráter de máquina do
 DM Mono e passam a depender da caixa alta com `letterSpacing`.
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-08-15
+**1.2.0 — 2026-08-22 · Princípio IV, forma do consentimento**
+*Mudança*: o princípio exigia que todo compartilhamento fosse **opt-in** — na prática, desligado
+por padrão. Passa a exigir consentimento **informado, persistido e revogável**, admitindo que ele
+seja colhido no **onboarding** (com justificativa própria, recusável sem perda de função) em vez
+de por toggle desligado. A revogação continua obrigatória e continua nos Ajustes.
+*Justificativa*: decisão do Sávio (feature 005, 2026-08-22) sobre a localização — "localização
+ligada por padrão, deve pedir ao entrar no app na primeira vez; se aceitar, pronto; se não, aí
+desativa nas configurações". Registrada como emenda porque a redação anterior tornaria a
+localização da 005 um desvio do próprio princípio que a governa. A substância da proteção não
+muda: o dado só sai com consentimento explícito e a pessoa pode cortar o envio a qualquer momento.
+*Efeito colateral aceito*: quem toca "Permitir tudo" sem ler o card concede localização junto —
+por isso a emenda exige **justificativa própria e visível** por permissão, e não uma linha na
+letra miúda. Recusar a localização não bloqueia nada no app.
+
+**Version**: 1.2.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-08-22

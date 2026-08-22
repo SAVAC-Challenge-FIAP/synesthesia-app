@@ -2,16 +2,26 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { FILTERS } from '@/constants/filters';
 import { VIBES } from '@/constants/vibes';
+import { ContextoCena, montarContexto } from '@/services/contexto';
 import { montarLooks } from '@/services/looks';
+import { GostoVisual, useLookTasteStore } from '@/stores/useLookTasteStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { chaveDaFaixa, useTasteStore } from '@/stores/useTasteStore';
 import { LookRecipe, MusicSuggestion, PapelFaixa, Vibe, VibeId } from '@/types';
 
 /**
- * Curadoria musical — até 4 sugestões por vibe (FR-005) — e análise de cena.
+ * Curadoria musical — até 4 sugestões (FR-005) — e análise de cena.
  *
- * Caminho principal (T-0A/T-0B): a própria foto capturada vai ao Gemini
- * multimodal, que infere a vibe REAL da cena e sugere as faixas numa só
- * chamada (`analyzePhotoAndSuggest`). Sem sorteio: mesma foto → mesma vibe.
+ * Caminho principal (T-0A/T-0B, revisto na feature 005): a própria foto vai ao
+ * Gemini multimodal, que **lê a vibe da cena como texto livre** — até duas
+ * palavras, um sentimento ou um lugar (FR-030) — e cura as faixas na mesma
+ * chamada (`analyzePhotoAndSuggest`). Hora e, sob opt-in, cidade entram junto
+ * (FR-034). Sem sorteio: mesma foto → mesma vibe.
+ *
+ * A vibe deixou de ser **entrada** e passou a ser **saída**. Antes ela chegava
+ * pronta de uma lista de oito e ancorava a busca — foi assim que um papel de
+ * parede de samurai virou "energetica" e a curadoria devolveu funk de Copa do
+ * Mundo. Hoje o `VibeId` sobrevive só como piso local, derivado no cliente.
  *
  * Pipeline de degradação graciosa (NFR/edge cases da spec):
  * 1. Gemini com foto (vibe + faixas) — requer EXPO_PUBLIC_GEMINI_API_KEY;
@@ -228,17 +238,55 @@ const PAPEIS_PEDIDOS: PapelFaixa[] = [
  * O gênero vem primeiro por ser o que generaliza: o artista não se repete, o
  * gênero sim.
  */
-function preferenciasAprendidas(): string {
-  const estado = useTasteStore.getState();
-  const generos = estado.generosFrequentes(3);
-  const artistas = estado.artistasFrequentes(4);
-  if (generos.length === 0 && artistas.length === 0) return '';
+/** Um tratamento em uma linha: «Nome» (base honey, brilho +0.2, véu -0.1). */
+function tratamentoEmLinha(t: GostoVisual): string {
+  const eixos: string[] = [];
+  const push = (rotulo: string, v: number | undefined) => {
+    if (v === undefined || Math.abs(v) < 0.005) return;
+    eixos.push(`${rotulo} ${v > 0 ? '+' : ''}${v.toFixed(2)}`);
+  };
+  push('brilho', t.ajustes.brilho);
+  push('saturação', t.ajustes.saturacao);
+  push('contraste', t.ajustes.contraste);
+  push('sépia', t.ajustes.sepia);
+  push('véu', t.ajustes.veu);
+  const base = t.base ?? 'sem tratamento';
+  return `«${t.nome}» (base ${base}${eixos.length ? ', ' + eixos.join(', ') : ''})`;
+}
+
+/**
+ * O gosto da pessoa, como **listas das últimas escolhas** (FR-033).
+ *
+ * Substituiu `preferenciasAprendidas()` na feature 005. A versão anterior
+ * mandava agregados por peso — "gosta de rock, metal" —, e o Sávio pediu outra
+ * coisa: "o que devemos armazenar de gosto é a música que ele já setou (nome,
+ * gênero, banda) (…) e do mesmo jeito para o filtro". Lista bruta por recência,
+ * portanto, e não ranking.
+ *
+ * O teto de 20 por tipo é dele também, com a razão junto: "para o prompt não
+ * gastar muito". Daí uma linha por item, compacta.
+ *
+ * Aparelho novo devolve string vazia — nenhuma seção, nenhuma frase pela metade
+ * (US3, cenário 2).
+ */
+function listasDeGosto(): string {
+  const musicas = useTasteStore.getState().ultimasEscolhas();
+  const tratamentos = useLookTasteStore.getState().ultimosTratamentos();
+  if (musicas.length === 0 && tratamentos.length === 0) return '';
+
   const partes: string[] = [];
-  if (generos.length) partes.push(`gosta de ${generos.join(', ')}`);
-  if (artistas.length) partes.push(`já escolheu ${artistas.join(', ')}`);
+  if (musicas.length) {
+    const linhas = musicas
+      .map((m) => `«${m.titulo} — ${m.artista}»${m.genero ? ` (${m.genero})` : ''}`)
+      .join('; ');
+    partes.push(`Esta pessoa já escolheu estas músicas (mais recentes primeiro): ${linhas}.`);
+  }
+  if (tratamentos.length) {
+    partes.push(`E estes tratamentos visuais: ${tratamentos.map(tratamentoEmLinha).join('; ')}.`);
+  }
   return (
-    `Esta pessoa ${partes.join(' e ')}. Leve isso em conta nas "certeira", ` +
-    `sem repetir os mesmos artistas. `
+    partes.join(' ') +
+    ` Leve o gosto em conta nas "certeira" e nos looks, sem repetir as mesmas faixas. `
   );
 }
 
@@ -264,7 +312,7 @@ function instrucaoDeCuradoria(bloqueio: string[]): string {
   const naoRepita = bloqueio.length
     ? `NÃO sugira nenhuma destas, já usadas recentemente: ${bloqueio.join('; ')}. `
     : '';
-  return papeis + genero + existir + variacao + preferenciasAprendidas() + naoRepita;
+  return papeis + genero + existir + variacao + listasDeGosto() + naoRepita;
 }
 
 /** Aceita só os papéis que o modelo tinha permissão de usar. */
@@ -303,8 +351,8 @@ async function callGemini(input: GeminiPart[]): Promise<string> {
 
 async function askGemini(vibe: Vibe): Promise<GeminiTrackIdea[]> {
   if (!GEMINI_KEY) return [];
-  // Aqui a vibe já é conhecida, então a lista de bloqueio pode ser a dela.
-  const bloqueio = useTasteStore.getState().faixasSugeridasRecentes(vibe.id, 20);
+  // Lista de bloqueio única desde a feature 005: não há mais recorte por vibe.
+  const bloqueio = useTasteStore.getState().faixasSugeridasRecentes(20);
   const prompt =
     `Você é o curador musical do app Synesthesia. A foto tem a vibe "${vibe.nome}" (${vibe.descricao}). ` +
     `Sugira músicas reais que combinem. ` +
@@ -395,20 +443,108 @@ function instrucaoDeLook(): string {
   );
 }
 
+/**
+ * Teto de caracteres da vibe livre. Duas palavras cabem folgadas; o corte existe
+ * para o caso em que o modelo devolve duas palavras quilométricas e a linha da
+ * interface estoura.
+ */
+const TETO_VIBE_CHARS = 24;
+
+/**
+ * Saneia a vibe livre devolvida pelo modelo (contrato §4).
+ *
+ * A regra "no máximo duas palavras" está escrita no prompt, mas **instrução em
+ * prompt é pedido, não garantia** — a mesma lição que `receitaDeIdeia` em
+ * `looks.ts` já tinha aprendido com o campo `nome` dos looks. Aqui ela é
+ * imposta na leitura.
+ *
+ * Nenhum passo rejeita a resposta inteira: uma vibe malformada não pode custar
+ * as músicas e os looks, que vêm na mesma chamada e normalmente estão certos.
+ */
+export function sanearVibe(bruto: unknown): string | undefined {
+  if (typeof bruto !== 'string') return undefined;
+  const semCercas = bruto
+    .replace(/```[a-z]*/gi, '')
+    .replace(/["'`]/g, '')
+    .trim();
+  // Colapsa espaço interno antes de contar palavras: "Noite   Cibernética" é
+  // duas palavras, não quatro.
+  const palavras = semCercas.split(/\s+/).filter(Boolean).slice(0, 2);
+  if (palavras.length === 0) return undefined;
+
+  let texto = palavras.join(' ');
+  if (texto.length > TETO_VIBE_CHARS) {
+    // Cortar no meio da segunda palavra deixaria "Noite Cibernét" na tela.
+    // Melhor uma palavra inteira que duas com uma quebrada.
+    texto = palavras[0].slice(0, TETO_VIBE_CHARS);
+  }
+  // Só pontuação, ou o que sobrou virou vazio → o campo some e a interface cai
+  // no piso local (FR-036).
+  if (!/[\p{L}\p{N}]/u.test(texto)) return undefined;
+  return texto;
+}
+
+/**
+ * Deriva o `VibeId` de **piso** a partir da leitura livre (contrato §5).
+ *
+ * O modelo não escolhe mais um dos oito ids — e não deve voltar a escolher, é o
+ * ponto da feature. Mas quatro sistemas locais continuam precisando de uma
+ * chave fixa: `montarLooks()`, o filtro automático, o catálogo offline e as
+ * mídias gravadas. O casamento por palavra cobre o caso fácil ("Praiana" não
+ * casa com nada, "Noturna Urbana" casa com `noturna`).
+ *
+ * `null` é resultado legítimo, não erro. Um palpite ruim de `VibeId` seria
+ * **pior** que nenhum: voltaria a empurrar a tabela `vibe → filtro` sobre uma
+ * cena que ela não descreve, que é exatamente o defeito que a feature corrige.
+ */
+export function vibeIdDePiso(
+  vibe: string | undefined,
+  cena: string | undefined,
+): VibeId | null {
+  const texto = normalizarNome(`${vibe ?? ''} ${cena ?? ''}`);
+  if (!texto) return null;
+  for (const v of VIBES) {
+    if (texto.includes(normalizarNome(v.nome)) || texto.includes(normalizarNome(v.id))) {
+      return v.id;
+    }
+  }
+  return null;
+}
+
 /** Foto → vibe real + faixas, numa única chamada multimodal (T-0A + T-0B). */
-async function askGeminiWithPhoto(photoBase64: string): Promise<GeminiSceneResult | null> {
+async function askGeminiWithPhoto(
+  photoBase64: string,
+  contexto: ContextoCena,
+): Promise<GeminiSceneResult | null> {
   if (!GEMINI_KEY) return null;
-  const vibesDisponiveis = VIBES.map((v) => `"${v.id}" (${v.descricao})`).join(', ');
-  // A vibe ainda não existe neste ponto — é o próprio Gemini que a classifica —,
+  // A vibe ainda não existe neste ponto — é o próprio Gemini que a lê da cena —,
   // então o bloqueio é o global: "não repita o que você acabou de sugerir".
-  const bloqueio = useTasteStore.getState().faixasSugeridasGlobais(20);
+  const bloqueio = useTasteStore.getState().faixasSugeridasRecentes(20);
   const prompt =
     `Você é o motor sensorial do app Synesthesia. Analise a foto anexada e: ` +
-    `1) classifique a atmosfera da cena em EXATAMENTE UMA destas vibes: ${vibesDisponiveis}; ` +
+    // A lista fechada dos oito ids saiu daqui na feature 005 (FR-030/FR-032).
+    // Ela era um FUNIL: o modelo era obrigado a escolher um rótulo antes de a
+    // busca começar, e as `musicaKeywords` daquele rótulo entravam no prompt
+    // como termos válidos. Foi assim que um papel de parede de samurai virou
+    // "energetica" e a curadoria devolveu funk de Copa do Mundo — não havia
+    // nada brasileiro na cena, mas "funk brasileiro" estava escrito no pedido.
+    // Hora do dia (FR-034): período legível, não timestamp — é o que o modelo
+    // consegue de fato usar. Não pede permissão, não usa rede e não tem caminho
+    // de falha, então entra sempre (D6).
+    `Contexto: a foto foi tirada no ${contexto.hora}. ` +
+    // O lugar é a linha que pode simplesmente não existir: sem opt-in, sem
+    // permissão ou fora do teto, ela some e o resto do prompt segue igual
+    // (FR-034). Cidade, nunca coordenada (D5).
+    (contexto.lugar ? `Contexto: quem fotografou está em ${contexto.lugar}. ` : '') +
+    `1) escreva a VIBE da cena: NO MÁXIMO DUAS PALAVRAS, em pt-BR, nomeando um ` +
+    `SENTIMENTO ou um LUGAR que a imagem transmite ("Noite Cibernética", ` +
+    `"Praiana", "Domingo Lento"). NÃO use categorias genéricas de app ` +
+    `("energética", "romântica", "nostálgica"), nem o nome de um filtro, nem ` +
+    `adjetivos soltos como "bonita" ou "legal"; ` +
     `2) sugira músicas reais que combinem com o que aparece na foto. ` +
     instrucaoDeCuradoria(bloqueio) +
     instrucaoDeLook() +
-    `Responda SOMENTE JSON: {"vibe":"<id da vibe>","cena":"o que há na foto, até 10 palavras", ` +
+    `Responda SOMENTE JSON: {"vibe":"até 2 palavras","cena":"o que há na foto, até 10 palavras", ` +
     `"musicas":[{"titulo":"...","artista":"...","papel":"...","genero":"...","justificativa":"até 12 palavras, em pt-BR, ligada à cena"}], ` +
     `"looks":[{"base":"<preset>","nome":"até 2 palavras","papel":"certeira|ousada",` +
     `"justificativa":"até 10 palavras, em pt-BR, ligada à cena",` +
@@ -667,8 +803,19 @@ function rotularAfinidade(sugestoes: MusicSuggestion[]): MusicSuggestion[] {
 export type EtapaCuradoria = 'preparando' | 'lendo' | 'buscando';
 
 export interface PhotoAnalysis {
-  /** Vibe real inferida da imagem; null quando o Gemini não pôde analisar */
+  /**
+   * Piso local (feature 005): um dos oito ids, **derivado no cliente** a partir
+   * da leitura livre — não mais escolhido pelo modelo. `null` quando nenhum
+   * casa, que é resultado legítimo: quem consome já sabe cair no fallback.
+   */
   vibeId: VibeId | null;
+  /**
+   * A leitura livre da cena, até duas palavras (FR-030). Ausente quando não
+   * houve leitura utilizável — sem chave, sem rede, tempo esgotado ou resposta
+   * malformada. É este campo que a interface **exibe**; `vibeId` é o que o
+   * sistema **usa** quando precisa de uma chave garantida.
+   */
+  vibe?: string;
   sugestoes: MusicSuggestion[];
   /**
    * Os três looks daquela foto (feature 003). Sempre três — mesmo sem chave,
@@ -736,20 +883,32 @@ export async function analyzePhotoAndSuggest(
   try {
     onEtapa?.('preparando');
     const marcoImagem = Date.now();
-    const base64 = await photoToBase64(photoUri);
+    // Lugar e imagem correm **juntos** (D5/R5): `photoToBase64` já consome
+    // tempo mensurável antes do Gemini, e resolver a localização em série
+    // somaria latência nova ao caminho crítico da curadoria. Em paralelo, o
+    // custo do lugar é absorvido pelo tempo que a imagem já gastava.
+    const [base64, contexto] = await Promise.all([
+      photoToBase64(photoUri),
+      montarContexto(useSettingsStore.getState().usarLocalizacao),
+    ]);
     tImagem = Date.now() - marcoImagem;
     bytes = base64.length;
 
     onEtapa?.('lendo');
     const marcoGemini = Date.now();
-    const scene = await askGeminiWithPhoto(base64);
+    const scene = await askGeminiWithPhoto(base64, contexto);
     tGemini = Date.now() - marcoGemini;
 
     if (scene) {
-      const vibeReal = VIBES.find((v) => v.id === scene.vibe) ?? null;
+      // A vibe agora é TEXTO, não id: saneada aqui e exibida como veio (FR-030).
+      const vibeLivre = sanearVibe(scene.vibe);
+      // O piso continua existindo para quem precisa de chave fixa, mas é
+      // derivado no cliente — o modelo não escolhe mais entre os oito.
+      const idDePiso = vibeIdDePiso(vibeLivre, scene.cena);
+      const vibeReal = idDePiso ? (VIBES.find((v) => v.id === idDePiso) ?? null) : null;
       console.log(
-        `[music] Gemini leu a cena: "${scene.cena ?? '?'}" → vibe="${scene.vibe}"` +
-          (vibeReal ? '' : ' (id inválido, mantendo vibe heurística)'),
+        `[music] Gemini leu a cena: "${scene.cena ?? '?'}" → vibe="${vibeLivre ?? '(ilegível)'}"` +
+          ` piso=${idDePiso ?? 'nenhum (usando prévia local)'}`,
       );
       const vibe = vibeReal ?? fallbackVibe;
       onEtapa?.('buscando');
@@ -761,12 +920,13 @@ export async function analyzePhotoAndSuggest(
         // A lista de bloqueio da próxima curadoria é esta: o que acabou de ser
         // oferecido. Guardar aqui, e não em quem consome, garante que vale para
         // todo caminho que devolve faixas do Gemini.
-        useTasteStore.getState().registrarSugeridas(vibe.id, sugestoes);
+        useTasteStore.getState().registrarSugeridas(sugestoes);
         console.log(`[music] ORIGEM=gemini-foto — ${sugestoes.length} sugestão(ões) da cena real`);
         registrarFaixas('gemini-foto', sugestoes);
         registrar('gemini-foto', tDeezer);
         return guardarAnalise(photoUri, {
           vibeId: vibeReal?.id ?? null,
+          vibe: vibeLivre,
           sugestoes,
           looks: montarLooks(scene.looks, vibe.id),
         });
@@ -778,6 +938,10 @@ export async function analyzePhotoAndSuggest(
       registrar('pipeline-por-vibe', tDeezer);
       return guardarAnalise(photoUri, {
         vibeId: vibeReal?.id ?? null,
+        // A vibe é **preservada** aqui de propósito (contrato §6): a cena foi
+        // lida e está certa; quem não resolveu foi o Deezer. Descartá-la faria
+        // a interface cair no piso por causa de uma falha que não é dela.
+        vibe: vibeLivre,
         sugestoes: porVibe,
         looks: montarLooks(scene.looks, vibe.id),
       });
@@ -792,6 +956,9 @@ export async function analyzePhotoAndSuggest(
   // derivados da vibe. É o piso da cadeia de degradação (FR-019, SC-004).
   return guardarAnalise(photoUri, {
     vibeId: null,
+    // Sem cena lida não há vibe livre nenhuma. O campo some, e a interface
+    // mostra o nome do piso local em vez de esqueleto preso (FR-036).
+    vibe: undefined,
     sugestoes: degradado,
     looks: montarLooks(undefined, fallbackVibe.id),
   });
@@ -825,7 +992,7 @@ export async function getSuggestions(
       const resolvidas = await resolveWithDeezer(ideas, vibe);
       if (resolvidas.length > 0) {
         const ok = rotularAfinidade(montarConjunto(await verificarDescobertas(resolvidas)));
-        useTasteStore.getState().registrarSugeridas(vibe.id, ok);
+        useTasteStore.getState().registrarSugeridas(ok);
         console.log(`[music] ORIGEM=gemini — ${ok.length} sugestão(ões) usadas`);
         registrarFaixas('gemini', ok);
         return ok;
@@ -851,7 +1018,7 @@ export async function getSuggestions(
   try {
     const inéditasCuradas = (FALLBACK[vibe.id] ?? []).filter(
       (s) =>
-        !new Set(useTasteStore.getState().faixasSugeridasRecentes(vibe.id, 20)).has(
+        !new Set(useTasteStore.getState().faixasSugeridasRecentes(20)).has(
           chaveDaFaixa(s.titulo, s.artista),
         ),
     );
@@ -873,7 +1040,7 @@ export async function getSuggestions(
       // Deezer com o artista certo — quando sobram uma ou duas, a busca por
       // keyword abaixo completa em vez de a pessoa receber uma lista magra.
       if (curadasComAudio.length >= 4) {
-        useTasteStore.getState().registrarSugeridas(vibe.id, curadasComAudio);
+        useTasteStore.getState().registrarSugeridas(curadasComAudio);
         console.log(`[music] ORIGEM=curado — ${curadasComAudio.length} do catálogo com preview`);
         registrarFaixas('curado', curadasComAudio);
         return curadasComAudio;
@@ -893,7 +1060,7 @@ export async function getSuggestions(
   try {
     onEtapa?.('buscando');
     const jaOferecidas = new Set(
-      useTasteStore.getState().faixasSugeridasRecentes(vibe.id, 20),
+      useTasteStore.getState().faixasSugeridasRecentes(20),
     );
     // Ponto de entrada variável na lista do Deezer — mas raso de propósito.
     // Testado no aparelho com amplitude maior (até o índice 21), a variação
@@ -927,7 +1094,7 @@ export async function getSuggestions(
       }));
       // Curadas primeiro: são as boas, a keyword só preenche o que sobrou.
       const combinadas = [...curadasComAudio, ...viaKeywords];
-      useTasteStore.getState().registrarSugeridas(vibe.id, combinadas);
+      useTasteStore.getState().registrarSugeridas(combinadas);
       registrarFaixas(curadasComAudio.length ? 'curado+deezer' : 'deezer', combinadas);
       return combinadas;
     }
@@ -937,7 +1104,7 @@ export async function getSuggestions(
 
   // Rede caiu no meio: o que o catálogo curado já resolveu vale mais que nada.
   if (curadasComAudio.length > 0) {
-    useTasteStore.getState().registrarSugeridas(vibe.id, curadasComAudio);
+    useTasteStore.getState().registrarSugeridas(curadasComAudio);
     registrarFaixas('curado', curadasComAudio);
     return curadasComAudio;
   }
@@ -954,14 +1121,14 @@ export async function getSuggestions(
     origem: 'local' as const,
   }));
   const jaOferecidasLocal = new Set(
-    useTasteStore.getState().faixasSugeridasRecentes(vibe.id, 20),
+    useTasteStore.getState().faixasSugeridasRecentes(20),
   );
   const inéditas = catalogo.filter(
     (s) => !jaOferecidasLocal.has(chaveDaFaixa(s.titulo, s.artista)),
   );
   // Nunca devolver lista vazia: esgotadas as inéditas, vale o catálogo inteiro.
   const local = [...inéditas, ...catalogo.filter((s) => !inéditas.includes(s))].slice(0, 4);
-  useTasteStore.getState().registrarSugeridas(vibe.id, local);
+  useTasteStore.getState().registrarSugeridas(local);
   registrarFaixas('local', local);
   return local;
 }

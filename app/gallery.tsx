@@ -37,6 +37,11 @@ export default function GalleryScreen() {
       filtroId: m.filtroId,
       filtroAuto: false, // edição preserva o filtro salvo; só o usuário troca
       vibeId: m.vibeId,
+      // A vibe salva volta com o pacote (feature 005): reabrir não recura nada,
+      // pelo mesmo motivo que fez as faixas e os looks viajarem junto. Mídia
+      // gravada antes da 005 vem sem o campo, e a tela cai no nome do `vibeId`
+      // (FR-035).
+      vibe: m.vibe,
       musica: m.musica,
       // A trilha já está no disco (T102): reabrir toca o arquivo, não o link
       // do Deezer, que expira. Mídia gravada antes disto vem sem o campo e o
@@ -149,6 +154,15 @@ export default function GalleryScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => {
             const vibe = vibeById(item.vibeId);
+            /**
+             * Vibe livre não tem emoji, e isso é decisão (feature 005, D4):
+             * pedir um ao Gemini somaria um campo que pode vir vazio, errado
+             * ou com um glifo que a fonte não tem — para ganhar decoração.
+             * Mídia antiga tem um emoji de verdade no catálogo, e aí ele volta.
+             */
+            const rotuloVibe = item.vibe
+              ? item.vibe.toUpperCase()
+              : `${vibe.emoji} ${vibe.nome.toUpperCase()}`;
             return (
               <Pressable
                 style={styles.card}
@@ -157,8 +171,8 @@ export default function GalleryScreen() {
               >
                 <FilteredImage uri={item.photoUri} filtroId={item.filtroId} style={styles.photo} />
                 <View style={styles.meta}>
-                  <Text style={styles.metaVibe}>
-                    {vibe.emoji} {vibe.nome.toUpperCase()}
+                  <Text style={styles.metaVibe} numberOfLines={1}>
+                    {rotuloVibe}
                   </Text>
                   <View style={styles.metaMusicRow}>
                     {item.musica ? (

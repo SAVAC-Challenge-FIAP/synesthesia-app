@@ -142,6 +142,22 @@ export interface Media {
   /** null = foto original, sem filtro (T-0B) */
   filtroId: FilterId | null;
   vibeId: VibeId;
+  /**
+   * Leitura livre da cena feita pelo Gemini (feature 005): até duas palavras,
+   * nomeando um sentimento ou um lugar que a imagem transmite ("Noite
+   * Cibernética", "Praiana").
+   *
+   * Opcional pelo mesmo motivo de `aspecto`, `sugestoes`, `looks` e `audioUri`:
+   * mídias gravadas antes desta feature não têm o campo, e ausência significa
+   * "não sei", nunca "não há" — quem exibe cai para `vibeById(vibeId).nome`
+   * (FR-035).
+   *
+   * `vibeId` continua obrigatório e continua sendo a **âncora**. Ele é o piso
+   * local: o visor ao vivo, `looksBase()`, o catálogo offline de música e as
+   * mídias já gravadas dependem de um valor garantido e determinístico, que
+   * vibe livre não é — ela só existe quando o Gemini responde.
+   */
+  vibe?: string;
   musica: MusicSuggestion | null;
   /** Trecho da música em segundos (0–30) */
   trechoInicio: number;

@@ -135,8 +135,12 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
     <Modal visible transparent animationType="slide" onRequestClose={cancelar}>
       <View style={styles.backdrop}>
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 8, 28) }]}>
-          <Text style={styles.kicker}>
-            {vibe.emoji} VIBE {vibe.nome.toUpperCase()}
+          {/* Mesma queda da galeria (feature 005, D4): texto livre quando o
+              Gemini leu a cena, catálogo com emoji quando não. */}
+          <Text style={styles.kicker} numberOfLines={1}>
+            {session.vibe
+              ? `VIBE ${session.vibe.toUpperCase()}`
+              : `${vibe.emoji} VIBE ${vibe.nome.toUpperCase()}`}
           </Text>
           <Text style={styles.title}>Escolha a vibe sonora.</Text>
 

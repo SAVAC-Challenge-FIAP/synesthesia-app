@@ -34,7 +34,8 @@
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "predictiveBackGestureEnabled": false,
       "versionCode": 4
@@ -55,6 +56,15 @@
         {
           "photosPermission": "O Synesthesia salva suas capturas na galeria do dispositivo.",
           "savePhotosPermission": "O Synesthesia salva suas capturas na galeria do dispositivo."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "O Synesthesia usa sua localização aproximada só no momento da captura, para a vibe da foto combinar com o lugar. Só a cidade é enviada — nunca sua posição exata — e nada fica guardado.",
+          "locationWhenInUsePermission": "O Synesthesia usa sua localização aproximada só no momento da captura, para a vibe da foto combinar com o lugar. Só a cidade é enviada — nunca sua posição exata — e nada fica guardado.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": false
         }
       ],
       "expo-audio",

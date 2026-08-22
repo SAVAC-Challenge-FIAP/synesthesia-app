@@ -1,7 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Animated,
-  Easing,
   FlatList,
   Pressable,
   StyleSheet,
@@ -11,6 +9,7 @@ import {
 } from 'react-native';
 
 import { FilteredImage } from '@/components/FilteredImage';
+import { EsqueletoTexto } from '@/components/EsqueletoTexto';
 import { FILTERS } from '@/constants/filters';
 import { identidadeDoLook } from '@/services/looks';
 import { previaParaSkia } from '@/services/previaFoto';
@@ -72,112 +71,19 @@ const PRESETS = [{ id: null as FilterId | null, nome: 'Original', emoji: '📷' 
  *
  * Não bloqueia nada: os presets ao lado continuam navegáveis e o botão Salvar
  * segue acionável o tempo todo (FR-020).
+ *
+ * A animação em si mora em `EsqueletoTexto` desde a feature 005, quando a vibe
+ * passou a precisar do mesmo vocabulário de espera (FR-031). As dimensões
+ * continuam sendo as da miniatura — o slot não muda de tamanho.
  */
 const Esqueleto = React.memo(function Esqueleto({ atraso = 0 }: { atraso?: number }) {
-  /**
-   * Shimmer: uma faixa clara atravessa o placeholder da esquerda para a
-   * direita, em laço.
-   *
-   * Prefere-se ao spinner porque diz coisas diferentes: um spinner comunica
-   * "processando, aguarde" — e aqui nada está bloqueado, a pessoa pode
-   * escolher qualquer preset ao lado e salvar. O shimmer comunica "conteúdo a
-   * caminho neste lugar", que é exatamente o caso, e é o vocabulário que as
-   * redes sociais já ensinaram ao público deste app.
-   *
-   * `translateX` no driver nativo: a animação roda fora da thread de JS, então
-   * continua fluida mesmo enquanto a curadoria ocupa o JS.
-   */
-  const brilho = useRef(new Animated.Value(0)).current;
-  /**
-   * Respiração do dourado (T104): a opacidade do lugar reservado sobe e desce
-   * devagar, fora de fase com o reflexo.
-   *
-   * É o que dá o ar de "algo raro sendo lapidado" em vez de "campo vazio". O
-   * reflexo sozinho é vocabulário de placeholder — comum, neutro; a pulsação
-   * lenta por baixo é o que faz a pessoa esperar algo bom em vez de só esperar.
-   */
-  const pulso = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const laco = Animated.loop(
-      Animated.sequence([
-        // O atraso escalonado entre os três é o que faz a fileira parecer viva
-        // em vez de três caixas piscando em uníssono.
-        Animated.delay(atraso),
-        Animated.timing(brilho, {
-          toValue: 1,
-          duration: 1100,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(brilho, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-        Animated.delay(420),
-      ]),
-    );
-    laco.start();
-    return () => laco.stop();
-  }, [brilho, atraso]);
-
-  useEffect(() => {
-    const laco = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulso, {
-          toValue: 1,
-          duration: 1300,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulso, {
-          toValue: 0,
-          duration: 1300,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    laco.start();
-    return () => laco.stop();
-  }, [pulso]);
-
-  const deslocamento = brilho.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-LARGURA, LARGURA],
-  });
-
-  // O reflexo fino corre à frente do largo: o atraso entre os dois é o que faz
-  // a luz parecer atravessar um material, não uma barra só passando.
-  const deslocamentoFino = brilho.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-LARGURA * 1.5, LARGURA * 1.4],
-  });
-
-  const respiracao = pulso.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.55, 1],
-  });
-
   return (
-    <Animated.View
-      style={[styles.thumb, styles.esqueleto, { opacity: respiracao }]}
-      accessibilityRole="progressbar"
-      accessibilityLabel="Procurando um tratamento para esta foto"
-    >
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.brilho, { transform: [{ translateX: deslocamento }, { rotate: '18deg' }] }]}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.brilhoFino,
-          { transform: [{ translateX: deslocamentoFino }, { rotate: '18deg' }] },
-        ]}
-      />
-    </Animated.View>
+    <EsqueletoTexto
+      largura={LARGURA}
+      altura={ALTURA}
+      atraso={atraso}
+      rotuloAcessivel="Procurando um tratamento para esta foto"
+    />
   );
 });
 
@@ -426,45 +332,6 @@ const styles = StyleSheet.create({
     // seleção não empurra as vizinhas 2px para o lado a cada troca.
     borderWidth: 2,
     borderColor: 'transparent',
-  },
-  /**
-   * A faixa é mais alta e mais estreita que a miniatura e vai inclinada: é o
-   * que faz o brilho cruzar na diagonal, como um reflexo passando, em vez de
-   * uma barra subindo reta.
-   */
-  brilho: {
-    position: 'absolute',
-    // Ancorada explicitamente: sem `top`, o `alignItems: center` do thumb
-    // centraliza a faixa e a altura extra vaza para fora do `overflow:hidden`
-    // — o brilho simplesmente não aparecia.
-    top: -ALTURA / 2,
-    left: 0,
-    width: LARGURA * 0.55,
-    height: ALTURA * 2,
-    // Ouro, não pergaminho (T104): o reflexo que cruza a espera é o mesmo
-    // âmbar que marca os looks quando eles chegam. A promessa e a entrega
-    // falam a mesma língua.
-    backgroundColor: 'rgba(248,162,13,0.30)',
-  },
-  /**
-   * Segundo reflexo, mais estreito e mais claro, correndo logo atrás do
-   * primeiro: é o que separa "carregando" de "vem coisa boa aí". Um brilho só
-   * lê como placeholder; dois, desencontrados, leem como algo sendo lapidado.
-   */
-  brilhoFino: {
-    position: 'absolute',
-    top: -ALTURA / 2,
-    left: 0,
-    width: LARGURA * 0.18,
-    height: ALTURA * 2,
-    backgroundColor: 'rgba(255,224,150,0.45)',
-  },
-  esqueleto: {
-    // Fundo levemente dourado e borda âmbar contínua — o lugar reservado já
-    // pertence à família dos looks (borda âmbar), em vez de parecer uma caixa
-    // vazia tracejada de sistema.
-    backgroundColor: 'rgba(248,162,13,0.07)',
-    borderColor: 'rgba(248,162,13,0.40)',
   },
   /** Look não selecionado: âmbar discreto, só para dizer "estes são especiais". */
   thumbLook: {

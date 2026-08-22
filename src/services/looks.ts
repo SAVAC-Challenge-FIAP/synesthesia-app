@@ -150,8 +150,10 @@ function nomeDeAfinidade(nomeSalvo: string | undefined, base: FilterId): string 
   return etiquetado ? nomeAutoral(base, 'certeira') : nome;
 }
 
-export function lookDeAfinidade(vibeId: VibeId): LookRecipe | null {
-  const preferido = useLookTasteStore.getState().preferidoDaVibe(vibeId);
+export function lookDeAfinidade(): LookRecipe | null {
+  // Sem recorte por vibe desde a feature 005 (D3): com vibe livre não há chave
+  // por onde recortar, e o limiar passou a valer sobre o histórico inteiro.
+  const preferido = useLookTasteStore.getState().preferido();
   // "Sem tratamento" é uma preferência legítima, mas não vira sugestão de look:
   // a foto original já está sempre disponível no carrossel dos presets, e um
   // chip "Original" no lugar de uma sugestão gastaria um dos três slots com o
@@ -311,7 +313,7 @@ export function montarLooks(ideias: unknown[] | undefined, vibeId: VibeId): Look
 
   const conjunto: LookRecipe[] = [];
 
-  const afinidade = lookDeAfinidade(vibeId);
+  const afinidade = lookDeAfinidade();
   if (afinidade) {
     conjunto.push(afinidade);
     console.log(`[looks] afinidade local: «${afinidade.nome}» base=${afinidade.base}`);

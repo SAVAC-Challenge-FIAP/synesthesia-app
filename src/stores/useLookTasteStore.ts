@@ -13,12 +13,24 @@ import { AjustesLook, FilterId, LookRecipe, VibeId } from '@/types';
  * migração própria; misturar os dois num blob só complicaria as três coisas sem
  * ganhar nada.
  *
- * ⚠️ **LGPD — este dado não sai do aparelho** (FR-014). Ao contrário do gosto
- * musical, que o Sávio autorizou expressamente a entrar no prompt no T074, o
- * gosto visual é consumido **apenas** por `lookDeAfinidade()` em `looks.ts`,
- * localmente. E não é só privacidade: é o que torna a afinidade confiável, já
- * que ela vira consulta a um dado que o app tem, não palpite de um modelo que
- * nunca viu o histórico.
+ * ⚠️ **LGPD — mudou na feature 005.** Até a 003 este dado **não saía do
+ * aparelho** (FR-014). O FR-033 da feature 005 reverte isso por decisão
+ * expressa do Sávio — "e do mesmo jeito para o filtro: guardamos o filtro x com
+ * esses valores e enviamos uma lista para o Gemini" —, a mesma decisão que o
+ * T074 já tinha tomado para o gosto musical.
+ *
+ * O que passa a sair: as **20 últimas** escolhas (`ultimosTratamentos`), como
+ * base + ajustes + nome. O que continua sem sair: o histórico inteiro, os
+ * pesos e as datas.
+ *
+ * O comentário antigo foi reescrito no mesmo commit que passou a enviar a
+ * lista, de propósito: código que documenta uma garantia que ele não cumpre
+ * mais é pior que código sem comentário nenhum.
+ *
+ * `preferido()` continua sendo consumido **só localmente**, por
+ * `lookDeAfinidade()`. Isso não é privacidade, é confiabilidade: a afinidade
+ * vira consulta a um dado que o app tem, não palpite de um modelo que nunca viu
+ * o histórico.
  */
 
 /** Peso de uma troca explícita — ela recusou o que estava aplicado e escolheu outro. */
@@ -37,6 +49,12 @@ const TETO_ESCOLHAS = 200;
  * e o edge case da spec é explícito em que "uma escolha isolada não é gosto
  * estabelecido". Só a contagem também não: duas escolhas de meses atrás já
  * decaíram e não deveriam mandar na sugestão de hoje.
+ *
+ * Na feature 005 passaram a ser avaliados sobre o histórico **inteiro**, e não
+ * sobre o recorte de uma vibe: com vibe livre não há recorte possível. A
+ * intenção original está preservada — ela era sobre volume de sinal, nunca
+ * sobre vibe — e de quebra fica mais robusta, por deixar de fragmentar o sinal
+ * em oito baldes.
  */
 const LIMIAR_PESO = 2;
 const LIMIAR_ESCOLHAS = 2;
@@ -50,7 +68,13 @@ export interface EscolhaVisual {
   base: FilterId | null;
   ajustes: AjustesLook;
   nome: string;
-  vibeId: VibeId;
+  /**
+   * @deprecated Legado da feature 003. Continua **gravado** por compatibilidade
+   * — reescrever dado persistido sem ganho seria risco à toa —, mas não é mais
+   * lido: com vibe livre, agrupar escolhas por vibe deixou de fazer sentido
+   * (feature 005, D3).
+   */
+  vibeId?: VibeId;
   /** `manual` = trocou o look/filtro; `auto` = aceitou o que já estava. */
   origem: 'auto' | 'manual';
   em: number;
@@ -84,21 +108,43 @@ export interface PreferenciaVisual {
   peso: number;
 }
 
+/**
+ * Um tratamento escolhido, no formato que vai ao prompt (FR-033).
+ *
+ * Sem peso e sem data: o modelo recebe *o que* foi escolhido, na ordem em que
+ * foi, e nada além disso.
+ */
+export interface GostoVisual {
+  base: FilterId | null;
+  ajustes: AjustesLook;
+  nome: string;
+}
+
 interface LookTasteState {
   escolhas: EscolhaVisual[];
 
   /** `look === null` registra "sem tratamento", que é uma escolha, não um vazio. */
-  registrarEscolha: (look: LookRecipe | null, vibeId: VibeId, origem: 'auto' | 'manual') => void;
+  registrarEscolha: (
+    look: LookRecipe | null,
+    vibeId: VibeId | undefined,
+    origem: 'auto' | 'manual',
+  ) => void;
 
   /**
-   * O tratamento mais forte para aquela vibe, **ou `null`** quando o histórico
-   * ainda não tem sinal suficiente. Devolver `null` é o comportamento correto,
-   * não uma falha: melhor um slot de cena do que um rótulo de afinidade mentindo.
+   * O tratamento mais forte do histórico, **ou `null`** quando ele ainda não
+   * tem sinal suficiente. Devolver `null` é o comportamento correto, não uma
+   * falha: melhor um slot de cena do que um rótulo de afinidade mentindo.
    */
-  preferidoDaVibe: (vibeId: VibeId) => PreferenciaVisual | null;
+  preferido: () => PreferenciaVisual | null;
+
+  /** Os N últimos tratamentos escolhidos, para o prompt (FR-033). */
+  ultimosTratamentos: (n?: number) => GostoVisual[];
 
   limpar: () => void;
 }
+
+/** Quantos tratamentos vão ao prompt (FR-033) — teto pedido pelo Sávio. */
+const TETO_GOSTO_NO_PROMPT = 20;
 
 export const useLookTasteStore = create<LookTasteState>()(
   persist(
@@ -108,8 +154,11 @@ export const useLookTasteStore = create<LookTasteState>()(
       registrarEscolha: (look, vibeId, origem) =>
         set((s) => {
           const chave = chaveDaEscolha(look?.base ?? null, look?.ajustes);
+          // Dedupe só pela receita desde a feature 005: o mesmo tratamento
+          // escolhido em cenas diferentes é o mesmo gosto, e antes virava uma
+          // entrada por vibe — o que diluía o sinal em vez de somá-lo.
           const anterior = s.escolhas.find(
-            (e) => chaveDaEscolha(e.base, e.ajustes) === chave && e.vibeId === vibeId,
+            (e) => chaveDaEscolha(e.base, e.ajustes) === chave,
           );
           const nova: EscolhaVisual = {
             base: look?.base ?? null,
@@ -123,7 +172,7 @@ export const useLookTasteStore = create<LookTasteState>()(
             em: Date.now(),
           };
           const semDuplicata = s.escolhas.filter(
-            (e) => !(chaveDaEscolha(e.base, e.ajustes) === chave && e.vibeId === vibeId),
+            (e) => chaveDaEscolha(e.base, e.ajustes) !== chave,
           );
           console.log(
             `[gosto-visual] escolha ${nova.origem} «${nova.nome}» base=${nova.base ?? 'original'} ` +
@@ -132,13 +181,13 @@ export const useLookTasteStore = create<LookTasteState>()(
           return { escolhas: [nova, ...semDuplicata].slice(0, TETO_ESCOLHAS) };
         }),
 
-      preferidoDaVibe: (vibeId) => {
+      preferido: () => {
         const agora = Date.now();
-        const daVibe = get().escolhas.filter((e) => e.vibeId === vibeId);
-        if (daVibe.length < LIMIAR_ESCOLHAS) return null;
+        const todas = get().escolhas;
+        if (todas.length < LIMIAR_ESCOLHAS) return null;
 
         const acumulado = new Map<string, PreferenciaVisual>();
-        for (const e of daVibe) {
+        for (const e of todas) {
           const chave = chaveDaEscolha(e.base, e.ajustes);
           const atual = acumulado.get(chave);
           const peso = (atual?.peso ?? 0) + pesoDe(e, agora);
@@ -149,6 +198,11 @@ export const useLookTasteStore = create<LookTasteState>()(
         if (!vencedor || vencedor.peso < LIMIAR_PESO) return null;
         return vencedor;
       },
+
+      ultimosTratamentos: (n = TETO_GOSTO_NO_PROMPT) =>
+        get()
+          .escolhas.slice(0, n)
+          .map((e) => ({ base: e.base, ajustes: e.ajustes, nome: e.nome })),
 
       limpar: () => set({ escolhas: [] }),
     }),

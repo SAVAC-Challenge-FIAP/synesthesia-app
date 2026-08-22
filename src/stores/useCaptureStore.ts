@@ -39,6 +39,18 @@ export interface CaptureSession {
   filtroAuto: boolean;
   vibeId: VibeId;
   /**
+   * Vibe livre lida da cena pelo Gemini (feature 005), até duas palavras.
+   *
+   * `undefined` tem **dois significados distintos**, e a interface precisa dos
+   * dois para não mentir:
+   *   • `curadoria === 'carregando'` → ainda não chegou → **esqueleto** (FR-031)
+   *   • curadoria terminada          → não vai chegar   → nome do `vibeId` (FR-036)
+   *
+   * Nunca um valor provisório enquanto se espera: mostrar a prévia heurística
+   * do visor aqui era exatamente o palpite errado que a feature veio eliminar.
+   */
+  vibe?: string;
+  /**
    * Proporção largura/altura da foto já recortada (T066). Viaja na sessão para
    * a tela de captura desenhar a prévia no formato certo e para o registro
    * salvo na galeria nascer com o campo.
