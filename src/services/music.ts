@@ -1,8 +1,10 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
+import { FILTERS } from '@/constants/filters';
 import { VIBES } from '@/constants/vibes';
+import { montarLooks } from '@/services/looks';
 import { chaveDaFaixa, useTasteStore } from '@/stores/useTasteStore';
-import { MusicSuggestion, PapelFaixa, Vibe, VibeId } from '@/types';
+import { LookRecipe, MusicSuggestion, PapelFaixa, Vibe, VibeId } from '@/types';
 
 /**
  * Curadoria musical — até 4 sugestões por vibe (FR-005) — e análise de cena.
@@ -336,10 +338,61 @@ async function photoToBase64(uri: string): Promise<string> {
   return saved.base64;
 }
 
+/**
+ * Trecho de look da resposta (feature 003) — contrato em
+ * `specs/003-looks-sugeridos/contracts/gemini-look.md`.
+ *
+ * Todos os campos são opcionais **de propósito**: o tipo descreve o que chega,
+ * não o que deveria chegar, e o que chega de um modelo às vezes não obedece. A
+ * obrigatoriedade real é imposta por `receitaDeIdeia()`, em `looks.ts`.
+ */
+interface GeminiLookIdea {
+  base?: string;
+  nome?: string;
+  papel?: string;
+  justificativa?: string;
+  ajustes?: Record<string, unknown>;
+}
+
 interface GeminiSceneResult {
   vibe: string;
   cena?: string;
   musicas?: GeminiTrackIdea[];
+  looks?: GeminiLookIdea[];
+}
+
+/**
+ * Instrução do trecho visual. Pede **desvio a partir de um preset nomeado**, e
+ * nunca valores absolutos: assim o modelo pousa sempre num lugar são e o pior
+ * caso possível é "o preset puro", que é um resultado bom (D2).
+ *
+ * `afinidade` não está na lista de papéis. O modelo não viu o histórico do
+ * aparelho — e não vai ver (FR-014) —, então esse rótulo é montado localmente.
+ */
+function instrucaoDeLook(): string {
+  const presets = FILTERS.map((f) => f.id).join(', ');
+  return (
+    `Proponha também 3 tratamentos visuais (looks) para esta foto. Cada look PARTE ` +
+    `de um destes presets e informa apenas o DESVIO em relação a ele: ${presets}. ` +
+    `Papéis, nesta ordem: 1x "certeira" (realça o que a cena já tem), ` +
+    `1x "ousada" (interpretação mais forte, ainda plausível), ` +
+    `1x "ousada" LIVRE (a leitura mais autoral que a cena permitir — escolha o ` +
+    `preset de partida que quiser e desvie dele com liberdade). ` +
+    `Os ajustes são deltas entre -0.5 e 0.5. ` +
+    // O que dá sentido à sugestão é ela ser DIFERENTE do que a pessoa já tem
+    // no carrossel (T105, pedido do Sávio). Um look devolvido com todos os
+    // ajustes em zero é o preset puro repetido com outro nome: ocupa um dos
+    // três lugares sem oferecer nada. A regra é dita aqui e **imposta** em
+    // `receitaDeIdeia`, porque instrução em prompt é pedido, não garantia.
+    `REGRA: nenhum look pode ser igual ao preset de partida. Todo look precisa ` +
+    `de pelo menos um ajuste diferente de zero. ` +
+    // O nome é o que a pessoa lê na miniatura — é identidade, não etiqueta.
+    // Sem esta régua o modelo devolve "Neon Variação", "Vivid Forte" e afins,
+    // que leem como rótulo de sistema (T107).
+    `O "nome" tem NO MÁXIMO 2 palavras, em pt-BR, e evoca a SENSAÇÃO da imagem ` +
+    `tratada ("Hora Dourada", "Luz Urbana", "Fita Velha"). Nunca use o nome do ` +
+    `preset, nem palavras genéricas como "livre", "suave", "forte" ou "variação". `
+  );
 }
 
 /** Foto → vibe real + faixas, numa única chamada multimodal (T-0A + T-0B). */
@@ -354,8 +407,12 @@ async function askGeminiWithPhoto(photoBase64: string): Promise<GeminiSceneResul
     `1) classifique a atmosfera da cena em EXATAMENTE UMA destas vibes: ${vibesDisponiveis}; ` +
     `2) sugira músicas reais que combinem com o que aparece na foto. ` +
     instrucaoDeCuradoria(bloqueio) +
+    instrucaoDeLook() +
     `Responda SOMENTE JSON: {"vibe":"<id da vibe>","cena":"o que há na foto, até 10 palavras", ` +
-    `"musicas":[{"titulo":"...","artista":"...","papel":"...","genero":"...","justificativa":"até 12 palavras, em pt-BR, ligada à cena"}]}`;
+    `"musicas":[{"titulo":"...","artista":"...","papel":"...","genero":"...","justificativa":"até 12 palavras, em pt-BR, ligada à cena"}], ` +
+    `"looks":[{"base":"<preset>","nome":"até 2 palavras","papel":"certeira|ousada",` +
+    `"justificativa":"até 10 palavras, em pt-BR, ligada à cena",` +
+    `"ajustes":{"brilho":0,"saturacao":0,"contraste":0,"sepia":0,"veu":0}}]}`;
   const text = await callGemini([
     { type: 'text', text: prompt },
     { type: 'image', data: photoBase64, mime_type: 'image/jpeg' },
@@ -613,6 +670,36 @@ export interface PhotoAnalysis {
   /** Vibe real inferida da imagem; null quando o Gemini não pôde analisar */
   vibeId: VibeId | null;
   sugestoes: MusicSuggestion[];
+  /**
+   * Os três looks daquela foto (feature 003). Sempre três — mesmo sem chave,
+   * sem rede ou com o tempo estourado, `montarLooks()` completa com os looks
+   * base da vibe (FR-001, SC-004).
+   */
+  looks: LookRecipe[];
+}
+
+/**
+ * Cache da análise por foto (FR-009, D5).
+ *
+ * A mesma foto tem que produzir o mesmo conjunto de três looks — reabrir uma
+ * mídia não pode devolver sugestões diferentes sem que nada tenha mudado. O
+ * problema é o mesmo que o T083 resolveu para as faixas guardando `sugestoes`
+ * junto da mídia; aqui ele é resolvido um nível acima, para valer também dentro
+ * da mesma sessão, antes de qualquer coisa ser salva.
+ *
+ * Teto baixo porque o consumo é serial: quem fotografa mexe numa foto por vez, e
+ * isto é cache de determinismo, não de desempenho.
+ */
+const TETO_CACHE_ANALISE = 8;
+const cacheAnalise = new Map<string, PhotoAnalysis>();
+
+function guardarAnalise(photoUri: string, analise: PhotoAnalysis): PhotoAnalysis {
+  cacheAnalise.set(photoUri, analise);
+  if (cacheAnalise.size > TETO_CACHE_ANALISE) {
+    const maisAntiga = cacheAnalise.keys().next().value;
+    if (maisAntiga !== undefined) cacheAnalise.delete(maisAntiga);
+  }
+  return analise;
 }
 
 /**
@@ -629,6 +716,12 @@ export async function analyzePhotoAndSuggest(
   // Instrumentação das três etapas (T020). O research R3 descartou por inspeção
   // a hipótese "o Deezer está em série"; estes números dizem qual etapa domina
   // de fato, para que a otimização não seja palpite.
+  const emCache = cacheAnalise.get(photoUri);
+  if (emCache) {
+    console.log('[music] análise reaproveitada do cache — mesma foto, mesmas sugestões');
+    return emCache;
+  }
+
   const t0 = Date.now();
   let tImagem = 0;
   let tGemini = 0;
@@ -672,12 +765,22 @@ export async function analyzePhotoAndSuggest(
         console.log(`[music] ORIGEM=gemini-foto — ${sugestoes.length} sugestão(ões) da cena real`);
         registrarFaixas('gemini-foto', sugestoes);
         registrar('gemini-foto', tDeezer);
-        return { vibeId: vibeReal?.id ?? null, sugestoes };
+        return guardarAnalise(photoUri, {
+          vibeId: vibeReal?.id ?? null,
+          sugestoes,
+          looks: montarLooks(scene.looks, vibe.id),
+        });
       }
-      // Cena lida mas faixas não resolveram → pipeline por vibe, já com a vibe real
+      // Cena lida mas faixas não resolveram → pipeline por vibe, já com a vibe
+      // real. Os looks continuam valendo: a cena foi lida, quem não resolveu foi
+      // o Deezer, e uma coisa não tem nada a ver com a outra.
       const porVibe = await getSuggestions(vibe, onEtapa);
       registrar('pipeline-por-vibe', tDeezer);
-      return { vibeId: vibeReal?.id ?? null, sugestoes: porVibe };
+      return guardarAnalise(photoUri, {
+        vibeId: vibeReal?.id ?? null,
+        sugestoes: porVibe,
+        looks: montarLooks(scene.looks, vibe.id),
+      });
     }
   } catch (e) {
     console.log('[music] análise da foto falhou (caiu para pipeline por vibe):', e);
@@ -685,7 +788,13 @@ export async function analyzePhotoAndSuggest(
   }
   const degradado = await getSuggestions(fallbackVibe, onEtapa, expirou);
   registrar('degradado', 0);
-  return { vibeId: null, sugestoes: degradado };
+  // Sem cena lida não há ideia de look nenhuma — e ainda assim saem três, todos
+  // derivados da vibe. É o piso da cadeia de degradação (FR-019, SC-004).
+  return guardarAnalise(photoUri, {
+    vibeId: null,
+    sugestoes: degradado,
+    looks: montarLooks(undefined, fallbackVibe.id),
+  });
 }
 
 /**

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { FilterId, MusicSuggestion, VibeId } from '@/types';
+import { FilterId, LookRecipe, MusicSuggestion, VibeId } from '@/types';
 
 /**
  * Estado da curadoria musical da sessão em edição.
@@ -44,7 +44,27 @@ export interface CaptureSession {
    * salvo na galeria nascer com o campo.
    */
   aspecto: number;
+  /**
+   * As três sugestões de look da foto (feature 003). `[]` enquanto a curadoria
+   * não voltou — a interface mostra as miniaturas dos 8 presets nesse intervalo,
+   * e o caminho de salvar nunca espera por isto (FR-020).
+   */
+  looks: LookRecipe[];
+  lookEscolhido: LookRecipe | null;
+  /**
+   * `true` enquanto ninguém tocou em look nenhum. É o que distingue **escolha
+   * explícita** de **aceite passivo** na hora de gravar o histórico (FR-011) —
+   * mesma mecânica de `filtroAuto`, que já existia para o filtro.
+   */
+  lookAuto: boolean;
   musica: MusicSuggestion | null;
+  /**
+   * Caminho local do .mp3 da trilha, quando já existe (T102). Chega preenchido
+   * nas mídias reabertas da galeria e passa a existir na captura nova assim que
+   * o `salvar()` baixa a prévia. É o que o player prefere tocar: a
+   * `previewUrl` do Deezer expira, o arquivo não.
+   */
+  audioUri: string | null;
   sugestoes: MusicSuggestion[];
   curadoria: EstadoCuradoria;
   trechoInicio: number;
@@ -68,8 +88,22 @@ interface CaptureState {
    * carregam salvas (T083).
    */
   start: (
-    s: Omit<CaptureSession, 'sugestoes' | 'curadoria' | 'trilhaArquivada'> & {
+    s: Omit<
+      CaptureSession,
+      | 'sugestoes'
+      | 'curadoria'
+      | 'trilhaArquivada'
+      | 'looks'
+      | 'lookEscolhido'
+      | 'lookAuto'
+      | 'audioUri'
+    > & {
       sugestoes?: MusicSuggestion[];
+      /** Só as mídias reabertas da galeria já têm o .mp3 no disco. */
+      audioUri?: string | null;
+      /** Presentes só nas mídias reabertas da galeria, que já as trazem salvas. */
+      looks?: LookRecipe[];
+      lookEscolhido?: LookRecipe | null;
     },
   ) => void;
   patch: (p: Partial<CaptureSession>) => void;
@@ -83,6 +117,13 @@ export const useCaptureStore = create<CaptureState>()((set) => ({
       session: {
         ...s,
         sugestoes: s.sugestoes ?? [],
+        audioUri: s.audioUri ?? null,
+        looks: s.looks ?? [],
+        lookEscolhido: s.lookEscolhido ?? null,
+        // Nasce `true`: até alguém tocar, o que estiver aplicado é aceite
+        // passivo. Uma mídia reaberta também entra assim — o toque que a
+        // escolheu já foi registrado quando ela foi salva.
+        lookAuto: true,
         trilhaArquivada: false,
         // Abre em `carregando`, nunca em `indisponivel`: enquanto não se sabe
         // se há trilha, a postagem fica bloqueada em vez de sair sem áudio.

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 
 import { FilteredImage } from '@/components/FilteredImage';
+import { previaParaSkia } from '@/services/previaFoto';
 import { FILTERS } from '@/constants/filters';
 import { colors, fonts, radii } from '@/theme/tokens';
 import { FilterId } from '@/types';
@@ -102,20 +103,45 @@ export function FilterThumbs({ photoUri, ativo, onSelect }: Props) {
   const { fontScale } = useWindowDimensions();
   const mostrarNomeSempre = fontScale <= LIMITE_FONTE_AMPLIADA;
 
+  /**
+   * As nove miniaturas leem a cópia reduzida, não a foto de 64 MP.
+   *
+   * Cada `<Image>` decodifica seu próprio bitmap: nove decodificações de um
+   * JPEG de ~5,7 MB para exibir em 70×93px era boa parte do 1 GB que o modal
+   * de Captura chegou a ocupar (medido em 2026-08-21). A mesma cópia de
+   * ~435 KB serve as nove — e `previaParaSkia` memoiza por `uri`, então a
+   * prévia grande e as miniaturas compartilham o mesmo arquivo, gerado uma
+   * vez só.
+   *
+   * Enquanto o resize não termina, as miniaturas usam a original: é o
+   * comportamento de antes, e só dura o primeiro instante.
+   */
+  const [uriLeve, setUriLeve] = useState<string | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    previaParaSkia(photoUri).then((u) => {
+      if (vivo) setUriLeve(u);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [photoUri]);
+  const uriDasThumbs = uriLeve ?? photoUri;
+
   const renderItem = useCallback(
     ({ item }: { item: ThumbItem }) => {
       const selected = item.id === ativo;
       return (
         <Thumb
           item={item}
-          photoUri={photoUri}
+          photoUri={uriDasThumbs}
           selected={selected}
           mostrarNome={mostrarNomeSempre || selected}
           onSelect={onSelect}
         />
       );
     },
-    [ativo, photoUri, mostrarNomeSempre, onSelect],
+    [ativo, uriDasThumbs, mostrarNomeSempre, onSelect],
   );
 
   return (

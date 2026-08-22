@@ -75,16 +75,47 @@ export async function prepararFoto(params: {
   // do arquivo inteiro no caminho crítico da captura.
   const recortar = Math.abs(razaoAtual - razaoAlvo) >= 0.01;
 
-  if (!girar && !recortar) return { uri, aspecto: razaoAtual };
+  /**
+   * Teto de área da foto guardada — 24 MP.
+   *
+   * Sensores de 200 MP (o JOVI V70 5G, por exemplo) entregam 16320×12240: um
+   * bitmap RGBA de ~800 MB só para girar e recortar, no **caminho crítico do
+   * disparo**. É a mesma classe de estouro que derrubava o app com os 64 MP
+   * deste Redmi, multiplicada por quatro — e a doc do `expo-image-manipulator`
+   * não promete nada sobre imagens desse tamanho; a recomendação dela é
+   * justamente reduzir cedo na cadeia.
+   *
+   * 24 MP (ex.: 6000×4000) é o dobro do teto do render final e continua muito
+   * acima de qualquer destino de rede social. Fotos menores que isso passam
+   * intactas — no Redmi de 64 MP em 4:3, por exemplo, nada muda.
+   */
+  const AREA_MAXIMA_FOTO = 24_000_000;
+  // Área antes do recorte: se já cabe aqui, o recorte só diminui e não há o
+  // que encolher.
+  const acimaDoTeto = l * a > AREA_MAXIMA_FOTO;
+
+  if (!girar && !recortar && !acimaDoTeto) return { uri, aspecto: razaoAtual };
 
   try {
     const contexto = ImageManipulator.manipulate(uri);
     if (girar) contexto.rotate(frontal ? -90 : 90);
     let aspectoFinal = razaoAtual;
+    // Dimensões que valem depois do recorte — é sobre elas que o teto se aplica.
+    let larguraFinal = l;
+    let alturaFinal = a;
     if (recortar) {
       const { origemX, origemY, corteL, corteA } = corteCentral(l, a, razaoAlvo);
       contexto.crop({ originX: origemX, originY: origemY, width: corteL, height: corteA });
       aspectoFinal = corteL / corteA;
+      larguraFinal = corteL;
+      alturaFinal = corteA;
+    }
+    // O resize vem por último, sobre as dimensões já recortadas, e só quando
+    // a foto passa do teto. Recortar primeiro é o que evita reduzir pixels que
+    // seriam descartados de qualquer forma.
+    if (larguraFinal * alturaFinal > AREA_MAXIMA_FOTO) {
+      const escala = Math.sqrt(AREA_MAXIMA_FOTO / (larguraFinal * alturaFinal));
+      contexto.resize({ width: Math.max(1, Math.round(larguraFinal * escala)) });
     }
     const imagem = await contexto.renderAsync();
     // `compress: 1` porque isto é a foto do pacote, não o envio ao Gemini: aqui

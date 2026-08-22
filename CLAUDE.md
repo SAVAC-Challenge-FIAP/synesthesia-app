@@ -67,7 +67,20 @@ Modais claros (permissões, compartilhar, música): superfície `parchment` com 
 
 1. **Permissões** — onboarding: pede câmera 📸 e galeria 🏞️; "Permitir tudo". Enfatiza processamento local.
 2. **Câmera** — visor com filtro ao vivo, carrossel de 8 filtros, galeria / captura / flip, "+ Opções" (→ Ajustes).
-3. **Modal Captura** (bottom-sheet) — foto capturada, filtro usado, carrossel de previews, player de música (slider 0–30s com trecho), "Trocar música", ações **Salvar** / **Postar agora**.
+3. **Modal Captura** (bottom-sheet) — foto capturada, três looks sugeridos, carrossel dos 8 presets, player de música (slider 0–30s com trecho), "Trocar música", ações **Salvar** / **Postar agora**.
+
+> **Mudou em 2026-08-19** (feature 003, `specs/003-looks-sugeridos/`): a tabela fixa
+> `vibe → filtro` que escolhia um único tratamento por conta própria virou **três looks
+> sugeridos por foto** (papéis `certeira`/`ousada`/`afinidade`), lidos pelo Gemini na
+> mesma chamada que já cura a música — sem chamada de rede nova. O primeiro é aplicado
+> sozinho; os outros dois ficam a um toque. O app aprende o gosto visual do aparelho
+> (`useLookTasteStore`) e, com sinal suficiente, a sugestão principal passa a vir do
+> histórico local, nunca do prompt do Gemini (`FR-014`). A tabela `vibe → filtro`
+> continua viva como piso de degradação (sem rede/chave) e como o que o **visor ao
+> vivo** usa — ele segue nos 8 presets locais, sem depender desta feature (`FR-021`).
+> Render fiel da foto final (Skia, paridade Android/iOS) é carga opcional: funciona sem
+> rebuild nativo, caindo para o render antigo (`style.filter` do RN) até o dev build
+> ser regerado com `@shopify/react-native-skia` dentro.
 4. **Modal Trocar Música** (bottom-sheet claro) — "Escolha a vibe sonora", 3–4 sugestões do Gemini (emoji + título + artista + justificativa + play), Cancelar / Confirmar escolha.
 5. **Confirmação de Postagem** — "Vídeo gerado!", grade de destinos (Instagram, TikTok, WhatsApp, LinkedIn, X/Twitter, Mais), Fechar.
 6. **Ajustes** — seções CÂMERA (Filtro automático, Detecção em tempo real / ML Kit, Grade de composição) e MÚSICA (Sugestão automática / Gemini, Fonte do áudio: DEEZER); toggles ruby.
@@ -78,6 +91,8 @@ Este repo usa **Spec Kit**. Artefatos e ordem:
 - `.specify/memory/constitution.md` — princípios inegociáveis do projeto.
 - `specs/001-synesthesia-mvp/spec.md` — especificação (User Stories US01–US11 → priorizadas).
 - `specs/001-synesthesia-mvp/plan.md` — plano técnico (gerar via `/speckit-plan`).
+- `specs/002-qa-lapidacao-v1/` — QA e lapidação pós-MVP.
+- `specs/003-looks-sugeridos/` — três looks sugeridos com memória de gosto (ver nota acima); `ESTADO.md` registra onde a implementação parou entre sessões.
 - Skills disponíveis: `/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, `/speckit-implement`, `/speckit-clarify`, `/speckit-analyze`, `/speckit-checklist`, `/speckit-converge`.
 
 Ao implementar uma feature, siga a spec e o plano correspondentes; a constitution prevalece sobre preferências pontuais.

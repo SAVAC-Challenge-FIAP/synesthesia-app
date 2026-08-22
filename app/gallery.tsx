@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
+import { Alert, BackHandler, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FilteredImage } from '@/components/FilteredImage';
 import { FundoBase } from '@/components/FundoBase';
 import { vibeById } from '@/constants/vibes';
+import { looksDeMidiaAntiga } from '@/services/looks';
+import { cacheAudioPreview } from '@/services/mediaStorage';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
@@ -23,6 +25,12 @@ export default function GalleryScreen() {
   const start = useCaptureStore((s) => s.start);
 
   const lapidar = (m: Media) => {
+    // Mídias gravadas antes da feature 003 não têm `looks` — e ausência aqui
+    // significa "não sei", nunca "não há" (a mesma convenção de `aspecto` e
+    // `sugestoes`). Em vez de abrir sem sugestão nenhuma ou inventar sugestões
+    // que nunca existiram, reconstrói-se o conjunto base da vibe com o
+    // tratamento que a mídia de fato tinha na frente (FR-023, SC-009).
+    const antiga = m.looks?.length ? null : looksDeMidiaAntiga(m.filtroId, m.vibeId);
     start({
       mediaId: m.id,
       photoUri: m.photoUri,
@@ -30,6 +38,14 @@ export default function GalleryScreen() {
       filtroAuto: false, // edição preserva o filtro salvo; só o usuário troca
       vibeId: m.vibeId,
       musica: m.musica,
+      // A trilha já está no disco (T102): reabrir toca o arquivo, não o link
+      // do Deezer, que expira. Mídia gravada antes disto vem sem o campo e o
+      // player cai de volta na URL remota.
+      audioUri: m.audioUri ?? null,
+      // Os três looks voltam com o pacote: reabrir não consulta rede nenhuma
+      // (US4), pelo mesmo motivo que fez as faixas passarem a viajar junto.
+      looks: antiga ? antiga.looks : (m.looks ?? []),
+      lookEscolhido: antiga ? antiga.escolhido : (m.lookEscolhido ?? null),
       // O leque de opções volta com o pacote (T083): reabrir não dispara
       // curadoria nenhuma, e "Trocar música" já abre com as quatro faixas.
       sugestoes: m.sugestoes ?? [],
@@ -39,6 +55,24 @@ export default function GalleryScreen() {
       // proporção com que elas foram criadas, então reabrir não as deforma.
       aspecto: m.aspecto ?? sizes.photoAspect,
     });
+    /**
+     * Pré-carrega as outras sugestões em segundo plano (T106).
+     *
+     * A trilha escolhida já toca do disco (T102), mas as outras três só tinham
+     * a URL do Deezer — que expira. Quem reabre um momento e vai em "Trocar
+     * música" costuma fazê-lo logo em seguida, então baixar agora é a diferença
+     * entre a prévia tocar na hora e não tocar nunca.
+     *
+     * Deliberadamente sem `await`: é adiantamento, não etapa do fluxo. Reabrir
+     * a mídia não espera por rede nenhuma, e cada falha morre em silêncio no
+     * `catch` — a faixa simplesmente segue dependendo da URL, como antes.
+     */
+    for (const s of m.sugestoes ?? []) {
+      if (s.id !== m.musica?.id) {
+        cacheAudioPreview(s.previewUrl, s.id).catch(() => {});
+      }
+    }
+
     // Empurra para a tela de captura. Enquanto o `CaptureSheet` era `<Modal>`,
     // bastava a galeria renderizá-lo quando houvesse sessão: o Modal desenhava
     // na própria janela, por cima. Virando corpo de tela (T063), o mesmo JSX
@@ -46,6 +80,26 @@ export default function GalleryScreen() {
     // da vista, e reabrir uma mídia deixou de funcionar sem erro nenhum.
     router.push('/capture');
   };
+
+  /**
+   * Voltar — do gesto/botão do sistema e do chevron do cabeçalho.
+   *
+   * Chegando aqui por `replace` (o caminho de "salvei agora"), não existe
+   * entrada anterior na pilha: `back()` falha com "GO_BACK was not handled" e
+   * o toque não faz nada. A câmera é o destino certo nos dois casos.
+   */
+  const voltar = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/camera');
+    return true;
+  }, [router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', voltar);
+      return () => sub.remove();
+    }, [voltar]),
+  );
 
   const excluir = (m: Media) => {
     Alert.alert(
@@ -62,7 +116,15 @@ export default function GalleryScreen() {
     <SafeAreaView style={styles.root}>
       <FundoBase />
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        {/* `back()` sozinho não serve: quando a galeria é aberta logo depois
+            de salvar, ela chega por `replace` da captura e não há entrada
+            anterior para onde voltar — o expo-router respondia com "GO_BACK was
+            not handled" e o toque não fazia nada. A câmera é o destino certo
+            nos dois caminhos (veio do visor ou veio de salvar). */}
+        <Pressable
+          onPress={voltar}
+          hitSlop={12}
+        >
           <Ionicons name="chevron-back" size={30} color={colors.parchment} />
         </Pressable>
         <Text style={styles.title}>Galeria.</Text>

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,6 +14,7 @@ import {
   StyleSheet,
   Text,
   UIManager,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import type { LayoutAnimationConfig } from 'react-native';
@@ -22,23 +24,26 @@ import { captureRef } from 'react-native-view-shot';
 import { FilteredImage } from '@/components/FilteredImage';
 import { FundoBase } from '@/components/FundoBase';
 import { LoaderMarca } from '@/components/LoaderMarca';
-import { FilterThumbs } from '@/components/FilterThumbs';
+import { TratamentoCarrossel } from '@/components/TratamentoCarrossel';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicSheet } from '@/components/MusicSheet';
 import { PostSheet } from '@/components/PostSheet';
-import { filterById } from '@/constants/filters';
+import { filterById, resolverReceita } from '@/constants/filters';
 import { vibeById } from '@/constants/vibes';
+import { identidadeDoLook, montarLooks } from '@/services/looks';
 import { analyzePhotoAndSuggest, EtapaCuradoria, getSuggestions } from '@/services/music';
-import { persistPhoto } from '@/services/mediaStorage';
+import { persistAudioPreview, persistPhoto } from '@/services/mediaStorage';
 import * as preExport from '@/services/preExport';
+import { renderizarLook } from '@/services/renderLook';
 import { exportPackage, SharePackage } from '@/services/sharePackage';
 import { saveToSystemGallery } from '@/services/systemGallery';
 import { useCaptureStore } from '@/stores/useCaptureStore';
 import { useGalleryStore } from '@/stores/useGalleryStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useLookTasteStore } from '@/stores/useLookTasteStore';
 import { useTasteStore } from '@/stores/useTasteStore';
 import { colors, fonts, hitSlops, radii, sizes } from '@/theme/tokens';
-import { FilterId, Media } from '@/types';
+import { FilterId, LookRecipe, Media } from '@/types';
 
 /**
  * Tempo máximo em `carregando` antes de liberar a postagem com confirmação.
@@ -101,14 +106,28 @@ export function CaptureSheet() {
   const add = useGalleryStore((s) => s.add);
   const update = useGalleryStore((s) => s.update);
   const registrarEscolha = useTasteStore((s) => s.registrarEscolha);
+  const registrarEscolhaVisual = useLookTasteStore((s) => s.registrarEscolha);
   const sugestaoAutomatica = useSettingsStore((s) => s.sugestaoAutomatica);
   const deteccaoTempoReal = useSettingsStore((s) => s.deteccaoTempoReal);
+  const filtroAutomatico = useSettingsStore((s) => s.filtroAutomatico);
 
   // Um <Modal> desenha na própria janela, sem o SafeAreaView da tela por baixo:
   // o espaçamento inferior tem de vir do inset real, senão a barra de navegação
   // come a metade de baixo de "Salvar" e "Postar agora" (medido: 130px em
   // navegação por botões, 44px em gestos — ver baseline.md T004).
   const insets = useSafeAreaInsets();
+  /**
+   * Teto de altura da prévia, em pixels reais.
+   *
+   * `maxHeight` percentual não serve aqui: dentro de um ScrollView a
+   * porcentagem se mede contra a altura do *conteúdo*, não da tela. Sem o
+   * teto, uma foto retrato (3:4) em `width: 100%` rende ~1400px e empurra o
+   * carrossel de tratamentos para fora da dobra — a pessoa teria de rolar
+   * para ver as opções que o app acabou de sugerir. 58% deixa a foto
+   * claramente dominante e ainda cabe a fileira de escolhas.
+   */
+  const { height: alturaJanela } = useWindowDimensions();
+  const alturaMaxPreview = Math.round(alturaJanela * 0.58);
   const previewRef = useRef<View>(null);
   const [showMusic, setShowMusic] = useState(false);
   const [sharePkg, setSharePkg] = useState<SharePackage | null>(null);
@@ -135,7 +154,26 @@ export function CaptureSheet() {
 
   // Estável pelo mesmo motivo do visor: mantém a memoização dos chips de pé
   const escolherFiltro = useCallback(
-    (id: FilterId | null) => patch({ filtroId: id, filtroAuto: false }),
+    // Escolher um dos 8 presets zera a receita: o que ela pediu foi o preset
+    // puro, não o look ajustado. `lookAuto: false` porque houve toque — e é o
+    // toque, não o resultado, que distingue escolha de aceite passivo (FR-011).
+    (id: FilterId | null) =>
+      patch({ filtroId: id, filtroAuto: false, lookEscolhido: null, lookAuto: false }),
+    [patch],
+  );
+
+  /**
+   * Troca entre as três sugestões (FR-005). Só mexe no estado da sessão — nada
+   * de rede, nada de recarregar a tela: as três receitas já estão na memória
+   * desde que a curadoria voltou, e é isso que faz a troca ser instantânea
+   * (SC-003).
+   *
+   * `filtroId` acompanha a âncora do look para que tudo que ainda raciocina por
+   * filtro (miniaturas, rótulo "FILTRO", galeria, mídias antigas) continue certo.
+   */
+  const escolherLook = useCallback(
+    (look: LookRecipe) =>
+      patch({ lookEscolhido: look, filtroId: look.base, filtroAuto: false, lookAuto: false }),
     [patch],
   );
 
@@ -154,7 +192,26 @@ export function CaptureSheet() {
    */
   const alternarArquivo = useCallback(
     (arquivar: boolean) => {
-      LayoutAnimation.configureNext(TRANSICAO_TRILHA);
+      /**
+       * A animação só é agendada quando o carrossel **não** está prestes a
+       * trocar de filhos (T103).
+       *
+       * `LayoutAnimation.configureNext` vale para a próxima atualização da
+       * árvore inteira, não só para este card. Se a curadoria voltar dentro dos
+       * 260ms da transição, a `FlatList` de tratamentos troca os três
+       * esqueletos (`esq-*`) pelos três looks (`look-*`) — chaves diferentes,
+       * três filhos desmontados e três montados — e o
+       * `ReactClippingViewManager` tenta reinserir uma view que a animação
+       * ainda segura: `addViewAt: failed to insert view ... already has a
+       * parent`, que derruba o app com uma exceção nativa.
+       *
+       * Enquanto a curadoria corre, arquivar/reativar faz o corte seco. É a
+       * troca certa: perder 260ms de suavidade num caso de borda vale menos que
+       * um crash que leva o momento junto.
+       */
+      if (useCaptureStore.getState().session?.curadoria !== 'carregando') {
+        LayoutAnimation.configureNext(TRANSICAO_TRILHA);
+      }
       patch({ trilhaArquivada: arquivar });
     },
     [patch],
@@ -258,12 +315,16 @@ export function CaptureSheet() {
 
     const analise = deteccaoTempoReal
       ? analyzePhotoAndSuggest(s.photoUri, vibeById(s.vibeId), setEtapa)
-      : getSuggestions(vibeById(s.vibeId), setEtapa).then((sugestoes) => ({
+      : // Curadoria por vibe: não há cena lida, mas os três looks saem do mesmo
+        // jeito, derivados da vibe heurística. Um caminho que devolvesse zero
+        // looks quebraria FR-001 justamente para quem desligou o Gemini.
+        getSuggestions(vibeById(s.vibeId), setEtapa).then((sugestoes) => ({
           vibeId: null,
           sugestoes,
+          looks: montarLooks(undefined, s.vibeId),
         }));
     analise
-      .then(({ vibeId: vibeReal, sugestoes }) => {
+      .then(({ vibeId: vibeReal, sugestoes, looks }) => {
         clearTimeout(limite);
         const atual = useCaptureStore.getState().session;
         if (!atual || atual.photoUri !== photoUri) return;
@@ -273,29 +334,63 @@ export function CaptureSheet() {
         const escolheSozinho =
           sugestaoAutomatica && atual.musica === null && atual.mediaId === null;
         const musicaFinal = escolheSozinho ? primeira : atual.musica;
+        // A sugestão principal já vem aplicada, sem exigir toque (FR-004) — mas
+        // só se ninguém tiver tocado em nada enquanto a curadoria rodava.
+        // Sobrescrever uma escolha feita durante a espera seria desfazer a
+        // decisão da pessoa por causa de uma resposta que chegou atrasada.
+        const lookPrincipal = looks[0] ?? null;
+        // `filtroAutomatico` (Ajustes → "Tratamento automático") é o que
+        // autoriza a aplicação sem toque. Desligado, as três sugestões
+        // aparecem e esperam a escolha.
+        const aplicaLook = filtroAutomatico && atual.lookAuto && lookPrincipal !== null;
         patch({
           sugestoes,
+          looks,
+          ...(aplicaLook ? { lookEscolhido: lookPrincipal, filtroId: lookPrincipal.base } : {}),
           // `pronta` só quando existe trilha de fato; caso contrário a
           // postagem passa a exigir confirmação em vez de sair calada (RV-01)
           curadoria: musicaFinal ? 'pronta' : 'indisponivel',
           // A vibe real da foto substitui a prévia do visor (T-0A)
           ...(vibeReal ? { vibeId: vibeReal } : {}),
-          // Filtro acompanha a vibe real enquanto o usuário não escolher um
-          ...(vibeReal && atual.filtroAuto ? { filtroId: vibeById(vibeReal).filtro } : {}),
-          ...(escolheSozinho ? { musica: primeira } : {}),
+          // Filtro acompanha a vibe real enquanto o usuário não escolher um.
+          // Só vale quando não houve look para aplicar: a partir da feature 003
+          // quem manda no tratamento é a sugestão principal, e a tabela fixa
+          // `vibe → filtro` fica sendo apenas o piso da degradação.
+          ...(vibeReal && atual.filtroAuto && !aplicaLook
+            ? { filtroId: vibeById(vibeReal).filtro }
+            : {}),
+          // Mesma invalidação da troca manual (T102): faixa nova, arquivo
+          // local antigo não vale mais.
+          ...(escolheSozinho ? { musica: primeira, audioUri: null } : {}),
         });
       })
       .catch(() => {
         clearTimeout(limite);
         patch({ curadoria: 'indisponivel' });
       });
-  }, [photoUri, sugestaoAutomatica, deteccaoTempoReal, patch]);
+  }, [photoUri, sugestaoAutomatica, deteccaoTempoReal, filtroAutomatico, patch]);
 
+  /**
+   * Exporta a foto com o tratamento aplicado, na resolução do arquivo
+   * original (T037, FR-024) — não mais um print da prévia na resolução da
+   * tela, que é o que `captureRef` sempre fez.
+   *
+   * `renderizarLook` (Skia) é o caminho de primeira classe; o `captureRef`
+   * continua como rede de segurança para quando o nativo ainda não foi
+   * regerado no dev build (research R3, carga opcional) — sem ele, salvar ou
+   * postar antes do rebuild sairia sem filtro nenhum, enquanto a prévia na
+   * tela (que já cai para o render legado nesse caso) mostraria um. Manter
+   * os dois em série é o que garante que o arquivo exportado sempre bate com
+   * o que a pessoa viu na prévia, com ou sem o rebuild.
+   */
   const renderizarComFiltro = useCallback(async (): Promise<string> => {
     const s = useCaptureStore.getState().session;
     if (!s) return '';
     // Sem filtro, a imagem sai exatamente como capturada (T-0B)
     if (!s.filtroId) return s.photoUri;
+    const filtro = s.lookEscolhido ? resolverReceita(s.lookEscolhido) : filterById(s.filtroId);
+    const viaSkia = await renderizarLook(s.photoUri, filtro);
+    if (viaSkia) return viaSkia;
     try {
       return await captureRef(previewRef, { format: 'jpg', quality: 0.92 });
     } catch {
@@ -311,7 +406,12 @@ export function CaptureSheet() {
   const chave = session
     ? preExport.chavePacote({
         photoUri: session.photoUri,
-        filtroId: session.filtroId,
+        // A âncora não basta: dois looks podem partir do mesmo preset e sair
+        // diferentes. Sem a receita na chave, o vídeo pré-gerado de um look
+        // seria servido para outro (D7).
+        filtroId: session.lookEscolhido
+          ? identidadeDoLook(session.lookEscolhido)
+          : session.filtroId,
         // Arquivada entra como "sem música" na chave: o pacote resultante é
         // outro, e servir o vídeo com trilha aqui seria entregar o que o
         // usuário acabou de tirar.
@@ -396,6 +496,9 @@ export function CaptureSheet() {
       // A mídia gravada reflete o pacote: com a trilha arquivada, o registro
       // sai sem música, igual ao que foi exportado.
       const musicaDoPacote = session.trilhaArquivada ? null : session.musica;
+      // O id sobe para antes do download da trilha: o .mp3 é nomeado por ele, e
+      // no ramo de captura nova ele só existia lá embaixo.
+      const idNovo = session.mediaId ?? `${Date.now()}`;
       // Histórico de gosto (T057): vale a faixa que de fato foi no pacote, e só
       // ela. Trilha arquivada é rejeição — não registra. O peso é `auto`, bem
       // menor que o da troca no MusicSheet, porque aceitar passivamente o que o
@@ -403,6 +506,46 @@ export function CaptureSheet() {
       if (musicaDoPacote) {
         registrarEscolha(musicaDoPacote, session.vibeId, 'auto');
       }
+      // Gosto visual (US2): registra o tratamento que de fato foi ao ar, sob a
+      // vibe daquela foto. `lookAuto` é o que separa os dois pesos — quem tocou
+      // num chip recusou o que estava aplicado, e isso diz muito mais do que
+      // aceitar em silêncio o que o sistema propôs (FR-010, FR-011).
+      //
+      // "Sem tratamento" também é registrado, como escolha e não como vazio: a
+      // spec trata a foto original como opção de primeira classe.
+      registrarEscolhaVisual(
+        session.lookEscolhido,
+        session.vibeId,
+        session.lookAuto ? 'auto' : 'manual',
+      );
+      /**
+       * Trilha em disco (T102). A prévia do Deezer é um link que expira; sem
+       * uma cópia local, reabrir o momento pela galeria deixava o player
+       * girando para sempre. Baixa uma vez por faixa e reaproveita: trocar de
+       * música invalida, salvar de novo a mesma não rebaixa nada.
+       *
+       * Best-effort de ponta a ponta — falhar aqui devolve `null` e a mídia é
+       * salva com a URL remota, como antes. Salvar a foto nunca depende de rede.
+       */
+      /**
+       * O que vai para o registro é SEMPRE a cópia permanente.
+       *
+       * O cache de candidatas (T106) serve para tocar a prévia na hora, não
+       * para ser guardado: `Paths.cache` é apagável pelo sistema, e um
+       * `audioUri` apontando para lá traria de volta o T102 — player travado —
+       * só que com um caminho local morto em vez de uma URL expirada. Por isso
+       * `persistAudioPreview` roda de qualquer forma; o cache economiza a
+       * *reprodução*, nunca a persistência.
+       */
+      const audioUri =
+        musicaDoPacote === null
+          ? null
+          : (session.audioUri ??
+            (await persistAudioPreview(
+              musicaDoPacote.previewUrl,
+              session.mediaId ?? idNovo,
+            )));
+
       let media: Media;
       if (session.mediaId) {
         media = {
@@ -415,6 +558,9 @@ export function CaptureSheet() {
           trechoFim: session.trechoFim,
           aspecto: session.aspecto,
           sugestoes: session.sugestoes,
+          looks: session.looks,
+          lookEscolhido: session.lookEscolhido ?? undefined,
+          audioUri: audioUri ?? undefined,
           criadaEm: 0,
           atualizadaEm: Date.now(),
         };
@@ -427,9 +573,16 @@ export function CaptureSheet() {
           // Reabrir e trocar de música atualiza o leque salvo junto com a
           // escolha — senão a mídia guardaria a faixa nova e as opções velhas.
           sugestoes: session.sugestoes,
+          // Mesma lógica para o look (T039): sem isto, trocar de look numa
+          // mídia reaberta nunca sobrevivia ao Salvar (FR-022).
+          looks: session.looks,
+          lookEscolhido: session.lookEscolhido ?? undefined,
+          // Trocar de música numa mídia reaberta troca o arquivo local junto —
+          // senão o registro guardaria a faixa nova e o .mp3 da antiga.
+          audioUri: audioUri ?? undefined,
         });
       } else {
-        const id = `${Date.now()}`;
+        const id = idNovo;
         // Nunca perder a foto: se a cópia permanente falhar, o registro
         // entra na galeria apontando para o arquivo original do cache.
         let uriPersistente: string;
@@ -450,6 +603,11 @@ export function CaptureSheet() {
           // As quatro opções vão junto: reabrir esta foto não precisa mais
           // consultar o Gemini para mostrar de onde a escolha saiu (T083).
           sugestoes: session.sugestoes,
+          // Mesma ideia para os looks (T039): sem isto a US4 só funcionava
+          // pela reconstrução de mídia antiga, e a decisão real nunca persistia.
+          looks: session.looks,
+          lookEscolhido: session.lookEscolhido ?? undefined,
+          audioUri: audioUri ?? undefined,
           criadaEm: Date.now(),
           atualizadaEm: Date.now(),
         };
@@ -459,6 +617,10 @@ export function CaptureSheet() {
         // sem permissão ou no Expo Go retorna false e a mídia segue no app)
         await saveToSystemGallery(await renderizarComFiltro());
       }
+      // A sessão passa a conhecer o arquivo: quem salvou e continuou editando
+      // (o caminho do `salvar(false)` dentro de `exportar`) já toca do disco, e
+      // um segundo Salvar não baixa de novo.
+      if (audioUri && audioUri !== session.audioUri) patch({ audioUri });
       if (fechar) clear();
       return media;
     } finally {
@@ -577,27 +739,50 @@ export function CaptureSheet() {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
             {/* Foto com o filtro aplicado (frame ~735/913 do Figma) */}
             <View ref={previewRef} collapsable={false} style={styles.previewShot}>
+              {/* Único lugar do app com `usarSkia`: aqui a pessoa compara os
+                  três looks de perto, então a fidelidade da matriz de cor se
+                  paga, e há uma imagem só na tela. Galeria e miniaturas usam o
+                  render leve — ver a nota em `FilteredImage`. */}
               <FilteredImage
                 uri={session.photoUri}
                 filtroId={session.filtroId}
-                style={[styles.preview, { aspectRatio: aspectoReal ?? session.aspecto }]}
+                look={session.lookEscolhido}
+                usarSkia
+                style={[
+                  styles.preview,
+                  { aspectRatio: aspectoReal ?? session.aspecto, maxHeight: alturaMaxPreview },
+                ]}
               />
             </View>
 
             <View style={styles.filtroRow}>
-              <Text style={styles.sectionLabel}>FILTRO</Text>
+              {/* "VIBE", não "TRATAMENTO" (decisão do Sávio, 1.2.1): o rótulo
+                  longo dominava a linha e competia com o nome do look à
+                  direita, que é a informação que importa ali. "Vibe" é curto e
+                  é a palavra que o produto já usa com o usuário. */}
+              <Text style={styles.sectionLabel}>VIBE</Text>
               <Text style={styles.filtroAtual}>
-                {filtro ? `${filtro.emoji} ${filtro.nome.toUpperCase()}` : '📷 ORIGINAL'} · VIBE{' '}
-                {vibe.nome.toUpperCase()}
+                {session.lookEscolhido
+                  ? session.lookEscolhido.nome.toUpperCase()
+                  : filtro
+                    ? `${filtro.emoji} ${filtro.nome.toUpperCase()}`
+                    : '📷 ORIGINAL'}{' '}
+                · VIBE {vibe.nome.toUpperCase()}
               </Text>
             </View>
-            {/* Aqui existe foto: cada filtro se mostra aplicado nela, em vez
-                de se anunciar por um emoji (T054). */}
+            {/* Uma fileira só: os três looks (ou seus lugares reservados) e os
+                nove presets. Antes eram duas seções que somadas passavam de
+                300px — mais espaço que a própria foto. Ver
+                `TratamentoCarrossel`. */}
             <View style={styles.carouselWrap}>
-              <FilterThumbs
+              <TratamentoCarrossel
                 photoUri={session.photoUri}
-                ativo={session.filtroId}
-                onSelect={escolherFiltro}
+                looks={session.looks}
+                carregando={session.curadoria === 'carregando'}
+                lookEscolhido={session.lookEscolhido}
+                filtroAtivo={session.filtroId}
+                onSelectLook={escolherLook}
+                onSelectFiltro={escolherFiltro}
               />
             </View>
 
@@ -657,8 +842,13 @@ export function CaptureSheet() {
                     <>
                       <Text style={styles.musicReason}>{session.musica.justificativa}</Text>
                       <MusicPlayer
-                        key={session.musica.id}
+                        // A chave inclui a fonte: quando o .mp3 local aparece
+                        // (logo depois do Salvar), o player precisa nascer de
+                        // novo apontando para o disco — `useAudioPlayer` fixa a
+                        // origem na criação.
+                        key={`${session.musica.id}:${session.audioUri ?? 'remoto'}`}
                         musica={session.musica}
+                        audioUri={session.audioUri}
                         // Com o modal de música aberto, o dono da saída de áudio
                         // é ele — este player fica montado por baixo, mas calado
                         ativo={!showMusic}
@@ -751,7 +941,16 @@ export function CaptureSheet() {
               <Pressable
                 style={[styles.action, styles.actionSalvar, postando && styles.actionDesabilitada]}
                 disabled={salvando || postando}
-                onPress={() => salvar(true)}
+                onPress={async () => {
+                  const m = await salvar(true);
+                  // Salvar leva à galeria: o momento acabou de virar registro,
+                  // e é lá que ele existe. Antes o modal apenas fechava e a
+                  // pessoa caía de volta no visor, sem confirmação visível de
+                  // que a mídia tinha sido guardada. `replace` para que o
+                  // "voltar" da galeria vá para a câmera, e não reabra a
+                  // captura que acabou de ser salva.
+                  if (m) router.replace('/gallery');
+                }}
               >
                 <Text style={styles.actionText}>{salvando ? 'Salvando...' : 'Salvar'}</Text>
               </Pressable>
@@ -780,10 +979,18 @@ export function CaptureSheet() {
       {sharePkg ? (
         <PostSheet
           pacote={sharePkg}
-          onClose={() => {
-            setSharePkg(null);
-            clear();
-          }}
+          /**
+           * Fechar a folha fecha **só a folha** (T101).
+           *
+           * Aqui havia um `clear()` junto. Fechar depois de postar é o gesto de
+           * quem mudou de ideia e quer lapidar de novo — e zerar a sessão nesse
+           * momento desmontava o `CaptureSheet` inteiro: quem publicou a partir
+           * da captura caía no visor com a foto, o look e a trilha perdidos, e
+           * quem veio da galeria voltava para a lista em vez da mídia aberta.
+           * A conclusão do fluxo tem donos próprios — o X (`descartar`) e o
+           * `salvar(true)` —, e é lá que a sessão termina.
+           */
+          onClose={() => setSharePkg(null)}
         />
       ) : null}
     </View>
@@ -821,7 +1028,10 @@ const styles = StyleSheet.create({
     fontSize: 26,
   },
   scroll: {
-    paddingBottom: 16,
+    // Folga para o rodapé fixo (Salvar/Postar), que desenha por cima do fim
+    // da rolagem. Com 16 a última fileira de miniaturas aparecia cortada ao
+    // meio e os nomes dos tratamentos ficavam escondidos atrás dos botões.
+    paddingBottom: 28,
   },
   previewShot: {
     marginHorizontal: 20,

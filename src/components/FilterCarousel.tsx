@@ -9,8 +9,6 @@ interface Props {
   /** null = chip "Original" (sem filtro, T-0B) */
   ativo: FilterId | null;
   onSelect: (id: FilterId | null) => void;
-  /** chip "AUTO" indica que o filtro veio da vibe (não escolhido manualmente) */
-  autoAtivo?: boolean;
 }
 
 interface CarouselItem {
@@ -33,12 +31,10 @@ const GAP = 8;
 const Chip = React.memo(function Chip({
   item,
   selected,
-  autoAtivo,
   onSelect,
 }: {
   item: CarouselItem;
   selected: boolean;
-  autoAtivo?: boolean;
   onSelect: (id: FilterId | null) => void;
 }) {
   return (
@@ -48,10 +44,7 @@ const Chip = React.memo(function Chip({
       style={[styles.chip, selected && styles.chipAtivo]}
     >
       <Text style={styles.emoji}>{item.emoji}</Text>
-      <Text style={styles.nome}>
-        {item.nome.toUpperCase()}
-        {selected && autoAtivo ? ' · AUTO' : ''}
-      </Text>
+      <Text style={styles.nome}>{item.nome.toUpperCase()}</Text>
     </Pressable>
   );
 });
@@ -68,17 +61,16 @@ const Chip = React.memo(function Chip({
  * numa faixa que já é densa. Com ele saiu também toda a medição de larguras que
  * existia só para calcular esse número — o componente voltou a ser uma lista.
  */
-export function FilterCarousel({ ativo, onSelect, autoAtivo }: Props) {
+export function FilterCarousel({ ativo, onSelect }: Props) {
   const renderItem = useCallback(
     ({ item }: { item: CarouselItem }) => (
       <Chip
         item={item}
         selected={item.id === ativo}
-        autoAtivo={autoAtivo}
         onSelect={onSelect}
       />
     ),
-    [ativo, autoAtivo, onSelect],
+    [ativo, onSelect],
   );
 
   return (

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { deletePhoto } from '@/services/mediaStorage';
+import { deleteAudio, deletePhoto } from '@/services/mediaStorage';
 import { Media } from '@/types';
 
 /**
@@ -29,7 +29,12 @@ export const useGalleryStore = create<GalleryState>()(
         })),
       remove: (id) => {
         const media = get().medias.find((m) => m.id === id);
-        if (media) deletePhoto(media.photoUri);
+        if (media) {
+          deletePhoto(media.photoUri);
+          // A trilha local é parte do pacote (T102): apagar o momento apaga as
+          // duas metades, senão o .mp3 fica órfão ocupando disco para sempre.
+          if (media.audioUri) deleteAudio(media.audioUri);
+        }
         set((s) => ({ medias: s.medias.filter((m) => m.id !== id) }));
       },
     }),
