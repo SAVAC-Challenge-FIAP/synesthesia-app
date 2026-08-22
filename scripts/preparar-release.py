@@ -30,6 +30,20 @@ Depois dele, o APK sai com:
 As duas ABIs cobrem todo celular Android real; incluir `x86`/`x86_64`, que só
 servem a emuladores, levava o APK de 59 MB para 100 MB.
 
+**A ordem importa**: rode este script *depois* do `expo prebuild`, nunca antes.
+O prebuild reescreve `styles.xml` do zero e devolve a linha do
+`splashscreen_logo`, então rodar na ordem inversa faz o build de release falhar
+com "resource drawable/splashscreen_logo not found" — o script chega a dizer
+"splash já estava sem logo", mas o prebuild seguinte desfaz o trabalho.
+
+Sequência completa do release:
+
+    # 1. versão nova no app.json (version + android.versionCode)
+    npx expo prebuild --platform android --no-install
+    python3 scripts/preparar-release.py
+    cd android && ./gradlew assembleRelease \
+        -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+
 Uso:  python3 scripts/preparar-release.py
 """
 
