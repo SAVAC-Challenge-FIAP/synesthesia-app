@@ -200,3 +200,38 @@ Screenshots do fluxo de compartilhamento podem cair em telas com **contatos reai
 destinatários do Mensagens, por exemplo). Essas imagens **não vão** para `docs/preview/` nem para
 commit. Escolha um destino que mostre o resultado sem expor terceiros — o Gmail, por exemplo,
 mostra o anexo com nome e tamanho sem tocar em contato nenhum.
+
+## 11. Armadilha 3 — `pkill -f "expo start"` NÃO mata o Metro
+
+Descoberto em 2026-08-21, depois de ~1h perdida perseguindo um bug fantasma.
+
+O processo do Metro sobrevive a `pkill -f "expo start"`, a `pkill -f metro` e a
+`expo start --clear`. Ele fica escutando a 8081 com o **mesmo PID** de antes, e
+`--clear` limpa o cache de transformação **sem** reiniciar o processo.
+
+Isso importa porque `@expo/metro-config` **memoiza a config do Babel por
+processo** (`loadBabelConfig`, em `build/loadBabelConfig.js`: `if (babelRC !==
+null) return babelRC;`). Se o Metro subiu antes de o `babel.config.js` existir —
+ou antes de você editá-lo — ele serve bundles com a config **velha** para
+sempre, e nenhum `--clear` conserta.
+
+Sintoma: você edita `babel.config.js`, reinicia "o Metro", e o bundle continua
+sem o plugin. Um `babel.config.js` que **lança um erro** ainda produz bundle com
+sucesso — essa é a prova de que o arquivo não está sendo lido.
+
+Como matar de verdade:
+
+```bash
+lsof -nP -iTCP:8081 -sTCP:LISTEN -t | xargs kill -9
+lsof -nP -iTCP:8081 -sTCP:LISTEN -t || echo "porta livre"
+```
+
+Só depois disso suba o Metro de novo. Confira que o PID mudou.
+
+Para verificar se o plugin de worklets está mesmo sendo aplicado, sem depender
+de rodar o app:
+
+```bash
+curl -s "http://localhost:8081/src/services/renderLook.bundle?platform=android&dev=true&modulesOnly=true&runModule=false" -o /tmp/x.js
+grep -c "__workletHash" /tmp/x.js     # 0 = plugin NÃO aplicado
+```
