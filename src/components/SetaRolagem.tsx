@@ -73,7 +73,7 @@ export function SetaRolagem({ visivel, onPress }: Props) {
 const styles = StyleSheet.create({
   wrap: {
     position: "absolute",
-    bottom: 96,
+    bottom: 150,
     alignSelf: "center",
     width: 36,
     height: 36,

@@ -34,12 +34,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import {
-  CameraOptionsBar,
-  megapixels,
-  opcoesDeResolucao,
-  rotuloDeResolucao,
-} from "@/components/CameraOptionsBar";
+import { CameraOptionsBar } from "@/components/CameraOptionsBar";
 import { FilterCarousel } from "@/components/FilterCarousel";
 import { FundoBase } from "@/components/FundoBase";
 import { FilterLayer } from "@/components/FilterLayer";
@@ -173,37 +168,7 @@ export default function CameraScreen() {
       .then(setTamanhos)
       .catch(() => {});
   }, []);
-  const [resolucaoEscolhida, setResolucaoEscolhida] = useState<string | null>(
-    null,
-  );
-  const opcoesResolucao = useMemo(
-    () => opcoesDeResolucao(tamanhos, razaoAlvo),
-    [tamanhos, razaoAlvo],
-  );
-
-  useEffect(() => {
-    if (resolucaoEscolhida && !opcoesResolucao.includes(resolucaoEscolhida)) {
-      setResolucaoEscolhida(null);
-    }
-  }, [opcoesResolucao, resolucaoEscolhida]);
-
-  const pictureSize = resolucaoEscolhida ?? tamanhoNativo;
-
-  const proximaResolucao = useCallback(() => {
-    if (opcoesResolucao.length === 0) return;
-    const atual = resolucaoEscolhida ?? opcoesResolucao[0];
-    const i = opcoesResolucao.indexOf(atual);
-    setResolucaoEscolhida(opcoesResolucao[(i + 1) % opcoesResolucao.length]);
-  }, [opcoesResolucao, resolucaoEscolhida]);
-
-  const resolucao =
-    resolucaoEscolhida !== null
-      ? megapixels(resolucaoEscolhida)
-      : opcoesResolucao.length > 0
-        ? megapixels(opcoesResolucao[0])
-        : tamanhos.length > 0
-          ? rotuloDeResolucao(tamanhos)
-          : null;
+  const pictureSize = tamanhoNativo;
 
   const proximoFlash = () =>
     setFlash((f) => (f === "off" ? "auto" : f === "auto" ? "on" : "off"));
@@ -318,10 +283,6 @@ export default function CameraScreen() {
         >
           {}
           <CameraOptionsBar
-            resolucao={resolucao}
-            onTrocarResolucao={
-              opcoesResolucao.length > 1 ? proximaResolucao : undefined
-            }
             onAjustes={() => router.push("/settings")}
             slotFlash={
               <Pressable

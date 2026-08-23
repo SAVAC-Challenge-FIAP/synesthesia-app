@@ -5,12 +5,15 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
 const TOLERANCIA = 0.02;
 
+const AREA_ALVO_CAPTURA = 12_000_000;
+
 export function escolherTamanhoNativo(
   tamanhos: string[],
   razao: number,
 ): string | null {
   let melhor: string | null = null;
-  let maiorArea = 0;
+  let melhorArea = 0;
+  let menorDistancia = Infinity;
   for (const t of tamanhos) {
     const [l, a] = t.split("x").map(Number);
     if (!l || !a) continue;
@@ -18,8 +21,13 @@ export function escolherTamanhoNativo(
     const alvo = razao > 1 ? 1 / razao : razao;
     if (Math.abs(proporcao - alvo) > TOLERANCIA) continue;
     const area = l * a;
-    if (area > maiorArea) {
-      maiorArea = area;
+    const distancia = Math.abs(area - AREA_ALVO_CAPTURA);
+    if (
+      distancia < menorDistancia ||
+      (distancia === menorDistancia && area > melhorArea)
+    ) {
+      menorDistancia = distancia;
+      melhorArea = area;
       melhor = t;
     }
   }
@@ -91,6 +99,25 @@ export async function prepararFoto(params: {
     console.log("[enquadrar] preparo falhou, mantendo a foto original:", e);
     return { uri, aspecto: largura / altura };
   }
+}
+
+export async function aplicarTransformacao(params: {
+  uri: string;
+  aspectoAtual: number;
+  rotacaoGraus: 90 | 180 | 270;
+}): Promise<{ uri: string; aspecto: number }> {
+  const { uri, aspectoAtual, rotacaoGraus } = params;
+
+  const contexto = ImageManipulator.manipulate(uri);
+  contexto.rotate(rotacaoGraus);
+
+  const imagem = await contexto.renderAsync();
+  const salva = await imagem.saveAsync({ compress: 1, format: SaveFormat.JPEG });
+
+  const giraEixos = rotacaoGraus === 90 || rotacaoGraus === 270;
+  const aspecto = giraEixos ? 1 / aspectoAtual : aspectoAtual;
+
+  return { uri: salva.uri, aspecto };
 }
 
 function corteCentral(largura: number, altura: number, razaoDesejada: number) {

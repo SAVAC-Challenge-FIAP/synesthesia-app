@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef } from "react-native-view-shot";
 
 import { EsqueletoTexto } from "@/components/EsqueletoTexto";
-import { FilteredImage } from "@/components/FilteredImage";
+import { FotoEditavel } from "@/components/FotoEditavel";
 import { FundoBase } from "@/components/FundoBase";
 import { LoaderMarca } from "@/components/LoaderMarca";
 import { SetaRolagem } from "@/components/SetaRolagem";
@@ -35,6 +35,7 @@ import { TratamentoCarrossel } from "@/components/TratamentoCarrossel";
 import { MusicPlayer } from "@/components/MusicPlayer";
 import { MusicSheet } from "@/components/MusicSheet";
 import { PostSheet } from "@/components/PostSheet";
+import { aplicarTransformacao } from "@/services/enquadrar";
 import { filterById, resolverReceita } from "@/constants/filters";
 import { vibeById } from "@/constants/vibes";
 import { identidadeDoLook, montarLooks } from "@/services/looks";
@@ -53,12 +54,14 @@ import { useGalleryStore } from "@/stores/useGalleryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useLookTasteStore } from "@/stores/useLookTasteStore";
 import { useTasteStore } from "@/stores/useTasteStore";
-import { colors, fonts, hitSlops, radii, sizes } from "@/theme/tokens";
+import { colors, fonts, hitSlops, radii } from "@/theme/tokens";
 import { FilterId, LookRecipe, Media } from "@/types";
 
 const LIMITE_CURADORIA_MS = 30_000;
 
 const ESPERA_QUIETUDE_MS = 2_500;
+
+const LIMIAR_ASPECTO_SETA = 0.65;
 
 if (
   Platform.OS === "android" &&
@@ -97,6 +100,7 @@ export function CaptureSheet() {
   const scrollRef = useRef<ScrollView>(null);
   const [jaRolou, setJaRolou] = useState(false);
   const [yAlvoFiltros, setYAlvoFiltros] = useState<number | null>(null);
+  const [girando, setGirando] = useState(false);
   const [showMusic, setShowMusic] = useState(false);
   const [sharePkg, setSharePkg] = useState<SharePackage | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -275,6 +279,25 @@ export function CaptureSheet() {
     }
   }, []);
 
+  const girarFoto = useCallback(async () => {
+    const s = useCaptureStore.getState().session;
+    if (!s || girando) return;
+    setGirando(true);
+    try {
+      const resultado = await aplicarTransformacao({
+        uri: s.photoUri,
+        aspectoAtual: aspectoReal ?? s.aspecto,
+        rotacaoGraus: 90,
+      });
+      patch({ photoUri: resultado.uri, aspecto: resultado.aspecto });
+      setAspectoReal(resultado.aspecto);
+    } catch (e) {
+      console.warn("[capture] girar falhou:", e);
+    } finally {
+      setGirando(false);
+    }
+  }, [girando, aspectoReal, patch]);
+
   const chave = session
     ? preExport.chavePacote({
         photoUri: session.photoUri,
@@ -334,7 +357,6 @@ export function CaptureSheet() {
 
   const arquivada = session.trilhaArquivada;
   const filtro = session.filtroId ? filterById(session.filtroId) : null;
-  const vibe = vibeById(session.vibeId);
   const editando = session.mediaId !== null;
 
   const salvar = async (fechar: boolean): Promise<Media | null> => {
@@ -546,15 +568,13 @@ export function CaptureSheet() {
           {}
           <View ref={previewRef} collapsable={false} style={styles.previewShot}>
             {}
-            <FilteredImage
+            <FotoEditavel
               uri={session.photoUri}
               filtroId={session.filtroId}
               look={session.lookEscolhido}
-              usarSkia
-              style={[
-                styles.preview,
-                { aspectRatio: aspectoReal ?? session.aspecto },
-              ]}
+              aspectRatio={aspectoReal ?? session.aspecto}
+              girando={girando}
+              onGirar={girarFoto}
             />
           </View>
 
@@ -733,7 +753,7 @@ export function CaptureSheet() {
         </ScrollView>
 
         <SetaRolagem
-          visivel={!jaRolou}
+          visivel={!jaRolou && (aspectoReal ?? session.aspecto) <= LIMIAR_ASPECTO_SETA}
           onPress={() => {
             if (yAlvoFiltros !== null) {
               scrollRef.current?.scrollTo({ y: yAlvoFiltros, animated: true });
@@ -880,10 +900,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     borderRadius: radii.card,
     overflow: "hidden",
-  },
-  preview: {
-    width: "100%",
-    borderRadius: radii.card,
   },
   filtroRow: {
     flexDirection: "row",
