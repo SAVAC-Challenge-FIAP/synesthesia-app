@@ -13,13 +13,13 @@ import {
   BackHandler,
   Image,
   LayoutAnimation,
+  LayoutChangeEvent,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   UIManager,
-  useWindowDimensions,
   View,
 } from "react-native";
 import type { LayoutAnimationConfig } from "react-native";
@@ -30,6 +30,7 @@ import { EsqueletoTexto } from "@/components/EsqueletoTexto";
 import { FilteredImage } from "@/components/FilteredImage";
 import { FundoBase } from "@/components/FundoBase";
 import { LoaderMarca } from "@/components/LoaderMarca";
+import { SetaRolagem } from "@/components/SetaRolagem";
 import { TratamentoCarrossel } from "@/components/TratamentoCarrossel";
 import { MusicPlayer } from "@/components/MusicPlayer";
 import { MusicSheet } from "@/components/MusicSheet";
@@ -92,9 +93,10 @@ export function CaptureSheet() {
   const filtroAutomatico = useSettingsStore((s) => s.filtroAutomatico);
 
   const insets = useSafeAreaInsets();
-  const { height: alturaJanela } = useWindowDimensions();
-  const alturaMaxPreview = Math.round(alturaJanela * 0.58);
   const previewRef = useRef<View>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const [jaRolou, setJaRolou] = useState(false);
+  const [yAlvoFiltros, setYAlvoFiltros] = useState<number | null>(null);
   const [showMusic, setShowMusic] = useState(false);
   const [sharePkg, setSharePkg] = useState<SharePackage | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -533,8 +535,13 @@ export function CaptureSheet() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
+          onScroll={() => {
+            if (!jaRolou) setJaRolou(true);
+          }}
+          scrollEventThrottle={16}
         >
           {}
           <View ref={previewRef} collapsable={false} style={styles.previewShot}>
@@ -546,15 +553,17 @@ export function CaptureSheet() {
               usarSkia
               style={[
                 styles.preview,
-                {
-                  aspectRatio: aspectoReal ?? session.aspecto,
-                  maxHeight: alturaMaxPreview,
-                },
+                { aspectRatio: aspectoReal ?? session.aspecto },
               ]}
             />
           </View>
 
-          <View style={styles.filtroRow}>
+          <View
+            style={styles.filtroRow}
+            onLayout={(e: LayoutChangeEvent) =>
+              setYAlvoFiltros(e.nativeEvent.layout.y)
+            }
+          >
             {}
             <Text style={styles.sectionLabel}>VIBE</Text>
             <View style={styles.tratamentoEVibe}>
@@ -722,6 +731,16 @@ export function CaptureSheet() {
             )}
           </View>
         </ScrollView>
+
+        <SetaRolagem
+          visivel={!jaRolou}
+          onPress={() => {
+            if (yAlvoFiltros !== null) {
+              scrollRef.current?.scrollTo({ y: yAlvoFiltros, animated: true });
+            }
+            setJaRolou(true);
+          }}
+        />
 
         <View
           style={[

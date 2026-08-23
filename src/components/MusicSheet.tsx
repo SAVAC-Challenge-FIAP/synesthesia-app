@@ -3,8 +3,9 @@
  */
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -38,6 +39,8 @@ const PAPEL_ESTILO: Record<PapelFaixa, { color: string }> = {
   curinga: { color: "rgba(9,5,6,0.45)" },
 };
 
+const TIMEOUT_PREVIA_MS = 10_000;
+
 export function MusicSheet({ onClose }: { onClose: () => void }) {
   const session = useCaptureStore((s) => s.session);
   const patch = useCaptureStore((s) => s.patch);
@@ -48,8 +51,24 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
     session?.musica ?? null,
   );
   const [tocandoId, setTocandoId] = useState<string | null>(null);
+  const [expiradasIds, setExpiradasIds] = useState<Set<string>>(new Set());
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (status.isLoaded && timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, [status.isLoaded]);
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const s = useCaptureStore.getState().session;
@@ -72,16 +91,29 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
   const vibe = vibeById(session.vibeId);
 
   const tocar = (m: MusicSuggestion) => {
-    const fonte = audioEmCache(m.id) ?? m.previewUrl;
+    const fonteJaBaixada =
+      session.musica?.id === m.id ? session.audioUri : null;
+    const fonte = fonteJaBaixada ?? audioEmCache(m.id) ?? m.previewUrl;
     if (!fonte) return;
     if (tocandoId === m.id && status.playing) {
       player.pause();
       setTocandoId(null);
       return;
     }
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setExpiradasIds((atual) => {
+      if (!atual.has(m.id)) return atual;
+      const proximo = new Set(atual);
+      proximo.delete(m.id);
+      return proximo;
+    });
     player.replace(fonte);
     player.play();
     setTocandoId(m.id);
+    timeoutRef.current = setTimeout(() => {
+      setTocandoId((atual) => (atual === m.id ? null : atual));
+      setExpiradasIds((atual) => new Set(atual).add(m.id));
+    }, TIMEOUT_PREVIA_MS);
   };
 
   const confirmar = () => {
@@ -132,6 +164,9 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
               session.sugestoes.map((m) => {
                 const selecionada = escolhida?.id === m.id;
                 const tocando = tocandoId === m.id && status.playing;
+                const carregando =
+                  tocandoId === m.id && !status.isLoaded && !status.playing;
+                const expirada = expiradasIds.has(m.id);
                 return (
                   <Pressable
                     key={m.id}
@@ -158,16 +193,27 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
                     <Pressable
                       onPress={() => tocar(m)}
                       hitSlop={8}
+                      accessibilityLabel={
+                        expirada
+                          ? "Prévia expirou, toque para tentar de novo"
+                          : undefined
+                      }
                       style={[
                         styles.playBtn,
                         !m.previewUrl && { opacity: 0.3 },
                       ]}
                     >
-                      <Ionicons
-                        name={tocando ? "pause" : "play"}
-                        size={15}
-                        color={colors.parchment}
-                      />
+                      {carregando ? (
+                        <ActivityIndicator size="small" color={colors.parchment} />
+                      ) : (
+                        <Ionicons
+                          name={
+                            expirada ? "refresh" : tocando ? "pause" : "play"
+                          }
+                          size={15}
+                          color={colors.parchment}
+                        />
+                      )}
                     </Pressable>
                   </Pressable>
                 );
