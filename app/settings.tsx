@@ -1,17 +1,24 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { useLookTasteStore } from '@/stores/useLookTasteStore';
-import { useSettingsStore } from '@/stores/useSettingsStore';
-import { colors, fonts, radii } from '@/theme/tokens';
-
 /**
- * Ajustes (US9/FR-015) + opt-in LGPD de metadados anônimos (FR-010).
- * Toggles ruby, seções em Lato, título display em Nunito — Figma.
+ * @docs docs/components/settings.md
  */
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { useLookTasteStore } from "@/stores/useLookTasteStore";
+import { useSettingsStore } from "@/stores/useSettingsStore";
+import { colors, fonts, radii } from "@/theme/tokens";
+
 export default function SettingsScreen() {
   const router = useRouter();
   const s = useSettingsStore();
@@ -19,11 +26,11 @@ export default function SettingsScreen() {
 
   const apagarHistoricoVisual = () => {
     Alert.alert(
-      'Apagar histórico de gosto visual?',
-      'As sugestões de look voltam a vir só da cena, sem levar em conta o que você costuma escolher. Suas fotos e filtros salvos não são afetados.',
+      "Apagar histórico de gosto visual?",
+      "As sugestões de look voltam a vir só da cena, sem levar em conta o que você costuma escolher. Suas fotos e filtros salvos não são afetados.",
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Apagar', style: 'destructive', onPress: limparGostoVisual },
+        { text: "Cancelar", style: "cancel" },
+        { text: "Apagar", style: "destructive", onPress: limparGostoVisual },
       ],
     );
   };
@@ -43,19 +50,19 @@ export default function SettingsScreen() {
           titulo="Tratamento automático"
           desc="Aplica sozinho o look sugerido para a foto. Desligado: as três sugestões aparecem, mas nenhuma entra sem o seu toque"
           value={s.filtroAutomatico}
-          onToggle={() => s.toggle('filtroAutomatico')}
+          onToggle={() => s.toggle("filtroAutomatico")}
         />
         <Row
           titulo="Leitura da cena (IA)"
           desc="A foto capturada é analisada pelo Gemini para inferir a vibe real e curar a trilha. Desligado: prévia local por hora/câmera, nada sai do aparelho"
           value={s.deteccaoTempoReal}
-          onToggle={() => s.toggle('deteccaoTempoReal')}
+          onToggle={() => s.toggle("deteccaoTempoReal")}
         />
         <Row
           titulo="Grade de composição"
           desc="Linhas de terços sobre o visor"
           value={s.gradeComposicao}
-          onToggle={() => s.toggle('gradeComposicao')}
+          onToggle={() => s.toggle("gradeComposicao")}
         />
 
         <Text style={styles.section}>MÚSICA</Text>
@@ -63,7 +70,7 @@ export default function SettingsScreen() {
           titulo="Sugestão automática"
           desc="Curadoria da trilha na captura (Gemini + Deezer)"
           value={s.sugestaoAutomatica}
-          onToggle={() => s.toggle('sugestaoAutomatica')}
+          onToggle={() => s.toggle("sugestaoAutomatica")}
         />
         <View style={styles.rowStatic}>
           <View style={styles.rowText}>
@@ -74,26 +81,24 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={styles.section}>PRIVACIDADE</Text>
-        {/* O consentimento acontece no onboarding, num card próprio (decisão do
-            Sávio, 2026-08-22). Este toggle é a via de **revogação** que o
-            Princípio IV exige: desligar corta o envio na hora, sem precisar
-            mexer nas configurações do sistema. */}
+        {}
         <Row
           titulo="Usar localização"
           desc="Envia só a sua cidade (nunca a posição exata) junto da foto, para a vibe combinar com o lugar. Nada é guardado. Desligue para parar de enviar."
           value={s.usarLocalizacao}
-          onToggle={() => s.toggle('usarLocalizacao')}
+          onToggle={() => s.toggle("usarLocalizacao")}
         />
         <Row
           titulo="Metadados anônimos"
           desc="Opt-in: compartilhar estatísticas anônimas de uso. Revogável a qualquer momento."
           value={s.metadadosAnonimos}
-          onToggle={() => s.toggle('metadadosAnonimos')}
+          onToggle={() => s.toggle("metadadosAnonimos")}
         />
         <Text style={styles.privacyNote}>
-          🔒 O visor processa tudo no seu celular. Com "Leitura da cena (IA)" ativa, a foto
-          capturada é enviada ao Gemini apenas para inferir a vibe e sugerir a trilha — desative
-          para que nenhuma imagem saia do aparelho.
+          🔒 O visor processa tudo no seu celular. Com "Leitura da cena (IA)"
+          ativa, a foto capturada é enviada ao Gemini apenas para inferir a vibe
+          e sugerir a trilha — desative para que nenhuma imagem saia do
+          aparelho.
         </Text>
 
         <Pressable
@@ -105,8 +110,9 @@ export default function SettingsScreen() {
           <View style={styles.rowText}>
             <Text style={styles.rowTitle}>Histórico de gosto visual</Text>
             <Text style={styles.rowDesc}>
-              Guardado só no aparelho — nunca sai daqui, nunca é enviado ao Gemini. Apagar volta
-              as sugestões de look ao ponto de partida, sem histórico.
+              Guardado só no aparelho — nunca sai daqui, nunca é enviado ao
+              Gemini. Apagar volta as sugestões de look ao ponto de partida, sem
+              histórico.
             </Text>
           </View>
           <Ionicons name="trash-outline" size={20} color={colors.ruby} />
@@ -136,7 +142,7 @@ function Row({
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: 'rgba(245,238,222,0.2)', true: colors.ruby }}
+        trackColor={{ false: "rgba(245,238,222,0.2)", true: colors.ruby }}
         thumbColor={colors.parchment}
       />
     </View>
@@ -149,8 +155,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 14,
     paddingHorizontal: 20,
     paddingVertical: 14,
@@ -178,8 +184,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     borderWidth: 1,
     borderColor: colors.parchment25,
@@ -188,8 +194,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   rowStatic: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     borderWidth: 1,
     borderColor: colors.parchment25,

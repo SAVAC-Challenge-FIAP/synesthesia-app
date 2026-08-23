@@ -1,36 +1,15 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
-
-import { FundoBase } from '@/components/FundoBase';
-import { LoaderMarca } from '@/components/LoaderMarca';
-import { colors, fonts } from '@/theme/tokens';
-
 /**
- * Abertura do app (T080/T094) — a marca **em movimento**, e não mais um pisca.
- *
- * O que o Sávio viu: *"aparece a logo e depois troca para logo, tipo em uma
- * piscada"*. Não era bug, eram duas marcas estáticas em sequência com escalas
- * diferentes: o Android 12+ mostra sozinho o ícone do app enquanto o processo
- * sobe, e logo atrás vinha o splash do `expo-splash-screen` com a mesma arte em
- * outro tamanho. Dois quase-iguais lidos em sequência = salto.
- *
- * A correção tem duas metades. A outra é o `app.json`, onde o splash **perdeu a
- * imagem** e ficou só com o `backgroundColor`: casar as duas escalas seria
- * calibração fina e frágil, e a marca não precisa aparecer duas vezes. Agora o
- * app mostra a marca **uma vez só** — esta —, e ela se move.
- *
- * O ícone que o sistema desenha antes de tudo é do Android, não nosso: não há
- * como desligar nem animar. Também não existe splash em GIF — essa fase é
- * imagem estática por definição da plataforma, e é por isso que a animação
- * começa aqui, no primeiro frame de JS.
- *
- * É o mesmo `LoaderMarca` da espera do Gemini, que o Sávio aprovou — a mesma
- * ideia de movimento nos dois lugares em que o app pede tempo a quem usa.
+ * @docs docs/components/AberturaMarca.md
  */
+import React, { useEffect, useRef } from "react";
+import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+
+import { FundoBase } from "@/components/FundoBase";
+import { LoaderMarca } from "@/components/LoaderMarca";
+import { colors, fonts } from "@/theme/tokens";
+
 export function AberturaMarca({
-  /** Só sai quando o app tem o que mostrar no lugar (fontes carregadas). */
   pronto,
-  /** Com as fontes ainda carregando, o nome esperaria — e trocaria de fonte à vista. */
   mostrarNome,
   onFim,
 }: {
@@ -44,7 +23,7 @@ export function AberturaMarca({
 
   useEffect(() => {
     if (!mostrarNome) return;
-    // O nome entra depois do símbolo: dá uma leitura em vez de um bloco só.
+
     Animated.timing(entrada, {
       toValue: 1,
       duration: 420,
@@ -55,8 +34,7 @@ export function AberturaMarca({
 
   useEffect(() => {
     if (!pronto) return;
-    // Tempo mínimo em cena: sem ele, um arranque rápido faria a marca aparecer
-    // e sumir — que é exatamente a piscada que esta tela veio resolver.
+
     const restante = Math.max(0, 1100 - (Date.now() - nascidoEm));
     const t = setTimeout(() => {
       Animated.timing(saida, {
@@ -76,10 +54,18 @@ export function AberturaMarca({
       style={[
         styles.root,
         {
-          opacity: saida.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-          // Some crescendo de leve, como se a íris abrisse para o visor.
+          opacity: saida.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 0],
+          }),
+
           transform: [
-            { scale: saida.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) },
+            {
+              scale: saida.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 1.08],
+              }),
+            },
           ],
         },
       ]}
@@ -92,14 +78,16 @@ export function AberturaMarca({
           style={{
             opacity: entrada,
             transform: [
-              { translateY: entrada.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+              {
+                translateY: entrada.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [10, 0],
+                }),
+              },
             ],
           }}
         >
-          {/* O nome vem da tipografia do app, não do `logo-full-name.png`: o
-              arquivo traz um retângulo preto embutido (a pendência conhecida dos
-              assets), e sobre o gradiente ele aparecia como uma caixa preta em
-              volta da palavra. Escrito, fica na identidade e sem remendo. */}
+          {}
           <Text style={styles.nome}>SYNESTHESIA</Text>
           <Text style={styles.assinatura}>SINTA A CENA · OUÇA A IMAGEM</Text>
         </Animated.View>
@@ -116,8 +104,8 @@ const styles = StyleSheet.create({
   },
   centro: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: 26,
   },
   nome: {
@@ -125,14 +113,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     fontSize: 30,
     letterSpacing: 4,
-    textAlign: 'center',
+    textAlign: "center",
   },
   assinatura: {
     color: colors.amber,
     fontFamily: fonts.labelLight,
     fontSize: 10,
     letterSpacing: 3,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 10,
   },
 });

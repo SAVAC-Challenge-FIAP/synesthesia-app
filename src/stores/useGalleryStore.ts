@@ -1,14 +1,13 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-
-import { deleteAudio, deletePhoto } from '@/services/mediaStorage';
-import { Media } from '@/types';
-
 /**
- * Galeria persistente — cada Media é o "pacote sensorial" completo
- * (imagem + filtro + música + trecho), nunca quebrado (RN-001, FR-011).
+ * @docs docs/components/useGalleryStore.md
  */
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+
+import { deleteAudio, deletePhoto } from "@/services/mediaStorage";
+import { Media } from "@/types";
+
 interface GalleryState {
   medias: Media[];
   add: (media: Media) => void;
@@ -31,15 +30,14 @@ export const useGalleryStore = create<GalleryState>()(
         const media = get().medias.find((m) => m.id === id);
         if (media) {
           deletePhoto(media.photoUri);
-          // A trilha local é parte do pacote (T102): apagar o momento apaga as
-          // duas metades, senão o .mp3 fica órfão ocupando disco para sempre.
+
           if (media.audioUri) deleteAudio(media.audioUri);
         }
         set((s) => ({ medias: s.medias.filter((m) => m.id !== id) }));
       },
     }),
     {
-      name: 'synesthesia-galeria',
+      name: "synesthesia-galeria",
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),

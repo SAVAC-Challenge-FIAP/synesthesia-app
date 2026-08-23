@@ -1,43 +1,17 @@
-import { Directory, File, Paths } from 'expo-file-system';
-
 /**
- * Geração do .mp4 real (imagem + trilha) via módulo nativo local (T-07).
- *
- * `modules/video-muxer` (Android: MediaMuxer/MediaCodec) só carrega em
- * development build — no Expo Go o `require` do módulo nativo lança na
- * primeira chamada. Por isso tudo aqui é best-effort: qualquer falha (Expo
- * Go, plataforma não suportada, erro de encoding) devolve `null` e
- * `sharePackage.ts` mantém o pacote composto atual (RN "nunca perder a
- * foto" — o vídeo é um extra, não um requisito para salvar/postar).
+ * @docs docs/components/videoMuxer.md
  */
+import { Directory, File, Paths } from "expo-file-system";
 
-/**
- * Recebe o progresso da exportação, de 0 a 100. Só é chamado quando o device
- * sabe informar de fato — se nunca for chamado, o indicador deve permanecer
- * indefinido em vez de fingir avanço (contrato C-04).
- */
 export type OnProgresso = (progresso: number) => void;
 
-/**
- * Apaga os .mp4 de exportações anteriores (T040).
- *
- * Medido no device: cada pacote pesa ~15 MB e **nada nunca apagava** —
- * `cache/synesthesia-video` estava com **834 MB** depois de um dia de uso, de
- * um cache total de 1,27 GB. O usuário não tem como saber disso nem como
- * limpar sem ir nas configurações do Android.
- *
- * Roda **antes** de gerar o novo arquivo, e não depois de compartilhar: assim
- * o vídeo que o usuário ainda pode estar vendo ou baixando na tela de
- * postagem nunca é o que se apaga. Best-effort — falhar aqui não pode
- * atrapalhar a exportação, que é o que o usuário pediu.
- */
 function limparPacotesAntigos(dir: Directory): void {
   try {
     for (const item of dir.list()) {
-      if (item instanceof File && item.name.endsWith('.mp4')) item.delete();
+      if (item instanceof File && item.name.endsWith(".mp4")) item.delete();
     }
   } catch (error) {
-    console.warn('[videoMuxer] nao deu para limpar pacotes antigos:', error);
+    console.warn("[videoMuxer] nao deu para limpar pacotes antigos:", error);
   }
 }
 
@@ -49,25 +23,25 @@ export async function muxImageAndAudio(params: {
 }): Promise<string | null> {
   let inscricao: { remove: () => void } | null = null;
   try {
-    // Import dinâmico: em runtimes sem o módulo nativo (Expo Go), a falha
-    // fica isolada nesta função em vez de quebrar o bundle inteiro.
-    const { default: VideoMuxer } = await import('../../modules/video-muxer/src/VideoMuxerModule');
+    const { default: VideoMuxer } =
+      await import("../../modules/video-muxer/src/VideoMuxerModule");
 
-    const outputDir = new Directory(Paths.cache, 'synesthesia-video');
+    const outputDir = new Directory(Paths.cache, "synesthesia-video");
     if (!outputDir.exists) outputDir.create({ intermediates: true });
     limparPacotesAntigos(outputDir);
     const output = new File(outputDir, `pacote-${Date.now()}.mp4`);
 
     if (params.onProgresso) {
       const notificar = params.onProgresso;
-      // `addListener` pode não existir em runtimes antigos do módulo; a
-      // exportação não pode falhar por causa de um extra informativo (C-01).
+
       try {
-        inscricao = VideoMuxer.addListener('onProgress', ({ progresso, estado }) => {
-          // `iniciando` não é avanço, é só o aviso de que começou — repassá-lo
-          // como 0 faria a barra "zerar" visualmente a cada exportação.
-          if (estado === 'exportando' || estado === 'concluido') notificar(progresso);
-        });
+        inscricao = VideoMuxer.addListener(
+          "onProgress",
+          ({ progresso, estado }) => {
+            if (estado === "exportando" || estado === "concluido")
+              notificar(progresso);
+          },
+        );
       } catch {
         inscricao = null;
       }
@@ -77,11 +51,14 @@ export async function muxImageAndAudio(params: {
       params.imageUri,
       params.audioUri,
       output.uri,
-      params.durationSeconds
+      params.durationSeconds,
     );
     return uri;
   } catch (error) {
-    console.warn('[videoMuxer] falha ao gerar .mp4, mantendo pacote sem vídeo:', error);
+    console.warn(
+      "[videoMuxer] falha ao gerar .mp4, mantendo pacote sem vídeo:",
+      error,
+    );
     return null;
   } finally {
     inscricao?.remove();

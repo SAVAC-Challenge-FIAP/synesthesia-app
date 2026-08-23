@@ -1,6 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import React, { useEffect, useState } from 'react';
+/**
+ * @docs docs/components/MusicSheet.md
+ */
+import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -8,95 +11,67 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { vibeById } from '@/constants/vibes';
-import { LoaderMarca } from '@/components/LoaderMarca';
-import { getSuggestions } from '@/services/music';
-import { audioEmCache } from '@/services/mediaStorage';
-import { useCaptureStore } from '@/stores/useCaptureStore';
-import { useTasteStore } from '@/stores/useTasteStore';
-import { colors, fonts, hitSlops, radii } from '@/theme/tokens';
-import { MusicSuggestion, PapelFaixa } from '@/types';
+import { vibeById } from "@/constants/vibes";
+import { LoaderMarca } from "@/components/LoaderMarca";
+import { getSuggestions } from "@/services/music";
+import { audioEmCache } from "@/services/mediaStorage";
+import { useCaptureStore } from "@/stores/useCaptureStore";
+import { useTasteStore } from "@/stores/useTasteStore";
+import { colors, fonts, hitSlops, radii } from "@/theme/tokens";
+import { MusicSuggestion, PapelFaixa } from "@/types";
 
-/**
- * Rótulo do papel de cada faixa (T058). Não é enfeite: uma faixa de artista
- * desconhecido no meio de três conhecidas parece erro da curadoria. Dito o
- * papel, a mesma faixa vira proposta — que é o Princípio II.
- */
 const PAPEL_ROTULO: Record<PapelFaixa, string> = {
-  afinidade: 'DO SEU GOSTO',
-  certeira: 'CERTEIRA',
-  descoberta: 'DESCOBERTA',
-  curinga: 'CURINGA',
+  afinidade: "DO SEU GOSTO",
+  certeira: "CERTEIRA",
+  descoberta: "DESCOBERTA",
+  curinga: "CURINGA",
 };
 
 const PAPEL_ESTILO: Record<PapelFaixa, { color: string }> = {
   afinidade: { color: colors.ruby },
-  certeira: { color: 'rgba(9,5,6,0.45)' },
-  // A descoberta é a razão de ser da Fase 14; ganha o âmbar, que é a cor de
-  // acento da música no produto.
-  descoberta: { color: '#8A5A00' },
-  curinga: { color: 'rgba(9,5,6,0.45)' },
+  certeira: { color: "rgba(9,5,6,0.45)" },
+
+  descoberta: { color: "#8A5A00" },
+  curinga: { color: "rgba(9,5,6,0.45)" },
 };
 
-/**
- * Modal "Trocar música" (US4) — superfície clara (parchment) do Figma.
- * Confirmar aplica a escolha; Cancelar não muda nada (constituição II).
- */
 export function MusicSheet({ onClose }: { onClose: () => void }) {
   const session = useCaptureStore((s) => s.session);
   const patch = useCaptureStore((s) => s.patch);
   const registrarEscolha = useTasteStore((s) => s.registrarEscolha);
 
-  // Modal na própria janela: Cancelar / Confirmar escolha só ficam inteiramente
-  // tocáveis com o inset real do aparelho (ver baseline.md T004).
   const insets = useSafeAreaInsets();
-  const [escolhida, setEscolhida] = useState<MusicSuggestion | null>(session?.musica ?? null);
+  const [escolhida, setEscolhida] = useState<MusicSuggestion | null>(
+    session?.musica ?? null,
+  );
   const [tocandoId, setTocandoId] = useState<string | null>(null);
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
 
-  // NÃO pause o player num cleanup de unmount aqui.
-  //
-  // Havia um `useEffect(() => () => player.pause(), [player])` neste ponto, posto
-  // no T044 como reforço para o caso de o modal fechar por um caminho inesperado.
-  // Ele quebrava a troca de música: no unmount, o `useAudioPlayer` libera o
-  // player (shared object) **antes** deste cleanup rodar, e chamar `pause()` num
-  // objeto liberado estoura com `ERR_USING_RELEASED_SHARED_OBJECT` — tela
-  // vermelha em cima do usuário.
-  //
-  // O reforço também era desnecessário: liberar o player já interrompe a
-  // reprodução. Quem garante o silêncio nos caminhos normais é o `pause()`
-  // explícito de `cancelar()` e `confirmar()`, e o botão físico de voltar cai em
-  // `cancelar` via `onRequestClose`.
-
-  // Busca sob demanda quando o usuário abriu sem sugestões prontas
   useEffect(() => {
     const s = useCaptureStore.getState().session;
-    if (!s || s.sugestoes.length > 0 || s.curadoria === 'carregando') return;
-    patch({ curadoria: 'carregando' });
+    if (!s || s.sugestoes.length > 0 || s.curadoria === "carregando") return;
+    patch({ curadoria: "carregando" });
     getSuggestions(vibeById(s.vibeId))
       .then((sugestoes) =>
         patch({
           sugestoes,
-          // A busca traz opções, não uma escolha: sem trilha aplicada o estado
-          // continua `indisponivel` e a postagem segue exigindo confirmação.
-          curadoria: useCaptureStore.getState().session?.musica ? 'pronta' : 'indisponivel',
+
+          curadoria: useCaptureStore.getState().session?.musica
+            ? "pronta"
+            : "indisponivel",
         }),
       )
-      .catch(() => patch({ curadoria: 'indisponivel' }));
+      .catch(() => patch({ curadoria: "indisponivel" }));
   }, [patch]);
 
   if (!session) return null;
   const vibe = vibeById(session.vibeId);
 
   const tocar = (m: MusicSuggestion) => {
-    // Arquivo em cache primeiro, URL do Deezer como reserva (T106): quem
-    // reabriu a mídia pela galeria já teve as candidatas baixadas em segundo
-    // plano, então aqui a prévia toca do disco — inclusive sem rede. Sem cache
-    // (captura nova, download que falhou), segue pela URL, como antes.
     const fonte = audioEmCache(m.id) ?? m.previewUrl;
     if (!fonte) return;
     if (tocandoId === m.id && status.playing) {
@@ -111,17 +86,11 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
 
   const confirmar = () => {
     player.pause();
-    // O recorte escolhido **sobrevive** à troca de faixa: toda prévia do Deezer
-    // tem os mesmos 30s, então "quero 10 segundos de vídeo" continua valendo com
-    // a música nova. Antes isto resetava para 0–30 e jogava a escolha fora.
+
     if (escolhida) {
-      // `audioUri: null` é obrigatório aqui (T102): o .mp3 em disco é da faixa
-      // anterior, e sem zerar o campo o player tocaria a música velha com o
-      // nome da nova. O próximo Salvar baixa a prévia certa.
-      patch({ musica: escolhida, curadoria: 'pronta', audioUri: null });
-      // Sinal forte de gosto (T057): ela abriu a lista e trocou. Fica no
-      // aparelho — ver a nota de LGPD em `useTasteStore`.
-      registrarEscolha(escolhida, session.vibeId, 'manual');
+      patch({ musica: escolhida, curadoria: "pronta", audioUri: null });
+
+      registrarEscolha(escolhida, session.vibeId, "manual");
     }
     onClose();
   };
@@ -134,9 +103,13 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
   return (
     <Modal visible transparent animationType="slide" onRequestClose={cancelar}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 8, 28) }]}>
-          {/* Mesma queda da galeria (feature 005, D4): texto livre quando o
-              Gemini leu a cena, catálogo com emoji quando não. */}
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: Math.max(insets.bottom + 8, 28) },
+          ]}
+        >
+          {}
           <Text style={styles.kicker} numberOfLines={1}>
             {session.vibe
               ? `VIBE ${session.vibe.toUpperCase()}`
@@ -145,14 +118,15 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
           <Text style={styles.title}>Escolha a vibe sonora.</Text>
 
           <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-            {session.curadoria === 'carregando' ? (
+            {session.curadoria === "carregando" ? (
               <View style={styles.loading}>
                 <LoaderMarca tamanho={30} />
                 <Text style={styles.loadingText}>BUSCANDO SUGESTÕES...</Text>
               </View>
             ) : session.sugestoes.length === 0 ? (
               <Text style={styles.loadingText}>
-                Sem sugestões agora (verifique a conexão). Você pode salvar sem áudio.
+                Sem sugestões agora (verifique a conexão). Você pode salvar sem
+                áudio.
               </Text>
             ) : (
               session.sugestoes.map((m) => {
@@ -184,10 +158,13 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
                     <Pressable
                       onPress={() => tocar(m)}
                       hitSlop={8}
-                      style={[styles.playBtn, !m.previewUrl && { opacity: 0.3 }]}
+                      style={[
+                        styles.playBtn,
+                        !m.previewUrl && { opacity: 0.3 },
+                      ]}
                     >
                       <Ionicons
-                        name={tocando ? 'pause' : 'play'}
+                        name={tocando ? "pause" : "play"}
                         size={15}
                         color={colors.parchment}
                       />
@@ -199,7 +176,11 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
           </ScrollView>
 
           <View style={styles.actions}>
-            <Pressable style={styles.cancel} hitSlop={hitSlops.botao} onPress={cancelar}>
+            <Pressable
+              style={styles.cancel}
+              hitSlop={hitSlops.botao}
+              onPress={cancelar}
+            >
               <Text style={styles.cancelText}>Cancelar</Text>
             </Pressable>
             <Pressable
@@ -220,11 +201,11 @@ export function MusicSheet({ onClose }: { onClose: () => void }) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(9,5,6,0.6)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(9,5,6,0.6)",
+    justifyContent: "flex-end",
   },
   sheet: {
-    maxHeight: '80%',
+    maxHeight: "80%",
     backgroundColor: colors.parchment,
     borderTopLeftRadius: radii.modal,
     borderTopRightRadius: radii.modal,
@@ -249,27 +230,27 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   loading: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     paddingVertical: 16,
   },
   loadingText: {
-    color: 'rgba(9,5,6,0.6)',
+    color: "rgba(9,5,6,0.6)",
     fontFamily: fonts.labelLight,
     fontSize: 11,
     letterSpacing: 1,
   },
   item: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(9,5,6,0.15)',
+    borderColor: "rgba(9,5,6,0.15)",
     borderRadius: radii.card,
     padding: 12,
     marginBottom: 10,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: "rgba(255,255,255,0.4)",
   },
   itemAtiva: {
     borderColor: colors.ruby,
@@ -293,15 +274,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   itemArtist: {
-    color: 'rgba(9,5,6,0.65)',
+    color: "rgba(9,5,6,0.65)",
     fontFamily: fonts.label,
     fontSize: 12,
   },
   itemReason: {
-    color: 'rgba(9,5,6,0.5)',
+    color: "rgba(9,5,6,0.5)",
     fontFamily: fonts.labelLight,
     fontSize: 10,
-    fontStyle: 'italic',
+    fontStyle: "italic",
     marginTop: 2,
   },
   playBtn: {
@@ -309,21 +290,21 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     backgroundColor: colors.ruby,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginTop: 8,
   },
   cancel: {
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(9,5,6,0.3)',
+    borderColor: "rgba(9,5,6,0.3)",
     borderRadius: radii.card,
     paddingVertical: 14,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelText: {
     color: colors.ink,
@@ -335,7 +316,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ruby,
     borderRadius: radii.card,
     paddingVertical: 14,
-    alignItems: 'center',
+    alignItems: "center",
   },
   confirmText: {
     color: colors.parchment,

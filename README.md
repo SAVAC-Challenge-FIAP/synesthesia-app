@@ -17,7 +17,7 @@
 
 **Synesthesia** é o app mobile da equipe **SAVAC** para o **JOVI Challenge — FIAP 2026**. Ele redefine a câmera do smartphone como uma experiência **multimodal e contextual**: traduz automaticamente o contexto visual de uma cena em **filtros** e **trilha sonora** harmônicos, entregando um "pacote sensorial" (foto + filtro + música) pronto para compartilhar — com o mínimo de atrito de decisão.
 
-Este repositório é a evolução **mobile (Expo / React Native)** do MVP funcional em terminal entregue na disciplina de Python. Os documentos-fonte de requisitos e arquitetura estão em [`docs/`](docs/).
+Este repositório é a evolução **mobile (Expo / React Native)** do MVP funcional em terminal entregue na disciplina de Python. Para o estado atual do projeto (feature ativa, versão, o que falta), veja [`docs/ESTADO.md`](docs/ESTADO.md) — é o ponto de entrada da documentação.
 
 ## ✨ Pilares
 
@@ -27,33 +27,26 @@ Este repositório é a evolução **mobile (Expo / React Native)** do MVP funcio
 
 ## 📱 Preview
 
-Capturas reais do app rodando em release build (Redmi Note 8 Pro, Android 10):
+Capturas reais da versão em produção (1.3.0), tiradas em dev build no Redmi Note 8 Pro:
 
 <div align="center">
-<img src="docs/preview/fase19-20/abertura.png" width="220" alt="Abertura animada com a marca" />
-<img src="docs/preview/fase19-20/camera-43.png" width="220" alt="Visor no enquadramento 4:3, centralizado na área útil" />
-<img src="docs/preview/fase19-20/camera-169.png" width="220" alt="Visor no enquadramento 16:9, ancorado nos controles" />
-<img src="docs/preview/fase19-20/galeria.png" width="220" alt="Galeria com cards uniformes" />
-<img src="docs/preview/fase19-20/postar.png" width="220" alt="Modal de postagem com o vídeo pronto" />
+<img src="docs/previews/1.3.0/camera.png" width="220" alt="Visor da câmera com o carrossel de filtros e a marca Synesthesia" />
+<img src="docs/previews/1.3.0/captura.png" width="220" alt="Modal de Captura com a vibe lida pela IA e a trilha curada" />
+<img src="docs/previews/1.3.0/trocar-musica.png" width="220" alt="Modal Trocar Música com quatro sugestões do Gemini" />
 </div>
 
 <div align="center">
-<sub><b>Abertura</b> — a marca em movimento, sem piscada entre splash e app · <b>Visor</b> — largura cheia em qualquer enquadramento, cada um com sua âncora na tela · <b>Galeria</b> — miniaturas uniformes, reabrir não refaz a curadoria · <b>Postar</b> — um botão só, pela folha de compartilhamento do sistema</sub>
-</div>
-
-### Novidades da 1.2.1
-
-<div align="center">
-<img src="docs/preview/v1.2.1/espera-dourada.png" width="220" alt="Os tres lugares reservados em ouro, com reflexos atravessando, enquanto a curadoria corre" />
-<img src="docs/preview/v1.2.1/looks-autorais.png" width="220" alt="Tres looks com nomes autorais lidos da cena, ao lado dos presets" />
-<img src="docs/preview/v1.2.1/galeria-com-trilha.png" width="220" alt="Galeria com os momentos e suas trilhas preservadas" />
+<img src="docs/previews/1.3.0/ajustes.png" width="220" alt="Tela de Ajustes com Leitura da cena (IA) e Usar localização" />
+<img src="docs/previews/1.3.0/galeria.png" width="220" alt="Galeria com os momentos salvos, cada um com sua vibe e trilha" />
+<img src="docs/previews/1.3.0/postagem.png" width="220" alt="Confirmação de postagem com o vídeo gerado, pronto para compartilhar" />
 </div>
 
 <div align="center">
-<sub><b>Espera</b> — o lugar do look é ouro em movimento, não caixa vazia · <b>Looks</b> — nomes lidos da própria cena, nunca o nome de um preset repetido · <b>Galeria</b> — a trilha volta com o momento, agora do disco e sem rede</sub>
+<sub><b>Câmera</b> — visor ao vivo, carrossel de 8 filtros locais · <b>Captura</b> — vibe lida pelo Gemini ("Vigilante Noturno · Gotham Noturna") e a trilha já curada · <b>Trocar Música</b> — quatro sugestões com papel (certeira/curinga/descoberta) e justificativa · <b>Ajustes</b> — leitura da cena e localização, ambas opt-in e revogáveis · <b>Galeria</b> — momentos persistidos com vibe e trilha, reabrir não refaz a curadoria · <b>Postagem</b> — imagem + trilha num só `.mp4`, pronto para a folha de compartilhamento do sistema</sub>
 </div>
 
-Mais capturas (por fase de trabalho) em [`docs/preview/`](docs/preview/).
+Mais capturas em [`docs/previews/1.3.0/`](docs/previews/1.3.0/). A cada release, a pasta da versão
+atual substitui a anterior — ver [`docs/previews/README.md`](docs/previews/README.md).
 
 ## 📦 Baixar o APK
 
@@ -101,7 +94,7 @@ A geração usa o módulo local [`modules/video-muxer`](modules/video-muxer), co
 npm run android        # compila nativo e instala no device conectado
 ```
 
-Utilitários de desenvolvimento em [`scripts/dev-android.sh`](scripts/dev-android.sh) (`build`, `log`, `shot`, `video`).
+Utilitários de desenvolvimento em [`scripts/dev-android.sh`](scripts/dev-android.sh) (`build`, `log`, `shot`, `video`). Numa máquina nova, copie `scripts/dev-android.local.sh.example` para `scripts/dev-android.local.sh` e ajuste ao seu device (esse arquivo copiado é local, fora do git).
 
 ### Publicar um APK release
 
@@ -115,7 +108,7 @@ cd android && ./gradlew assembleRelease \
   -PreactNativeArchitectures=armeabi-v7a,arm64-v8a   # ~60MB; sem isso, ~100MB (inclui ABIs de emulador)
 ```
 
-O APK sai em `android/app/build/outputs/apk/release/app-release.apk`. A keystore e as senhas são geradas na primeira execução do script e ficam **fora do git** (`android/keystore.properties`, `android/app/*.keystore`) — guarde uma cópia em lugar seguro, porque perdê-la impede atualizar um app já publicado sob a mesma identidade.
+O APK sai em `android/app/build/outputs/apk/release/app-release.apk`. Processo completo, incluindo onde a keystore de assinatura vive de fato, em [`docs/runbooks/build-e-deploy.md`](docs/runbooks/build-e-deploy.md).
 
 ## 🛠️ Stack
 
@@ -164,11 +157,21 @@ Tipografia: **Nunito** (display) + **Lato** (labels técnicas). Filtros: Vivid �
 │   ├── stores/                   # zustand: ajustes, galeria, sessão de captura, gosto musical e visual
 │   └── theme/                    # Design tokens (ruby/amber/ink/parchment, Nunito + Lato)
 ├── CLAUDE.md                     # Guia para agentes de código
-├── docs/                         # Documentos-fonte (requisitos + arquitetura) + previews
+├── docs/
+│   ├── ESTADO.md                  # Ponto de entrada: feature ativa, versão, o que falta
+│   ├── adr/                       # Decisões técnicas que atravessam vários arquivos, numeradas
+│   ├── components/                # Um .md por arquivo de código (ex-comentário inline)
+│   ├── research/                  # Material-fonte (specs do MVP em Python)
+│   ├── rules/                     # Regras de processo (código, segredos)
+│   ├── runbooks/                  # Como fazer: device, build/deploy, armadilhas conhecidas
+│   ├── previews/                  # Capturas da versão em produção (só a atual)
+│   └── _archive/                  # Documentos obsoletos, mantidos por histórico
 ├── specs/
 │   ├── 001-synesthesia-mvp/      # Especificação original (Spec Kit)
 │   ├── 002-qa-lapidacao-v1/      # QA e lapidação pós-MVP — histórico de bugs e decisões
-│   └── 003-looks-sugeridos/      # Três looks sugeridos com memória de gosto (ESTADO.md tem o progresso)
+│   ├── 003-looks-sugeridos/      # Três looks sugeridos com memória de gosto
+│   ├── 004-qa-pos-1.2.0/         # QA pós-1.2.0
+│   └── 005-vibe-pela-ia/         # Vibe definida pela IA (release 1.3.0)
 └── .specify/                     # Constituição, templates e workflow do Spec Kit
 ```
 

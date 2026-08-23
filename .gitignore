@@ -52,3 +52,11 @@ coverage/
 android/keystore.properties
 android/app/*.keystore
 !android/app/debug.keystore
+
+# Cofre local das chaves reais (keystore de release, credenciais) — dentro do
+# repo para nunca se perder, mas fora do git e fora do build. Ver
+# docs/rules/chaves-e-segredos.md.
+/keys/
+
+# Config pessoal dos scripts de dev (IP do device, etc.) — ver *.example versionado
+scripts/dev-android.local.sh

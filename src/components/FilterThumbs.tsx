@@ -1,4 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+/**
+ * @docs docs/components/FilterThumbs.md
+ */
+import React, { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -6,18 +9,16 @@ import {
   Text,
   useWindowDimensions,
   View,
-} from 'react-native';
+} from "react-native";
 
-import { FilteredImage } from '@/components/FilteredImage';
-import { previaParaSkia } from '@/services/previaFoto';
-import { FILTERS } from '@/constants/filters';
-import { colors, fonts, radii } from '@/theme/tokens';
-import { FilterId } from '@/types';
+import { FilteredImage } from "@/components/FilteredImage";
+import { previaParaSkia } from "@/services/previaFoto";
+import { FILTERS } from "@/constants/filters";
+import { colors, fonts, radii } from "@/theme/tokens";
+import { FilterId } from "@/types";
 
 interface Props {
-  /** URI da foto da sessão — é ela que aparece dentro de cada miniatura */
   photoUri: string;
-  /** null = "Original" (sem filtro, T-0B) */
   ativo: FilterId | null;
   onSelect: (id: FilterId | null) => void;
 }
@@ -28,28 +29,18 @@ interface ThumbItem {
   emoji: string;
 }
 
-/** "Original" + os 8 filtros: a foto sem filtro é uma escolha de primeira classe. */
-const ITEMS: ThumbItem[] = [{ id: null, nome: 'Original', emoji: '📷' }, ...FILTERS];
+const ITEMS: ThumbItem[] = [
+  { id: null, nome: "Original", emoji: "📷" },
+  ...FILTERS,
+];
 
-/** Figma 468:950 — miniatura 70×93, intervalo de 10 (frames em x = 0, 80, 160...) */
 const LARGURA = 70;
 const ALTURA = 93;
 const GAP = 10;
 const PAD_HORIZONTAL = 16;
 
-/**
- * Acima desta ampliação de fonte do sistema o nome sai só da miniatura
- * selecionada. Em 70px de largura o rótulo já vive em 9px; esticá-lo mais
- * truncaria os oito ao mesmo tempo. Era a alternativa combinada no T054, e o
- * nome do filtro em caixa alta continua visível na linha "FILTRO" logo acima.
- */
 const LIMITE_FONTE_AMPLIADA = 1.3;
 
-/**
- * Miniatura memoizada — mesmo motivo do `Chip` do carrossel de emoji, e mais
- * forte aqui: sem memo, cada troca de filtro redesenharia as nove imagens
- * filtradas, não nove textos.
- */
 const Thumb = React.memo(function Thumb({
   item,
   photoUri,
@@ -69,12 +60,15 @@ const Thumb = React.memo(function Thumb({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={`Filtro ${item.nome}`}
-      // 70×93 já passa folgado do alvo mínimo de 48dp (FR-Q02): sem hitSlop.
+
       style={[styles.thumb, selected && styles.thumbSelecionada]}
     >
-      <FilteredImage uri={photoUri} filtroId={item.id} style={StyleSheet.absoluteFill} />
-      {/* Véu: o emoji e o nome precisam ler sobre qualquer foto, inclusive
-          uma estourada de sol. */}
+      <FilteredImage
+        uri={photoUri}
+        filtroId={item.id}
+        style={StyleSheet.absoluteFill}
+      />
+      {}
       <View pointerEvents="none" style={styles.veu} />
       <Text style={styles.emoji}>{item.emoji}</Text>
       {mostrarNome ? (
@@ -89,33 +83,10 @@ const Thumb = React.memo(function Thumb({
   );
 });
 
-/**
- * Carrossel de filtros do **modal de captura**: a própria foto da sessão
- * miniaturizada com cada filtro aplicado, o emoji ao centro e o nome embaixo
- * (Figma 462:926 → "Filtros disponiveis", acima do bloco de música).
- *
- * O visor da câmera continua com o `FilterCarousel` de chips de emoji, e isso
- * é de propósito: lá não existe foto capturada para miniaturizar. Os dois
- * carrosséis são diferentes porque as duas telas são diferentes — não é
- * inconsistência a ser "corrigida".
- */
 export function FilterThumbs({ photoUri, ativo, onSelect }: Props) {
   const { fontScale } = useWindowDimensions();
   const mostrarNomeSempre = fontScale <= LIMITE_FONTE_AMPLIADA;
 
-  /**
-   * As nove miniaturas leem a cópia reduzida, não a foto de 64 MP.
-   *
-   * Cada `<Image>` decodifica seu próprio bitmap: nove decodificações de um
-   * JPEG de ~5,7 MB para exibir em 70×93px era boa parte do 1 GB que o modal
-   * de Captura chegou a ocupar (medido em 2026-08-21). A mesma cópia de
-   * ~435 KB serve as nove — e `previaParaSkia` memoiza por `uri`, então a
-   * prévia grande e as miniaturas compartilham o mesmo arquivo, gerado uma
-   * vez só.
-   *
-   * Enquanto o resize não termina, as miniaturas usam a original: é o
-   * comportamento de antes, e só dura o primeiro instante.
-   */
   const [uriLeve, setUriLeve] = useState<string | null>(null);
   useEffect(() => {
     let vivo = true;
@@ -148,7 +119,7 @@ export function FilterThumbs({ photoUri, ativo, onSelect }: Props) {
     <FlatList
       horizontal
       data={ITEMS}
-      keyExtractor={(f) => f.id ?? 'original'}
+      keyExtractor={(f) => f.id ?? "original"}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.row}
       renderItem={renderItem}
@@ -166,31 +137,30 @@ const styles = StyleSheet.create({
     width: LARGURA,
     height: ALTURA,
     borderRadius: radii.card,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.ink,
-    // A borda existe sempre, transparente quando não selecionada: assim a
-    // seleção não empurra as vizinhas 2px para o lado a cada troca.
+
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: "transparent",
   },
   thumbSelecionada: {
     borderColor: colors.amber,
   },
   veu: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(9,5,6,0.28)',
+    backgroundColor: "rgba(9,5,6,0.28)",
   },
   emoji: {
     fontSize: 24,
   },
   nome: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 6,
     left: 2,
     right: 2,
-    textAlign: 'center',
+    textAlign: "center",
     color: colors.parchment,
     fontFamily: fonts.labelForte,
     fontSize: 9,

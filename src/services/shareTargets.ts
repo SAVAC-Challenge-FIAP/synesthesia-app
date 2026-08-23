@@ -1,91 +1,56 @@
-import { Platform } from 'react-native';
+/**
+ * @docs docs/components/shareTargets.md
+ */
+import { Platform } from "react-native";
 
-import type { DestinoNativo } from '../../modules/share-target/src/ShareTarget.types';
+import type { DestinoNativo } from "../../modules/share-target/src/ShareTarget.types";
 
 export type { DestinoNativo };
 
-/**
- * Destinos reais de compartilhamento do aparelho (`modules/share-target`).
- *
- * Mesma postura do `videoMuxer.ts`: o módulo nativo só existe em development
- * build, então tudo aqui é best-effort. Falhou, não existe, é Expo Go ou é
- * web → lista vazia, e a interface cai sozinha no botão da folha do sistema,
- * que é o comportamento que o app já tinha.
- */
-
-/**
- * Ordem de preferência da grade. Não é uma lista de *quem aparece* — quem
- * aparece é quem está instalado —, é só quem vai **na frente** quando houver
- * mais destinos que espaço. Sem isto o `PackageManager` devolveria a ordem
- * dele, e "Gmail" ou "Arquivos" tomariam o lugar do Instagram na primeira
- * linha, que é onde os olhos caem.
- */
 const PREFERIDOS = [
-  'com.instagram.android',
-  'com.zhiliaoapp.musically', // TikTok global
-  'com.ss.android.ugc.trill', // TikTok em algumas regiões
-  'com.whatsapp',
-  'com.whatsapp.w4b', // WhatsApp Business
-  'com.linkedin.android',
-  'com.twitter.android',
-  'com.x.android',
-  'org.telegram.messenger',
-  'com.facebook.katana',
-  'com.snapchat.android',
+  "com.instagram.android",
+  "com.zhiliaoapp.musically",
+  "com.ss.android.ugc.trill",
+  "com.whatsapp",
+  "com.whatsapp.w4b",
+  "com.linkedin.android",
+  "com.twitter.android",
+  "com.x.android",
+  "org.telegram.messenger",
+  "com.facebook.katana",
+  "com.snapchat.android",
 ];
 
-/** MIME do que de fato vai no Intent: o .mp4 quando existe, senão a imagem. */
 export function mimeDoPacote(temVideo: boolean): string {
-  return temVideo ? 'video/mp4' : 'image/jpeg';
+  return temVideo ? "video/mp4" : "image/jpeg";
 }
 
-export async function listarDestinos(mimeType: string): Promise<DestinoNativo[]> {
-  if (Platform.OS !== 'android') return [];
+export async function listarDestinos(
+  mimeType: string,
+): Promise<DestinoNativo[]> {
+  if (Platform.OS !== "android") return [];
   try {
-    const { default: ShareTarget } = await import(
-      '../../modules/share-target/src/ShareTargetModule'
-    );
+    const { default: ShareTarget } =
+      await import("../../modules/share-target/src/ShareTargetModule");
     return ordenar(ShareTarget.listarDestinos(mimeType));
   } catch (error) {
-    console.warn('[shareTargets] modulo nativo indisponivel, usando folha do sistema:', error);
+    console.warn(
+      "[shareTargets] modulo nativo indisponivel, usando folha do sistema:",
+      error,
+    );
     return [];
   }
 }
 
-/** Preferidos na ordem da lista; o resto depois, preservando a ordem do sistema. */
 function posicao(pacote: string): number {
   const i = PREFERIDOS.indexOf(pacote);
   return i === -1 ? PREFERIDOS.length : i;
 }
 
-/**
- * Ordena em duas faixas — apps preferidos, depois o resto — e faz **rodízio
- * dentro de cada faixa**, um destino por app antes de repetir qualquer um.
- *
- * Os dois problemas que isto resolve foram vistos no device, nesta ordem:
- *
- * 1. Um mesmo pacote registra várias activities — o Instagram publica três
- *    (Feed, Stories, Reels). Ordenando só por preferência, ele tomava as três
- *    primeiras vagas e o WhatsApp instalado não aparecia.
- * 2. Corrigido só com "um por app antes de repetir", o tiro saiu pela culatra:
- *    Stories e Reels perderam a vaga para "Adicionar ao Maps" e "Mensagens",
- *    que também recebem `SEND` e não são para onde ninguém posta um pacote
- *    sensorial. Um segundo destino do Instagram vale mais que um primeiro do
- *    Maps — daí o rodízio ser por faixa, e não global.
- *
- * O resultado é o que se queria, sem hard-code de "Stories": quem declara essas
- * entradas é o próprio Instagram, e o app só decide a ordem em que cabem.
- */
 function ordenar(destinos: DestinoNativo[]): DestinoNativo[] {
   const porPacote = new Map<string, DestinoNativo[]>();
   const jaVistos = new Set<string>();
   for (const d of destinos) {
-    // Duas activities do mesmo app com o mesmo rótulo são, para quem olha, o
-    // mesmo botão duas vezes — medido no device: o Instagram publica **duas**
-    // entradas chamadas "Feed". Repetir o tile seria recriar, em outra forma,
-    // exatamente o defeito que esta task veio consertar (seis botões idênticos
-    // levando ao mesmo lugar). Fica a primeira, que é a de maior prioridade
-    // para o sistema.
     const identidade = `${d.pacote} ${d.nome}`;
     if (jaVistos.has(identidade)) continue;
     jaVistos.add(identidade);
@@ -95,7 +60,6 @@ function ordenar(destinos: DestinoNativo[]): DestinoNativo[] {
     else porPacote.set(d.pacote, [d]);
   }
 
-  // Insertion order = ordem do sistema, que é o desempate dos não-preferidos.
   const pacotes = [...porPacote.keys()];
   const preferidos = pacotes
     .filter((p) => PREFERIDOS.includes(p))
@@ -105,13 +69,15 @@ function ordenar(destinos: DestinoNativo[]): DestinoNativo[] {
   return [...rodizio(preferidos, porPacote), ...rodizio(resto, porPacote)];
 }
 
-/** Uma volta por vez: o i-ésimo destino de cada app, na ordem dos apps. */
 function rodizio(
   pacotes: string[],
-  porPacote: Map<string, DestinoNativo[]>
+  porPacote: Map<string, DestinoNativo[]>,
 ): DestinoNativo[] {
   const saida: DestinoNativo[] = [];
-  const maior = pacotes.reduce((max, p) => Math.max(max, porPacote.get(p)!.length), 0);
+  const maior = pacotes.reduce(
+    (max, p) => Math.max(max, porPacote.get(p)!.length),
+    0,
+  );
   for (let i = 0; i < maior; i++) {
     for (const pacote of pacotes) {
       const destino = porPacote.get(pacote)![i];
@@ -121,10 +87,6 @@ function rodizio(
   return saida;
 }
 
-/**
- * Abre o destino direto. Devolve `false` quando não deu — e aí quem chamou
- * deve cair na folha do sistema, em vez de deixar o toque sem resposta.
- */
 export async function compartilharEm(params: {
   destino: DestinoNativo;
   caminho: string;
@@ -132,19 +94,18 @@ export async function compartilharEm(params: {
   texto: string | null;
 }): Promise<boolean> {
   try {
-    const { default: ShareTarget } = await import(
-      '../../modules/share-target/src/ShareTargetModule'
-    );
+    const { default: ShareTarget } =
+      await import("../../modules/share-target/src/ShareTargetModule");
     await ShareTarget.compartilharEm(
       params.destino.pacote,
       params.destino.atividade,
       params.caminho,
       params.mimeType,
-      params.texto
+      params.texto,
     );
     return true;
   } catch (error) {
-    console.warn('[shareTargets] falha ao abrir destino direto:', error);
+    console.warn("[shareTargets] falha ao abrir destino direto:", error);
     return false;
   }
 }

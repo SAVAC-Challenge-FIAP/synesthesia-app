@@ -7,16 +7,25 @@
 #   ./scripts/dev-android.sh video    puxa o último .mp4 gerado pelo app
 #   ./scripts/dev-android.sh conectar reconecta por Wi-Fi (após reboot, precisa do cabo)
 #
-# O device fica em ADB_DEVICE (Wi-Fi). Depois de um reboot do aparelho o modo
-# tcpip cai: plugue o cabo e rode `conectar` de novo.
+# Config pessoal (IP do device, toolchain) em scripts/dev-android.local.sh,
+# fora do git — copie scripts/dev-android.local.sh.example na primeira vez.
+# Depois de um reboot do aparelho o modo tcpip cai: plugue o cabo e rode
+# `conectar` de novo.
+
+RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ -f "$RAIZ/scripts/dev-android.local.sh" ]; then
+  source "$RAIZ/scripts/dev-android.local.sh"
+else
+  echo "⚠️  scripts/dev-android.local.sh não existe — copie de dev-android.local.sh.example e ajuste ao seu device." >&2
+fi
 
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home}"
 export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
 
-ADB_DEVICE="${ADB_DEVICE:-192.168.15.3:5555}"
-PKG="com.savioomiodev.synesthesia"
-RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
+ADB_DEVICE="${ADB_DEVICE:?defina ADB_DEVICE em scripts/dev-android.local.sh}"
+PKG="${PKG:-com.savioomiodev.synesthesia}"
 APK="$RAIZ/android/app/build/outputs/apk/debug/app-debug.apk"
 
 adbd() { adb -s "$ADB_DEVICE" "$@"; }
@@ -51,6 +60,6 @@ case "$1" in
     adb tcpip 5555 && sleep 3 && adb connect "$ADB_DEVICE"
     ;;
   *)
-    grep '^#' "$0" | sed 's/^# \{0,1\}//' | head -14
+    grep '^#' "$0" | sed 's/^# \{0,1\}//' | head -13
     ;;
 esac

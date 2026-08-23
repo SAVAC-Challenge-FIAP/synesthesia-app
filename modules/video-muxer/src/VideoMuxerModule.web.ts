@@ -1,12 +1,14 @@
-import { registerWebModule, NativeModule } from 'expo';
+/**
+ * @docs docs/components/VideoMuxerModule.web.md
+ */
+import { registerWebModule, NativeModule } from "expo";
 
-import { VideoMuxerModuleEvents } from './VideoMuxer.types';
+import { VideoMuxerModuleEvents } from "./VideoMuxer.types";
 
-/** Sem implementação web: o muxer de vídeo é Android-only (MediaMuxer/MediaCodec). */
 class VideoMuxerModule extends NativeModule<VideoMuxerModuleEvents> {
   async muxImageAndAudio(): Promise<string> {
-    throw new Error('VideoMuxer não está disponível na web.');
+    throw new Error("VideoMuxer não está disponível na web.");
   }
 }
 
-export default registerWebModule(VideoMuxerModule, 'VideoMuxerModule');
+export default registerWebModule(VideoMuxerModule, "VideoMuxerModule");

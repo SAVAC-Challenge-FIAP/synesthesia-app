@@ -28,6 +28,9 @@ A UI segue os design tokens definidos (ruby `#8D1514`, amber `#F8A20D`, ink `#09
 - Stack fixada pelo documento de arquitetura (ver `CLAUDE.md`): Vision Camera, Skia+Reanimated, ML Kit, Zustand+AsyncStorage, Gemini+Deezer+Last.fm, expo-av, ffmpeg-kit, expo-media-library, expo-sharing.
 - Segredos apenas em variáveis de ambiente; `.env` fora do controle de versão.
 - Textos de produto e commits em **pt-BR**.
+- **Nenhum comentário em código-fonte** (`.ts`/`.tsx`). Toda explicação de decisão, contexto ou
+  motivo vive em documentação (`docs/adr/`, `docs/rules/`, ou o `ESTADO.md` da spec ativa) — nunca
+  no arquivo de código. Ver [`docs/rules/codigo.md`](../../docs/rules/codigo.md).
 
 ## Fluxo de Desenvolvimento
 
@@ -65,4 +68,17 @@ muda: o dado só sai com consentimento explícito e a pessoa pode cortar o envio
 por isso a emenda exige **justificativa própria e visível** por permissão, e não uma linha na
 letra miúda. Recusar a localização não bloqueia nada no app.
 
-**Version**: 1.2.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-08-22
+**1.3.0 — 2026-08-22 · Restrições Técnicas, proibição de comentário em código**
+*Mudança*: adicionada restrição técnica proibindo comentários em código-fonte (`.ts`/`.tsx`); toda
+explicação de decisão passa a viver em documentação (`docs/adr/`, `docs/rules/`, `ESTADO.md` da
+spec ativa).
+*Justificativa*: decisão do Sávio (2026-08-22), no mesmo pedido que centralizou a documentação em
+`docs/adr|research|rules|runbooks|_archive`. Comentário em código apodrece silenciosamente — ficou
+provado nos cabeçalhos de `useLookTasteStore.ts` e `vibeEngine.ts`, que mentiam sobre o
+comportamento atual até serem corrigidos na feature 005. Documentação em `.md` é lida antes de
+mexer no código relacionado, o que aumenta a chance real de ser mantida atualizada.
+*Efeito colateral aceito*: comentários já existentes no código precisam ser migrados para `.md`
+(ou removidos, se eram só changelog/what) à medida que os arquivos forem tocados — não há
+obrigação de uma varredura única imediata.
+
+**Version**: 1.3.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-08-22

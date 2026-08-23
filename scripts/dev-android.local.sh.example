@@ -1,0 +1,15 @@
+# Config pessoal do scripts/dev-android.sh — copie para dev-android.local.sh
+# (sem .example) e ajuste ao seu device. Esse arquivo copiado nunca vai para o
+# git (.gitignore).
+
+# IP:porta do device conectado por adb Wi-Fi. Descubra com o cabo conectado:
+#   adb tcpip 5555 && adb shell ip route
+export ADB_DEVICE="192.168.0.100:5555"
+
+# Pacote do app instalado — normalmente não precisa mudar.
+export PKG="com.savioomiodev.synesthesia"
+
+# Toolchain Android local, se não estiver em ~/.zshrc. Ver
+# docs/runbooks/build-e-deploy.md.
+# export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+# export ANDROID_HOME="/opt/homebrew/share/android-commandlinetools"

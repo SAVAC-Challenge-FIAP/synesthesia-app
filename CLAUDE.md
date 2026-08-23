@@ -11,7 +11,20 @@ Três pilares:
 2. **Fusão entre Atmosfera e Som** — imagem + música formam um único "pacote sensorial"; ao capturar, o sistema sugere trilhas coerentes com a atmosfera.
 3. **Ciclo de Vida da Mídia e Memória Persistente** — cada registro é editável e permanente; galeria inteligente permite revisitar, lapidar e exportar.
 
-> A entrega de Python (Sprint 2 — Computational Thinking) foi um **MVP funcional em terminal** (menus numéricos, dados em `filtros.json`/`musicas.json`/`galeria.json`). **Este repositório é a evolução mobile** dessa prova de conceito em React Native/Expo. Os dois `.md` na raiz (`Sprint 2 - ...`) são os documentos-fonte de requisitos e arquitetura — consulte-os como fonte de verdade do produto.
+> A entrega de Python (Sprint 2 — Computational Thinking) foi um **MVP funcional em terminal** (menus numéricos, dados em `filtros.json`/`musicas.json`/`galeria.json`). **Este repositório é a evolução mobile** dessa prova de conceito em React Native/Expo. Os documentos-fonte de requisitos e arquitetura estão em [`docs/research/`](docs/research/) — consulte-os como fonte de verdade do produto.
+
+## Por onde começar
+
+**Antes de tocar em código, leia [`docs/ESTADO.md`](docs/ESTADO.md)** — é o índice de estado atual
+do projeto (feature ativa, versão em produção, o que falta). Mapa completo da documentação:
+
+- [`docs/adr/`](docs/adr/) — decisões técnicas que atravessam mais de um arquivo, numeradas.
+- [`docs/components/`](docs/components/) — um `.md` por arquivo de código com o que antes era
+  comentário inline; o arquivo de código aponta pro seu par via `@docs` no topo.
+- [`docs/research/`](docs/research/) — material-fonte (specs do MVP em Python).
+- [`docs/rules/`](docs/rules/) — regras de processo (código, segredos).
+- [`docs/runbooks/`](docs/runbooks/) — como fazer: device, build/deploy, armadilhas conhecidas.
+- [`specs/`](specs/) — Spec Kit: uma pasta por feature, com sua própria spec/plan/tasks.
 
 ## Stack técnica (definida no doc de arquitetura)
 
@@ -104,23 +117,16 @@ Ao implementar uma feature, siga a spec e o plano correspondentes; a constitutio
 - Estado global em `zustand` stores (`src/stores/`); nada de estado sensorial (vibe/mídia em edição) espalhado em componentes.
 - Textos de UI em **pt-BR** (o produto é pt-BR).
 - Commits em pt-BR, no imperativo. Não commitar `.env`, chaves, nem `node_modules`.
+- **Proibido comentário em código-fonte** (`.ts`/`.tsx`) — nem os que explicam uma invariante
+  não-óbvia. Toda explicação de decisão vai para um `.md` (ADR, `ESTADO.md` da spec ativa, ou
+  `docs/rules/`). Ver [`docs/rules/codigo.md`](docs/rules/codigo.md) para o porquê.
+- Segredos e onde cada chave vive de fato: [`docs/rules/chaves-e-segredos.md`](docs/rules/chaves-e-segredos.md).
 
 <!-- SPECKIT START -->
 ## Feature ativa
 
-**005 — Vibe definida pela IA** (`feature/005-vibe-pela-ia`)
-
-- Spec: `specs/005-vibe-pela-ia/spec.md`
-- Plano: `specs/005-vibe-pela-ia/plan.md`
-- Artefatos: `research.md`, `data-model.md`, `contracts/gemini-cena.md`, `quickstart.md`
-
-A vibe deixa de ser um id fixo escolhido localmente e passa a ser **texto livre
-de até duas palavras produzido pelo Gemini**, lido da imagem com hora e lugar.
-`VibeId` **não morre**: continua como piso local do visor ao vivo, dos looks
-base, do catálogo offline e das mídias já gravadas — a vibe livre entra como
-campo aditivo (`Media.vibe?`), no mesmo padrão de `aspecto`/`sugestoes`/`looks`.
-As duas stores de gosto trocam índice por vibe por **lista das 20 últimas
-escolhas**, que passam a ir no prompt (reverte FR-014 da feature 003, por
-decisão do Sávio). Localização é opt-in desligado por padrão, enviada como
-cidade em texto, nunca coordenada.
+Nenhuma. A feature mais recente (005 — Vibe definida pela IA) foi mesclada e lançada como release
+1.3.0. Ver [`docs/ESTADO.md`](docs/ESTADO.md) para a linha do tempo completa e o resumo do que o
+app faz hoje; ao abrir uma feature nova, este bloco é atualizado pelo Spec Kit
+(`/speckit-specify`).
 <!-- SPECKIT END -->
