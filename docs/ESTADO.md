@@ -5,7 +5,7 @@
 > o único lugar que precisa ser lido para saber "onde estamos" sem abrir `specs/*/ESTADO.md` uma
 > por uma.
 
-**Última atualização**: 2026-08-22 · **Versão em produção**: 1.3.0 · **Próxima versão planejada**: 1.3.1 (ajustes de layout/bugs simples, ainda não especificados formalmente)
+**Última atualização**: 2026-08-23 · **Versão em produção**: 1.3.1 · **Próxima versão planejada**: nenhuma definida
 
 ## Feature ativa
 
@@ -20,6 +20,7 @@ Nenhuma. `main` está no HEAD do release 1.3.0, sem branch de feature aberta.
 | 003 | Looks sugeridos (3 looks + memória de gosto) | ✅ Concluída | [specs/003-looks-sugeridos/](../specs/003-looks-sugeridos/) |
 | 004 | QA pós-1.2.0 | ✅ Concluída | [specs/004-qa-pos-1.2.0/](../specs/004-qa-pos-1.2.0/) |
 | 005 | Vibe definida pela IA | ✅ Concluída, release 1.3.0 | [specs/005-vibe-pela-ia/](../specs/005-vibe-pela-ia/) |
+| — | Acabamento da captura (release 1.3.1) | ✅ Concluída, sem spec formal | — |
 
 Detalhe de progresso task-a-task de cada feature vive no `tasks.md`/`ESTADO.md` da própria pasta em
 `specs/`. Esta tabela é só o resumo de "em que fase está".
@@ -35,6 +36,12 @@ Detalhe de progresso task-a-task de cada feature vive no `tasks.md`/`ESTADO.md` 
   `modules/video-muxer` (Media3 Transformer) em dev build; degrada para imagem + áudio + legenda
   fora dele.
 - Galeria local persistente, editável, com emoji/vibe por card.
+- Captura mira ~12 MP (`escolherTamanhoNativo`) em vez da maior resolução do sensor: o disparo caiu
+  de 3534ms para 664ms medidos no Redmi. Resolução não é mais escolha do usuário — o seletor saiu
+  da barra da câmera.
+- No modal de captura a foto ocupa 100% da largura (altura livre pelo aspecto real), tem botão de
+  girar 90° (`FotoEditavel` → `aplicarTransformacao`, que troca `session.photoUri`) e ganha uma
+  seta de rolagem só em fotos altas (aspecto ≤ 0.65).
 
 ## Decisões-pilar
 

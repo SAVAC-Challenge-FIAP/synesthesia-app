@@ -55,6 +55,23 @@ escolhia H.265/HEVC sozinho, com upload menos garantido no Instagram/TikTok.
 Transformer precisa de Looper, então a chamada é despachada para a main thread. Validado no device:
 30,00s, trilhas `vide`+`soun`, avc1+mp4a.
 
+## `expo prebuild` devolve o `splashscreen_logo` e quebra o build
+
+Todo `expo prebuild` (incremental ou `--clean`) reescreve
+`android/app/src/main/res/values/styles.xml` incluindo
+`<item name="windowSplashScreenAnimatedIcon">@drawable/splashscreen_logo</item>`, mesmo com o
+plugin `expo-splash-screen` declarado **sem** `image` no `app.json`. Esse drawable nunca é gerado,
+e o build falha em `:app:processDebugResources` com *"resource drawable/splashscreen_logo not
+found"*.
+
+Aconteceu de novo em 2026-08-23, num prebuild feito para linkar uma dependência nativa nova — e
+custou tempo porque o erro parecia efeito da lib recém-instalada, não do prebuild.
+
+**Como aplicar**: no fluxo de release não há o que fazer, `scripts/preparar-release.py` já remove
+essa linha (é o motivo de ele rodar **depois** do prebuild, nunca antes). Em build de
+desenvolvimento, apague à mão de `styles.xml` as linhas `windowSplashScreenAnimatedIcon` e
+`android:windowSplashScreenBehavior` antes de chamar o gradle.
+
 ## React Native / UI
 - **FlatList e LayoutAnimation**: O uso de `LayoutAnimation` (ex. em carrosséis de tratamentos/filtros) junto de `<FlatList>` causa crashes repentinos de `IllegalStateException` no Android ao trocar as chaves (keys) dos filhos iterados rapidamente. A solução provada foi usar uma "chave de slot" rígida e não derivada dos dados.
 
