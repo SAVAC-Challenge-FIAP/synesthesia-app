@@ -5,16 +5,11 @@
 > o único lugar que precisa ser lido para saber "onde estamos" sem abrir `specs/*/ESTADO.md` uma
 > por uma.
 
-**Última atualização**: 2026-09-21 · **Versão em produção**: 1.3.1 · **Próxima versão planejada**: 1.4.0 (feature 006)
+**Última atualização**: 2026-09-21 · **Versão em produção**: 1.4.0 · **Próxima versão planejada**: nenhuma definida
 
 ## Feature ativa
 
-**006 — Foto compartilhada de fora do app**: o app passa a ser destino do "Compartilhar" do
-Android (`ACTION_SEND`/`image/*`) e abre a imagem recebida direto na tela de captura, na mesma
-sessão de um disparo. Implementada e **validada no device** (as cinco US, incluindo o fluxo real
-pela galeria do MIUI) — roteiro e resultado em
-[specs/006-foto-compartilhada/ESTADO.md](../specs/006-foto-compartilhada/ESTADO.md). Falta só o
-bump de versão/release.
+Nenhuma. As features 006 e 007 saíram juntas no **release 1.4.0** (2026-09-21).
 
 ## Linha do tempo das features
 
@@ -26,7 +21,8 @@ bump de versão/release.
 | 004 | QA pós-1.2.0 | ✅ Concluída | [specs/004-qa-pos-1.2.0/](../specs/004-qa-pos-1.2.0/) |
 | 005 | Vibe definida pela IA | ✅ Concluída, release 1.3.0 | [specs/005-vibe-pela-ia/](../specs/005-vibe-pela-ia/) |
 | — | Acabamento da captura (release 1.3.1) | ✅ Concluída, sem spec formal | — |
-| 006 | Foto compartilhada de fora do app | ✅ Implementada e validada no device (2026-09-21) | [specs/006-foto-compartilhada/](../specs/006-foto-compartilhada/) |
+| 006 | Foto compartilhada de fora do app | ✅ Concluída, release 1.4.0 | [specs/006-foto-compartilhada/](../specs/006-foto-compartilhada/) |
+| 007 | Curadoria recuperável (falha da IA dita, com retentativa) | ✅ Concluída, release 1.4.0 — só o caminho feliz foi visto no device | [specs/007-curadoria-recuperavel/](../specs/007-curadoria-recuperavel/) |
 
 Detalhe de progresso task-a-task de cada feature vive no `tasks.md`/`ESTADO.md` da própria pasta em
 `specs/`. Esta tabela é só o resumo de "em que fase está".
@@ -36,6 +32,8 @@ Detalhe de progresso task-a-task de cada feature vive no `tasks.md`/`ESTADO.md` 
 - Visor com filtro ao vivo (8 presets locais, piso de degradação) e detecção de vibe on-device.
 - Foto também entra **de fora**: compartilhar uma imagem de outro app (Android) abre a tela de
   captura com ela, com a mesma curadoria do disparo (feature 006).
+- Quando o Gemini falha ou passa de 30s, o app **diz** e oferece TENTAR DE NOVO, em vez de impor
+  uma faixa genérica do Deezer; salvar a imagem e postar sem trilha seguem abertos (feature 007).
 - Ao capturar: Gemini lê a foto + hora + localização (opt-in) e devolve vibe livre (texto, ≤2
   palavras), 3 looks sugeridos e até 4 sugestões de música (Deezer resolve os previews de 30s).
 - Gosto (música e tratamento visual) é lembrado como lista das 20 últimas escolhas e entra no
@@ -74,8 +72,9 @@ Decisões técnicas específicas (não-pilar, mas registradas para não se perde
 
 ## Próximos passos
 
-- **Release 1.3.1** — ajustes de layout e bugs simples que o Sávio notou no uso; ainda não
-  especificados formalmente. Abrir como feature/QA quando os itens estiverem listados.
+- **Validar a 007 no aparelho**: o caminho de falha (aviso + TENTAR DE NOVO) foi exercitado só por
+  código; no device só o caminho feliz foi visto, porque o aparelho de dev saiu do adb antes do
+  teste. Reproduzir com a rede desligada.
 - Ao abrir uma feature nova, criar `specs/00N-nome/` via `/speckit-specify` e atualizar a tabela
   acima.
 
