@@ -1,0 +1,7 @@
+{
+  "name": "share-intake",
+  "version": "1.0.0",
+  "description": "Recebe a foto que outro app compartilhou (ACTION_SEND) e entrega um arquivo local em pé",
+  "main": "src/ShareIntakeModule.ts",
+  "private": true
+}

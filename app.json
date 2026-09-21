@@ -38,7 +38,20 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "predictiveBackGestureEnabled": false,
-      "versionCode": 6
+      "versionCode": 6,
+      "intentFilters": [
+        {
+          "action": "SEND",
+          "category": [
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "image/*"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

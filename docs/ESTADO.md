@@ -5,11 +5,16 @@
 > o único lugar que precisa ser lido para saber "onde estamos" sem abrir `specs/*/ESTADO.md` uma
 > por uma.
 
-**Última atualização**: 2026-08-23 · **Versão em produção**: 1.3.1 · **Próxima versão planejada**: nenhuma definida
+**Última atualização**: 2026-09-21 · **Versão em produção**: 1.3.1 · **Próxima versão planejada**: 1.4.0 (feature 006)
 
 ## Feature ativa
 
-Nenhuma. `main` está no HEAD do release 1.3.0, sem branch de feature aberta.
+**006 — Foto compartilhada de fora do app**: o app passa a ser destino do "Compartilhar" do
+Android (`ACTION_SEND`/`image/*`) e abre a imagem recebida direto na tela de captura, na mesma
+sessão de um disparo. Implementada e **validada no device** (as cinco US, incluindo o fluxo real
+pela galeria do MIUI) — roteiro e resultado em
+[specs/006-foto-compartilhada/ESTADO.md](../specs/006-foto-compartilhada/ESTADO.md). Falta só o
+bump de versão/release.
 
 ## Linha do tempo das features
 
@@ -21,6 +26,7 @@ Nenhuma. `main` está no HEAD do release 1.3.0, sem branch de feature aberta.
 | 004 | QA pós-1.2.0 | ✅ Concluída | [specs/004-qa-pos-1.2.0/](../specs/004-qa-pos-1.2.0/) |
 | 005 | Vibe definida pela IA | ✅ Concluída, release 1.3.0 | [specs/005-vibe-pela-ia/](../specs/005-vibe-pela-ia/) |
 | — | Acabamento da captura (release 1.3.1) | ✅ Concluída, sem spec formal | — |
+| 006 | Foto compartilhada de fora do app | ✅ Implementada e validada no device (2026-09-21) | [specs/006-foto-compartilhada/](../specs/006-foto-compartilhada/) |
 
 Detalhe de progresso task-a-task de cada feature vive no `tasks.md`/`ESTADO.md` da própria pasta em
 `specs/`. Esta tabela é só o resumo de "em que fase está".
@@ -28,6 +34,8 @@ Detalhe de progresso task-a-task de cada feature vive no `tasks.md`/`ESTADO.md` 
 ## O que o app faz hoje (resumo)
 
 - Visor com filtro ao vivo (8 presets locais, piso de degradação) e detecção de vibe on-device.
+- Foto também entra **de fora**: compartilhar uma imagem de outro app (Android) abre a tela de
+  captura com ela, com a mesma curadoria do disparo (feature 006).
 - Ao capturar: Gemini lê a foto + hora + localização (opt-in) e devolve vibe livre (texto, ≤2
   palavras), 3 looks sugeridos e até 4 sugestões de música (Deezer resolve os previews de 30s).
 - Gosto (música e tratamento visual) é lembrado como lista das 20 últimas escolhas e entra no
