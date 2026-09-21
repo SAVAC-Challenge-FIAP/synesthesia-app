@@ -22,6 +22,7 @@ export interface CaptureSession {
   audioUri: string | null;
   sugestoes: MusicSuggestion[];
   curadoria: EstadoCuradoria;
+  degradada: boolean;
   trechoInicio: number;
   trechoFim: number;
   trilhaArquivada: boolean;
@@ -34,6 +35,7 @@ interface CaptureState {
       CaptureSession,
       | "sugestoes"
       | "curadoria"
+      | "degradada"
       | "trilhaArquivada"
       | "looks"
       | "lookEscolhido"
@@ -63,6 +65,7 @@ export const useCaptureStore = create<CaptureState>()((set) => ({
 
         lookAuto: true,
         trilhaArquivada: false,
+        degradada: false,
 
         curadoria: s.musica ? "pronta" : "carregando",
       },

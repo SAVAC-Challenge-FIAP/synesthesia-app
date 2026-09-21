@@ -42,6 +42,7 @@ import { identidadeDoLook, montarLooks } from "@/services/looks";
 import {
   analyzePhotoAndSuggest,
   EtapaCuradoria,
+  esquecerAnalise,
   getSuggestions,
 } from "@/services/music";
 import { persistAudioPreview, persistPhoto } from "@/services/mediaStorage";
@@ -57,7 +58,7 @@ import { useTasteStore } from "@/stores/useTasteStore";
 import { colors, fonts, hitSlops, radii } from "@/theme/tokens";
 import { FilterId, LookRecipe, Media } from "@/types";
 
-const LIMITE_CURADORIA_MS = 30_000;
+const LIMITE_CURADORIA_MS = 34_000;
 
 const ESPERA_QUIETUDE_MS = 2_500;
 
@@ -105,6 +106,7 @@ export function CaptureSheet() {
   const [sharePkg, setSharePkg] = useState<SharePackage | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [etapa, setEtapa] = useState<EtapaCuradoria>("preparando");
+  const [tentativa, setTentativa] = useState(0);
 
   const [postando, setPostando] = useState(false);
   const postandoRef = useRef(false);
@@ -179,12 +181,27 @@ export function CaptureSheet() {
   }, [photoUri]);
 
   const analisada = useRef<string | null>(null);
+  const forcarCuradoria = useRef(false);
+  const tentarCuradoriaDeNovo = useCallback(() => {
+    const s = useCaptureStore.getState().session;
+    if (!s) return;
+    esquecerAnalise(s.photoUri);
+    analisada.current = null;
+    forcarCuradoria.current = true;
+    setEtapa("preparando");
+    patch({ curadoria: "carregando", degradada: false, sugestoes: [] });
+    setTentativa((n) => n + 1);
+  }, [patch]);
+
   useEffect(() => {
     if (!photoUri || analisada.current === photoUri) return;
     const { session: s } = useCaptureStore.getState();
     if (!s || s.sugestoes.length > 0) return;
 
-    if (s.mediaId !== null) {
+    const forcada = forcarCuradoria.current;
+    forcarCuradoria.current = false;
+
+    if (s.mediaId !== null && !forcada) {
       analisada.current = photoUri;
       patch({ curadoria: s.musica ? "pronta" : "indisponivel" });
       return;
@@ -201,7 +218,7 @@ export function CaptureSheet() {
 
     const limite = setTimeout(() => {
       if (useCaptureStore.getState().session?.curadoria === "carregando") {
-        patch({ curadoria: "indisponivel" });
+        patch({ curadoria: "indisponivel", degradada: true });
       }
     }, LIMITE_CURADORIA_MS);
 
@@ -213,9 +230,16 @@ export function CaptureSheet() {
           vibe: undefined,
           sugestoes,
           looks: montarLooks(undefined, s.vibeId),
+          degradada: false,
         }));
     analise
-      .then(({ vibeId: vibeReal, vibe: vibeLivre, sugestoes, looks }) => {
+      .then(({
+        vibeId: vibeReal,
+        vibe: vibeLivre,
+        sugestoes,
+        looks,
+        degradada,
+      }) => {
         clearTimeout(limite);
         const atual = useCaptureStore.getState().session;
         if (!atual || atual.photoUri !== photoUri) return;
@@ -223,16 +247,23 @@ export function CaptureSheet() {
           sugestoes.find((m) => m.previewUrl) ?? sugestoes[0] ?? null;
 
         const escolheSozinho =
-          sugestaoAutomatica && atual.musica === null && atual.mediaId === null;
+          sugestaoAutomatica &&
+          !degradada &&
+          atual.musica === null &&
+          (atual.mediaId === null || forcada);
         const musicaFinal = escolheSozinho ? primeira : atual.musica;
 
         const lookPrincipal = looks[0] ?? null;
 
         const aplicaLook =
-          filtroAutomatico && atual.lookAuto && lookPrincipal !== null;
+          filtroAutomatico &&
+          !degradada &&
+          atual.lookAuto &&
+          lookPrincipal !== null;
         patch({
           sugestoes,
           looks,
+          degradada,
           ...(aplicaLook
             ? { lookEscolhido: lookPrincipal, filtroId: lookPrincipal.base }
             : {}),
@@ -252,10 +283,11 @@ export function CaptureSheet() {
       })
       .catch(() => {
         clearTimeout(limite);
-        patch({ curadoria: "indisponivel" });
+        patch({ curadoria: "indisponivel", degradada: true });
       });
   }, [
     photoUri,
+    tentativa,
     sugestaoAutomatica,
     deteccaoTempoReal,
     filtroAutomatico,
@@ -516,13 +548,18 @@ export function CaptureSheet() {
     if (session.curadoria === "indisponivel" && !arquivada) {
       Alert.alert(
         "Postar sem trilha?",
-        "Este momento vai só com a imagem — sem a metade sonora. Você pode esperar a curadoria, escolher uma faixa ou seguir assim mesmo.",
+        session.degradada
+          ? "A IA não respondeu. Você pode tentar de novo, escolher uma faixa na mão ou postar só com a imagem."
+          : "Este momento vai só com a imagem — sem a metade sonora. Você pode esperar a curadoria, escolher uma faixa ou seguir assim mesmo.",
         [
+          ...(session.degradada
+            ? [{ text: "Tentar de novo", onPress: tentarCuradoriaDeNovo }]
+            : []),
           { text: "Escolher música", onPress: () => setShowMusic(true) },
-          { text: "Cancelar", style: "cancel" },
+          { text: "Cancelar", style: "cancel" as const },
           {
             text: "Postar sem trilha",
-            style: "destructive",
+            style: "destructive" as const,
             onPress: exportar,
           },
         ],
@@ -732,21 +769,48 @@ export function CaptureSheet() {
             ) : (
               <View style={styles.semAudio}>
                 <Text style={styles.semAudioText}>
-                  {session.sugestoes.length > 0
-                    ? "Sem áudio — o momento será salvo só com a imagem."
-                    : "Sem sugestões no momento — você pode salvar só a imagem."}
+                  {session.degradada
+                    ? "A IA não respondeu a tempo. Sem leitura da cena, sem looks sugeridos e sem trilha curada."
+                    : session.sugestoes.length > 0
+                      ? "Sem áudio — o momento será salvo só com a imagem."
+                      : "Sem sugestões no momento — você pode salvar só a imagem."}
                 </Text>
-                <Pressable
-                  style={styles.musicBtn}
-                  hitSlop={hitSlops.chip}
-                  onPress={() => setShowMusic(true)}
-                >
-                  <Text style={styles.musicBtnText}>
-                    {session.sugestoes.length > 0
-                      ? "ESCOLHER MÚSICA"
-                      : "BUSCAR MÚSICA"}
+                <View style={styles.semAudioBotoes}>
+                  {session.degradada ? (
+                    <Pressable
+                      style={styles.btnTentarDeNovo}
+                      hitSlop={hitSlops.chip}
+                      accessibilityRole="button"
+                      onPress={tentarCuradoriaDeNovo}
+                    >
+                      <Ionicons
+                        name="refresh"
+                        size={15}
+                        color={colors.parchment}
+                      />
+                      <Text style={styles.btnTentarDeNovoText}>
+                        TENTAR DE NOVO
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    style={styles.musicBtn}
+                    hitSlop={hitSlops.chip}
+                    onPress={() => setShowMusic(true)}
+                  >
+                    <Text style={styles.musicBtnText}>
+                      {session.sugestoes.length > 0
+                        ? "ESCOLHER MÚSICA"
+                        : "BUSCAR MÚSICA"}
+                    </Text>
+                  </Pressable>
+                </View>
+                {session.degradada ? (
+                  <Text style={styles.semAudioRodape}>
+                    Ou siga assim mesmo: Salvar baixa a imagem para a galeria e
+                    Postar agora gera o vídeo só com a foto.
                   </Text>
-                </Pressable>
+                ) : null}
               </View>
             )}
           </View>
@@ -779,6 +843,18 @@ export function CaptureSheet() {
               <Text style={styles.motivoBloqueio}>
                 {TEXTO_ETAPA[etapa]} POSTAR LIBERA QUANDO A TRILHA CHEGAR.
                 SALVAR JÁ FUNCIONA.
+              </Text>
+            </View>
+          ) : session.degradada && !session.musica ? (
+            <View style={styles.motivoLinha}>
+              <Ionicons
+                name="alert-circle-outline"
+                size={12}
+                color={colors.amber}
+              />
+              <Text style={styles.motivoBloqueio}>
+                SEM CURADORIA — TENTE DE NOVO, SALVE A IMAGEM OU POSTE ASSIM
+                MESMO.
               </Text>
             </View>
           ) : postando ? (
@@ -1043,6 +1119,33 @@ const styles = StyleSheet.create({
     fontFamily: fonts.labelLight,
     fontSize: 11,
     lineHeight: 17,
+  },
+  semAudioBotoes: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  semAudioRodape: {
+    color: colors.parchment50,
+    fontFamily: fonts.labelLight,
+    fontSize: 10,
+    lineHeight: 16,
+  },
+  btnTentarDeNovo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.ruby,
+    borderRadius: radii.chip,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  btnTentarDeNovoText: {
+    color: colors.parchment,
+    fontFamily: fonts.labelForte,
+    fontSize: 10,
+    letterSpacing: 1,
   },
   actions: {
     gap: 10,
