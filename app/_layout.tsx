@@ -20,6 +20,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { AberturaMarca } from "@/components/AberturaMarca";
+import { RecepcaoCompartilhamento } from "@/components/RecepcaoCompartilhamento";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -57,6 +58,7 @@ export default function RootLayout() {
       ) : (
         <View style={{ flex: 1, backgroundColor: colors.ink }} />
       )}
+      <RecepcaoCompartilhamento />
       {}
       {abrindo ? (
         <AberturaMarca

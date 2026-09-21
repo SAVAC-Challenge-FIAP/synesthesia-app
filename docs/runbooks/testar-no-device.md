@@ -13,9 +13,23 @@ completo do toolchain em [build-e-deploy.md](./build-e-deploy.md).
 |---|---|
 | Modelo | Redmi Note 8 Pro (`begonia`) |
 | **Android** | **10** |
-| Endereço adb | `192.168.15.3:5555` (Wi-Fi) |
+| Endereço adb | **descubra sempre** — ver aviso abaixo |
 | Pacote | `com.savioomiodev.synesthesia` |
 | IP do Mac | confira sempre — **muda** |
+
+⚠️ **O IP do aparelho não é fixo — e pode virar o IP do próprio Mac.** Em 2026-09-21 o
+`adb connect 192.168.15.3:5555` respondia *connection refused* com o aparelho ligado e na rede: o
+DHCP tinha dado o `.3` ao **Mac** (interface `en5`), e o adb estava batendo na própria máquina.
+Confira antes de culpar o aparelho:
+
+```bash
+ifconfig | awk '/^[a-z]/{i=$1} /inet /{print i, $2}'   # IPs do Mac
+arp -a | grep -v incomplete                            # quem mais está na LAN
+```
+
+O IP do aparelho sai dele mesmo, com o cabo conectado: `adb shell ip route`. E lembre que
+**`adb connect` só funciona depois de um `adb tcpip 5555` via cabo** — o modo cai a cada reboot,
+então "porta 5555 fechada na varredura" é o estado normal de um aparelho recém-ligado, não defeito.
 
 ⚠️ **Android 10 muda o que vale de permissão.** `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO` e
 `READ_MEDIA_AUDIO` só existem a partir do Android 13: neste aparelho o `pm grant` delas falha com
@@ -57,6 +71,20 @@ Reinstale sem rebuildar:
 ```bash
 adb -s 192.168.15.3:5555 install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
+
+⚠️ **O APK debug não instala por cima do release.** Se o aparelho está com um APK de release
+(o caso normal entre sessões), `adb install -r` do debug falha com
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE: signatures do not match`. **Não desinstale para contornar** —
+isso apaga a galeria local e o histórico de gosto, que são dados reais de teste. O caminho é
+buildar release local e instalar por cima (mesma chave, dados preservados):
+
+```bash
+cd android && ./gradlew assembleRelease --console=plain
+adb -s "$ADB_DEVICE" install -r app/build/outputs/apk/release/app-release.apk
+```
+
+Isso também é o único jeito de testar **cold start por intent** (compartilhamento, deep link): no
+debug o `expo-dev-client` intercepta a abertura e mostra a tela de servidores, perdendo o intent.
 
 Só rode `./scripts/dev-android.sh build` se houve **mudança nativa** (Kotlin, `styles.xml`,
 `app.json`, dependência nativa nova). Mudança só de JS não precisa: o Metro recarrega.

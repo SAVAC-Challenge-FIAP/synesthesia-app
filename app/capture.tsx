@@ -14,7 +14,9 @@ export default function CaptureScreen() {
   const temSessao = useCaptureStore((s) => s.session !== null);
 
   useEffect(() => {
-    if (!temSessao && router.canGoBack()) router.back();
+    if (temSessao) return;
+    if (router.canGoBack()) router.back();
+    else router.replace("/camera");
   }, [temSessao, router]);
 
   if (!temSessao)

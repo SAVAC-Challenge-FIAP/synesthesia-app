@@ -31,19 +31,40 @@ do projeto (feature ativa, versão em produção, o que falta). Mapa completo da
 | Camada | Tecnologias |
 |---|---|
 | **App / navegação** | Expo, `expo-router`, TypeScript |
-| **Câmera** | `react-native-vision-camera` (frames contínuos, baixa latência) |
+| **Câmera** | `expo-camera` (CameraX no Android) |
 | **Estado / persistência** | `zustand`, `@react-native-async-storage/async-storage` |
-| **IA visual (on-device)** | `react-native-mlkit-image-labeling` (detecta objetos/ambiente → "vibe") |
-| **Curadoria musical** | `@google/generative-ai` (Gemini), **Deezer API**, **Last.fm API** (até 4 sugestões por mood) |
-| **Filtros / render** | `react-native-skia`, `react-native-reanimated` (GPU, tempo real) |
-| **Edição** | `@gorhom/bottom-sheet`, `@react-native-community/slider`, `expo-av` |
-| **Geração de vídeo** | `ffmpeg-kit-react-native` (une imagem + áudio → `.mp4`) |
+| **Leitura da cena** | Gemini (`gemini-3.1-flash-lite`) via REST, na **captura** — ver "IA visual on-device" abaixo |
+| **Curadoria musical** | Mesma chamada do Gemini + **Deezer API** (previews de 30s) |
+| **Filtros / render** | `@shopify/react-native-skia`, `react-native-reanimated` |
+| **Edição** | `@react-native-community/slider`, `expo-audio` |
+| **Contexto** | `expo-location` (opt-in duplo: flag nos ajustes + permissão) |
+| **Geração de vídeo** | `modules/video-muxer` local (Media3 Transformer → `.mp4` H.264+AAC) |
+| **Entrada por compartilhamento** | `modules/share-intake` local (`ACTION_SEND` de outro app → tela de captura) |
 | **Saída** | `expo-media-library` (salvar), `expo-sharing` (share intent nativo) |
 
 Regras de stack:
 - **Não** adicione Tailwind. O design gerado pelo Figma vem em React+Tailwind — **converta** para `StyleSheet` do React Native usando os tokens abaixo.
-- Preferir processamento **on-device** (o ML Kit não exige internet); só a curadoria musical usa APIs externas.
-- Chaves de API (Gemini/Last.fm) vivem em variáveis de ambiente, nunca commitadas.
+- Toda leitura de cena por IA acontece **na captura**, custa uma chamada de rede e é orçada em 22s
+  (`LIMITE_GEMINI_MS`). Sem rede ou sem chave, degrada para os 8 presets locais.
+- Chaves de API vivem em variáveis de ambiente, nunca commitadas.
+
+### IA visual on-device — não implementado, estudo para v2
+
+Versões anteriores deste arquivo listavam `react-native-mlkit-image-labeling` como se estivesse
+em uso. **Não está**: não é dependência do `package.json` e não é importado em lugar nenhum de
+`src/`. Nenhuma análise de imagem roda no aparelho hoje.
+
+O que o visor faz de fato ([`src/services/vibeEngine.ts`](src/services/vibeEngine.ts)) é escolher
+um clima de forma **determinística, por hora do dia + câmera frontal/traseira** — sem olhar um
+pixel. A leitura real da cena vem do Gemini, no disparo.
+
+Rodar um modelo embarcado (ML Kit ou equivalente) fica como **estudo para a v2**. O ganho seria
+leitura de cena sem rede, sem latência e sem a foto sair do aparelho — que é justamente o
+argumento mais forte numa integração com uma fabricante. Quem for implementar começa por aqui;
+até lá, **não afirme "on-device" em pitch, slide ou documentação**.
+
+O único dado que de fato nunca sai do aparelho hoje é o **histórico de gosto**
+(`useLookTasteStore` / `useTasteStore`, últimas 20 escolhas em AsyncStorage).
 
 ## Identidade visual (design tokens)
 
@@ -80,6 +101,13 @@ Modais claros (permissões, compartilhar, música): superfície `parchment` com 
 
 1. **Permissões** — onboarding: pede câmera 📸 e galeria 🏞️; "Permitir tudo". Enfatiza processamento local.
 2. **Câmera** — visor com filtro ao vivo, carrossel de 8 filtros, galeria / captura / flip, "+ Opções" (→ Ajustes).
+> **Entrada por fora (feature 006, 2026-09-21)**: a foto não precisa vir do disparo. O app é
+> destino de `ACTION_SEND`/`image/*` no Android — compartilhar uma imagem de qualquer app cai
+> direto na tela de captura, com a mesma sessão de um disparo (curadoria, looks, trilha, salvar,
+> postar). Quem lê o intent é `modules/share-intake`; o porquê de ser código nativo está em
+> [`docs/adr/0014-entrada-por-compartilhamento.md`](docs/adr/0014-entrada-por-compartilhamento.md).
+> **Android apenas** — o app é 100% Android por decisão de produto; não há versão iOS planejada.
+
 3. **Modal Captura** (bottom-sheet) — foto capturada, três looks sugeridos, carrossel dos 8 presets, player de música (slider 0–30s com trecho), "Trocar música", ações **Salvar** / **Postar agora**.
 
 > **Mudou em 2026-08-19** (feature 003, `specs/003-looks-sugeridos/`): a tabela fixa
@@ -106,6 +134,7 @@ Este repo usa **Spec Kit**. Artefatos e ordem:
 - `specs/001-synesthesia-mvp/plan.md` — plano técnico (gerar via `/speckit-plan`).
 - `specs/002-qa-lapidacao-v1/` — QA e lapidação pós-MVP.
 - `specs/003-looks-sugeridos/` — três looks sugeridos com memória de gosto (ver nota acima); `ESTADO.md` registra onde a implementação parou entre sessões.
+- `specs/006-foto-compartilhada/` — entrada por `ACTION_SEND`; o `ESTADO.md` traz o roteiro de teste no device e a armadilha do dev client no cold start.
 - Skills disponíveis: `/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, `/speckit-implement`, `/speckit-clarify`, `/speckit-analyze`, `/speckit-checklist`, `/speckit-converge`.
 
 Ao implementar uma feature, siga a spec e o plano correspondentes; a constitution prevalece sobre preferências pontuais.
@@ -125,8 +154,7 @@ Ao implementar uma feature, siga a spec e o plano correspondentes; a constitutio
 <!-- SPECKIT START -->
 ## Feature ativa
 
-Nenhuma. A feature mais recente (005 — Vibe definida pela IA) foi mesclada e lançada como release
-1.3.0. Ver [`docs/ESTADO.md`](docs/ESTADO.md) para a linha do tempo completa e o resumo do que o
-app faz hoje; ao abrir uma feature nova, este bloco é atualizado pelo Spec Kit
-(`/speckit-specify`).
+**006 — Foto compartilhada de fora do app** (`specs/006-foto-compartilhada/`): o Synesthesia vira
+destino do "Compartilhar" do Android e abre a foto recebida direto na tela de captura. Ver
+[`docs/ESTADO.md`](docs/ESTADO.md) para a linha do tempo completa e o resumo do que o app faz hoje.
 <!-- SPECKIT END -->

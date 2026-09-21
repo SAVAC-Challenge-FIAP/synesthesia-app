@@ -15,7 +15,7 @@ import { LookRecipe, MusicSuggestion, PapelFaixa, Vibe, VibeId } from "@/types";
 
 const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
-const LIMITE_GEMINI_MS = 22_000;
+const LIMITE_GEMINI_MS = 30_000;
 const LIMITE_DEEZER_MS = 8_000;
 
 async function fetchComLimite(
@@ -877,10 +877,15 @@ export interface PhotoAnalysis {
   vibe?: string;
   sugestoes: MusicSuggestion[];
   looks: LookRecipe[];
+  degradada: boolean;
 }
 
 const TETO_CACHE_ANALISE = 8;
 const cacheAnalise = new Map<string, PhotoAnalysis>();
+
+export function esquecerAnalise(photoUri: string): void {
+  cacheAnalise.delete(photoUri);
+}
 
 function guardarAnalise(
   photoUri: string,
@@ -966,6 +971,7 @@ export async function analyzePhotoAndSuggest(
           vibe: vibeLivre,
           sugestoes,
           looks: montarLooks(scene.looks, vibe.id),
+          degradada: false,
         });
       }
 
@@ -977,6 +983,7 @@ export async function analyzePhotoAndSuggest(
         vibe: vibeLivre,
         sugestoes: porVibe,
         looks: montarLooks(scene.looks, vibe.id),
+        degradada: false,
       });
     }
   } catch (e) {
@@ -995,6 +1002,7 @@ export async function analyzePhotoAndSuggest(
     vibe: undefined,
     sugestoes: degradado,
     looks: montarLooks(undefined, fallbackVibe.id),
+    degradada: true,
   });
 }
 
